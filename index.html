@@ -78,6 +78,7 @@ body.layout .lhint{display:block}
  <div class="dock">
   <button class="glass" id="bShop">ショップ</button>
   <button class="glass" id="bLay">レイアウト</button>
+  <button class="glass" id="bLight">💡照明</button>
   <button class="glass" id="bNote">知識ノート</button>
   <button class="glass" id="bLog">記録</button>
   <button class="glass" id="bWall">壁紙表示</button>
@@ -169,8 +170,9 @@ function waterTemp(t=now()){
 function lighting(){
  const d=new Date(now()),h=d.getHours()+d.getMinutes()/60;
  const on=(a,b)=>Math.max(0,Math.min(1,Math.min(h-a,b-h)/.5+.5));
- if(S.owned.light2){const l=on(9,19);return{bright:.42+.6*l,night:(1-l)*.85,lit:l>.5}}
- if(S.owned.light){const l=on(9,19);return{bright:.42+.44*l,night:(1-l)*.85,lit:l>.5}}
+ const man=(S.lightOn||0)>now();  // ボタンで手動点灯中（3時間で自動解除）
+ if(S.owned.light2){const l=man?1:on(9,19);return{bright:.42+.6*l,night:(1-l)*.85,lit:l>.5}}
+ if(S.owned.light){const l=man?1:on(9,19);return{bright:.42+.44*l,night:(1-l)*.85,lit:l>.5}}
  const r=on(6.5,20.5);return{bright:.5+.24*r,night:(1-r)*.7,lit:false};
 }
 
@@ -348,6 +350,7 @@ function simulate(){
 /* ---------- 画面表示 ---------- */
 function render(){
  renderWallHud();
+ $('bLight').textContent=(S.lightOn||0)>now()?'💡点灯中':'💡照明';
  const w=waterState(),k=dkey(now()),rate=S.rates[k];
  const wl=w.clar<.4?'にごっている':w.clar<.95?'少しにごり':'澄んでいる';
  const day=Math.floor(gdays(now()-S.created))+1;
@@ -690,6 +693,11 @@ function showTool(){const o=LAY.sel;$('ltool').classList.toggle('show',!!o);$('l
 function enterLayout(){LAY.on=true;LAY.sel=null;document.body.classList.add('layout');document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open'));renderTray();showTool()}
 function exitLayout(){LAY.on=false;LAY.sel=null;LAY.drag=null;document.body.classList.remove('layout');showTool();save()}
 $('bLay').onclick=enterLayout;
+$('bLight').onclick=()=>{
+ if(!S.owned.light&&!S.owned.light2){toast('照明がありません。ショップで照明を買うと使えます');return}
+ if((S.lightOn||0)>now()){S.lightOn=0;toast('自動（9時〜19時に点灯）に戻しました')}
+ else{const h=new Date(now()).getHours();S.lightOn=now()+3*3600000;toast(h>=9&&h<19?'今は点灯時間です。19時を過ぎても3時間は点いたままにします':'照明を点けました。3時間たつと自動に戻ります')}
+ save();markDirty();render()};
 $('lFlip').onclick=()=>{if(LAY.sel){LAY.sel.flip=!LAY.sel.flip;save();markDirty()}};
 $('lTrim').onclick=()=>{const o=LAY.sel;if(!o)return;o.since=gday(now());o.trim=1;addLog('ロタラをトリミングしました');unlock('trim');save();markDirty();nextNote();toast('トリミングしました。脇芽が出てこんもり茂ります')};
 $('lBack').onclick=()=>{const o=LAY.sel;if(!o)return;S.layout=S.layout.filter(x=>x!==o);S.inv[o.k]=(S.inv[o.k]||0)+1;LAY.sel=null;save();markDirty();renderTray();showTool()};

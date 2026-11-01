@@ -1,0 +1,28 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'io.github.sengokubuilder.redbeetank'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'io.github.sengokubuilder.redbeetank'
+        minSdk 29
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+    signingConfigs {
+        // 毎回同じ鍵で署名して、上書きインストールできるようにする
+        fixed {
+            storeFile file('redbee.keystore')
+            storePassword 'redbeetank'
+            keyAlias 'redbee'
+            keyPassword 'redbeetank'
+        }
+    }
+    buildTypes {
+        debug { signingConfig signingConfigs.fixed }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

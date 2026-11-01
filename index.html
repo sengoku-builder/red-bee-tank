@@ -79,7 +79,10 @@ body.layout .lhint{display:block}
  </div>
  <section class="panel glass" id="pShop"><h2>アクアショップ</h2><p>入門用の設備はすぐに一式そろいます。上位版は入門用を買うと解放されます。</p><div id="shopList"></div><button class="glass close" data-close>閉じる</button></section>
  <section class="panel glass" id="pNote"><h2>知識ノート</h2><div id="noteList"></div><button class="glass close" data-close>閉じる</button></section>
- <section class="panel glass" id="pLog"><h2>記録</h2><div class="log" id="logList"></div><p style="margin-top:14px">データはこの端末のブラウザに保存されています。スマホとPCの共有は次の段階で対応します。</p><button class="glass close" data-close>閉じる</button> <button class="glass close" id="bReset">最初からやり直す</button></section>
+ <section class="panel glass" id="pLog"><h2>記録</h2><div class="log" id="logList"></div><div class="note"><h3>スマホ・PCの共有</h3><div>Googleスプレッドシートに置いた Apps Script の「ウェブアプリのURL」を貼り付けて保存すると、どの端末でも同じ水槽になります。</div>
+ <input id="syncIn" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%;margin:8px 0;padding:8px;border-radius:9px;border:1px solid #dff3ee55;background:#0b1715;color:#eef6f4;font:inherit;font-size:12px">
+ <button class="glass" id="syncSave">保存</button> <button class="glass" id="syncCopy">壁紙用アドレスをコピー</button><p id="syncStat" style="font-size:12px"></p></div>
+ <button class="glass close" data-close>閉じる</button> <button class="glass close" id="bReset">最初からやり直す</button></section>
  <div class="modal glass" id="mLot"><div class="tag">今日のくじ</div><h2 id="lotTitle">今日の単価を決めよう</h2><div class="big" id="lotBig">？</div><p class="body" id="lotMsg" style="text-align:center">くじを引くと、今日1日（0時から）の1分あたりのGが決まります。</p><button class="glass" id="bDraw">くじを引く</button></div>
  <div class="modal glass" id="mNote"><div class="tag">知識カード</div><h2 id="mnTitle"></h2><div class="body" id="mnBody"></div><button class="glass" id="bNoteOk">わかった</button></div>
  <div id="lay"></div>
@@ -131,7 +134,7 @@ function drawLot(){
  S.rates[k]=pick[0];
  const from=Math.max(dayStart(t),S.created);S.g+=(pick[0]-BASE)*Math.max(0,t-from)/MIN; // 0時からさかのぼって適用
  for(const d of Object.keys(S.rates))if(d<dkey(t-40*DAY))delete S.rates[d];
- addLog('くじ：1分'+pick[0]+'G');save();
+ addLog('くじ：1分'+pick[0]+'G');save();markDirty();
  $('lotTitle').textContent=pick[0]===3?'大当たり！':'今日の単価';$('lotBig').textContent=pick[0]+'G / 分';$('lotMsg').textContent=pick[2];
  $('bDraw').textContent='閉じる';$('bDraw').onclick=()=>{$('mLot').classList.remove('open');nextNote()};
  render();
@@ -192,7 +195,7 @@ const NOTES={
  ready:['水ができた','バクテリアが十分に増えて、エビを迎えられる水になりました。<br>実際の飼育でも、立ち上げから2週間〜1か月ほど待ってからエビを入れるのが一般的です。早く入れたくて焦ることが、レッドビー飼育でいちばん多い失敗の原因です。<br>ショップでエビを迎えられるようになりました。オスとメスがそろうと、繁殖が始まります。']
 };
 const queue=[];
-function unlock(id){if(S.notes.includes(id))return;S.notes.push(id);addLog('知識カード：'+NOTES[id][0]);queue.push(id);save()}
+function unlock(id){if(S.notes.includes(id))return;S.notes.push(id);addLog('知識カード：'+NOTES[id][0]);queue.push(id);save();markDirty()}
 function nextNote(){
  if($('mLot').classList.contains('open')||$('mNote').classList.contains('open'))return;
  const id=queue.shift();if(!id)return;
@@ -269,7 +272,7 @@ function renderShop(){
   row.innerHTML='<div><strong>レッドビー<span class="gr">'+gname+'</span></strong><small>'+desc+'</small><small class="price">'+G(price)+' / 匹</small></div>';
   const btns=document.createElement('div');btns.className='btns';
   [['F','メス'],['M','オス']].forEach(([sex,lab])=>{const b=document.createElement('button');b.className='glass';b.textContent=lab;b.disabled=!ok||full||S.g<price;
-   b.onclick=()=>{tick();if(S.g<price||alive().length>=popMax()||waterState().mat<1)return;S.g-=price;addShrimp(sex,gday(now())-150,gi);addLog('お迎え：レッドビー '+gname+'（'+lab+'）');unlock('shrimp');save();render();renderShop();toast('レッドビー（'+gname+'・'+lab+'）を迎えました');nextNote()};
+   b.onclick=()=>{tick();if(S.g<price||alive().length>=popMax()||waterState().mat<1)return;S.g-=price;addShrimp(sex,gday(now())-150,gi);addLog('お迎え：レッドビー '+gname+'（'+lab+'）');unlock('shrimp');save();markDirty();render();renderShop();toast('レッドビー（'+gname+'・'+lab+'）を迎えました');nextNote()};
    btns.append(b)});
   row.append(btns);box.append(row);
  });
@@ -280,23 +283,27 @@ function renderShop(){
    const have=(S.inv[k]||0)+S.layout.filter(o=>o.k===k).length;
    buyRow(box,v.n,have?'持っている数：'+have:'買うと「レイアウト」で配置できます',v.p,S.g<v.p?'G不足':'購入',S.g>=v.p,()=>{tick();if(S.g<v.p)return;S.g-=v.p;S.inv[k]=(S.inv[k]||0)+1;addLog('購入：'+v.n+'（'+G(v.p)+'）');
     if(v.moss)unlock('moss');if(cat==='wood')unlock('wood');if(cat==='stone')unlock('stone');if(v.seiryu)unlock('seiryu');
-    save();render();renderShop();toast(v.n+'を買いました。「レイアウト」から配置できます');nextNote()});
+    save();markDirty();render();renderShop();toast(v.n+'を買いました。「レイアウト」から配置できます');nextNote()});
   });
  });
 }
 function buyEquip(e){tick();if(S.owned[e.id]||S.g<e.price)return;S.g-=e.price;S.owned[e.id]=now();addLog('購入：'+e.name+'（'+G(e.price)+'）');
  const card={filter:'filter',thermo:'thermo',heater:'heater',light:'light',fan:'fan',tester:'water'}[e.id];if(card)unlock(card);
- save();render();renderShop();toast(e.name+'を設置しました');nextNote()}
+ save();markDirty();render();renderShop();toast(e.name+'を設置しました');nextNote()}
 const POP_BASE=50,ADULT=100,HATCH=25;
 const popMax=()=>S.owned.filter2?100:POP_BASE;
 const alive=()=>S.shrimp.filter(s=>!s.dead);
-function newShrimp(sex,bd,gr){return{id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),sex,bd,gr:gr??2,v:sex==='M'?2:(Math.random()<.5?0:1),sz:sex==='M'?rnd(.85,.95):rnd(.95,1.08),life:Math.round(rnd(450,650)),egg:null,dead:null}}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const seedOf=d=>((Math.floor(S.created/1000)%2147483647)^Math.imul(d+1,2654435761))>>>0;
+function newShrimp(sex,bd,gr,R){const r=R||Math.random,rr=(a,b)=>a+r()*(b-a);
+ return{id:(R?'h'+bd+'_':Date.now().toString(36))+Math.floor(r()*2176782336).toString(36),sex,bd,gr:gr??2,v:sex==='M'?2:(r()<.5?0:1),sz:sex==='M'?rr(.85,.95):rr(.95,1.08),life:Math.round(rr(450,650)),egg:null,dead:null}}
 function addShrimp(sex,bd,gr){const s=newShrimp(sex,bd,gr);S.shrimp.push(s);syncActors();return s}
 
 /* ---------- 一生のシミュレーション（ゲーム内1日ずつ） ---------- */
 function migrate(){for(const s of S.shrimp){if(s.gr==null)s.gr=2;if(s.bd==null){s.bd=gday(now())-150;s.sex=s.sex||'F';s.v=s.v??(Math.random()<.5?0:1);s.sz=s.sz||s.size||1;s.life=s.life||Math.round(rnd(450,650));s.egg=s.egg??null;s.dead=s.dead??null}}}
 function kill(s,cause,t){s.dead=t;s.egg=null;addLog((s.bd>gday(t)-ADULT?'稚エビ':s.sex==='M'?'オス':'メス')+'が死んでしまいました（'+cause+'）',t);unlock('death')}
 function simDay(d){
+ const R=mulberry32(seedOf(d)),rd=(a,b)=>a+R()*(b-a);
  const t=tOfDay(d),T=waterTemp(t),live=alive(),Q=waterQ(t),moss=S.layout.some(o=>ITEMS[o.k]&&ITEMS[o.k].moss),bad=Q.ph>=7.2||Q.gh>=9,worse=Q.ph>=7.6||Q.gh>=12;
  if(!live.length)return;
  if(T>=27)unlock('heat');
@@ -308,14 +315,14 @@ function simDay(d){
   else if(T>=28){p=juv?.12:.08;cause='高水温'}
   else if(T>=27){p=.01;cause='高水温'}
   else if(worse){p=juv?.02:.01;cause='水質の悪化'}
-  if(Math.random()<p){kill(s,cause,t);continue}
-  if(juv&&Math.random()<(moss?.003:.006)){s.gone=1;continue}   // 稚エビの自然減（記録しない）
-  if(s.egg!=null&&T>=27&&Math.random()<.15){s.egg=null;addLog('暑さで、抱卵していたメスが卵を落としてしまいました',t);continue}
-  if(s.sex==='F'&&!juv&&s.egg==null&&male&&T>=20&&T<=26&&Math.random()<.025*(bad?.3:1)*Math.max(0,1-live.length/popMax())){s.egg=d;s.fg=males[Math.floor(Math.random()*males.length)].gr;addLog('メスが抱卵しました',t);unlock('berry');continue}
+  if(R()<p){kill(s,cause,t);continue}
+  if(juv&&R()<(moss?.003:.006)){s.gone=1;continue}   // 稚エビの自然減（記録しない）
+  if(s.egg!=null&&T>=27&&R()<.15){s.egg=null;addLog('暑さで、抱卵していたメスが卵を落としてしまいました',t);continue}
+  if(s.sex==='F'&&!juv&&s.egg==null&&male&&T>=20&&T<=26&&R()<.025*(bad?.3:1)*Math.max(0,1-live.length/popMax())){s.egg=d;s.fg=males[Math.floor(R()*males.length)].gr;addLog('メスが抱卵しました',t);unlock('berry');continue}
   if(s.egg!=null&&d-s.egg>=HATCH){
    s.egg=null;
-   const want=Math.round(rnd(8,18)*(T<=25?1:.6)),k=Math.max(0,Math.min(want,popMax()-alive().length)),pg=((s.gr??2)+(s.fg??2))/2;
-   for(let i=0;i<k;i++){const g=Math.max(0,Math.min(5,Math.round(pg+(Math.random()+Math.random()+Math.random()-1.5)*1.1)));S.shrimp.push(newShrimp(Math.random()<.5?'F':'M',d,g))}
+   const want=Math.round(rd(8,18)*(T<=25?1:.6)),k=Math.max(0,Math.min(want,popMax()-alive().length)),pg=((s.gr??2)+(s.fg??2))/2;
+   for(let i=0;i<k;i++){const g=Math.max(0,Math.min(5,Math.round(pg+(R()+R()+R()-1.5)*1.1)));S.shrimp.push(newShrimp(R()<.5?'F':'M',d,g,R))}
    if(k>0){addLog('稚エビが'+k+'匹生まれました',t);unlock('hatch')}
   }
  }
@@ -360,7 +367,7 @@ $('bShop').onclick=()=>{tick();renderShop();openPanel('pShop')};
 $('bNote').onclick=()=>{renderNotes();openPanel('pNote')};
 $('bLog').onclick=()=>{renderLog();openPanel('pLog')};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('.panel').classList.remove('open'));
-let resetArm=0;$('bReset').onclick=()=>{if(Date.now()-resetArm<3000){S=blank();save();location.reload()}else{resetArm=Date.now();toast('もう一度押すと、すべてのデータを消して最初から始めます')}};
+let resetArm=0;$('bReset').onclick=()=>{if(Date.now()-resetArm<3000){const rv=S.rev;S=blank();S.rev=rv;save();if(SYNC.id){push().then(()=>location.reload())}else location.reload()}else{resetArm=Date.now();toast('もう一度押すと、すべてのデータを消して最初から始めます')}};
 $('bWall').onclick=()=>{document.body.classList.add('wall')};
 $('gl').addEventListener('click',()=>{if(!PARAM_WALL)document.body.classList.remove('wall')});
 if(PARAM_WALL)document.body.classList.add('wall');
@@ -662,15 +669,15 @@ function renderTray(){
  if(!ks.length){const p=document.createElement('span');p.style.cssText='font-size:12px;color:#c3d4cf;padding:8px';p.textContent=S.layout.length?'配置済みの物はドラッグで動かせます':'ショップで水草・流木・石を買うと、ここに並びます';t.append(p)}
  for(const k of ks){const b=document.createElement('button');b.className='glass';b.textContent=ITEMS[k].n+' ×'+S.inv[k];
   b.onclick=()=>{S.inv[k]--;const vw=curView,o={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),k,x:Math.min(1450,Math.max(220,(vw[0]+vw[2]/2)*IW+rnd(-80,80))),z:.5,flip:Math.random()<.5,at:gday(now()),since:gday(now())};
-   S.layout.push(o);LAY.sel=o;save();renderTray();showTool()};t.append(b)}
+   S.layout.push(o);LAY.sel=o;save();markDirty();renderTray();showTool()};t.append(b)}
 }
 function showTool(){const o=LAY.sel;$('ltool').classList.toggle('show',!!o);$('lhint').style.visibility=o?'hidden':'';if(o)$('lTrim').style.display=ITEMS[o.k]&&ITEMS[o.k].rot?'':'none'}
 function enterLayout(){LAY.on=true;LAY.sel=null;document.body.classList.add('layout');document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open'));renderTray();showTool()}
 function exitLayout(){LAY.on=false;LAY.sel=null;LAY.drag=null;document.body.classList.remove('layout');showTool();save()}
 $('bLay').onclick=enterLayout;
-$('lFlip').onclick=()=>{if(LAY.sel){LAY.sel.flip=!LAY.sel.flip;save()}};
-$('lTrim').onclick=()=>{const o=LAY.sel;if(!o)return;o.since=gday(now());o.trim=1;addLog('ロタラをトリミングしました');unlock('trim');save();nextNote();toast('トリミングしました。脇芽が出てこんもり茂ります')};
-$('lBack').onclick=()=>{const o=LAY.sel;if(!o)return;S.layout=S.layout.filter(x=>x!==o);S.inv[o.k]=(S.inv[o.k]||0)+1;LAY.sel=null;save();renderTray();showTool()};
+$('lFlip').onclick=()=>{if(LAY.sel){LAY.sel.flip=!LAY.sel.flip;save();markDirty()}};
+$('lTrim').onclick=()=>{const o=LAY.sel;if(!o)return;o.since=gday(now());o.trim=1;addLog('ロタラをトリミングしました');unlock('trim');save();markDirty();nextNote();toast('トリミングしました。脇芽が出てこんもり茂ります')};
+$('lBack').onclick=()=>{const o=LAY.sel;if(!o)return;S.layout=S.layout.filter(x=>x!==o);S.inv[o.k]=(S.inv[o.k]||0)+1;LAY.sel=null;save();markDirty();renderTray();showTool()};
 const lay=$('lay');
 lay.addEventListener('pointerdown',ev=>{
  const p=toImg(ev);let hit=null;
@@ -680,11 +687,11 @@ lay.addEventListener('pointerdown',ev=>{
 });
 lay.addEventListener('pointermove',ev=>{if(!LAY.drag||!LAY.sel)return;const p=toImg(ev),o=LAY.sel;
  o.x=Math.min(1460,Math.max(210,p.x+LAY.drag.dx));o.z=Math.min(1,Math.max(0,(p.y+LAY.drag.dy-700)/88))});
-lay.addEventListener('pointerup',()=>{if(LAY.drag){LAY.drag=null;save()}});
+lay.addEventListener('pointerup',()=>{if(LAY.drag){LAY.drag=null;save();markDirty()}});
 migrate();syncActors();
 
 /* ---------- ループ ---------- */
-let sec=0;
+let sec=0,lastPull=0;
 function frame(ts){
  const dt=Math.min(.1,(ts-lastTs)/1000||0);lastTs=ts;
  if(!LAY.on)panClock+=dt;
@@ -696,7 +703,7 @@ function frame(ts){
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
  }
  ctx.clearRect(0,0,W,H);stepShrimp(dt);drawScene(vw,L,w,ts/1000);stepBubbles(dt);drawBubbles(vw,L);
- if(ts-sec>1000){sec=ts;tick();simulate();checkEvents();save();render();maybeLottery()}
+ if(ts-sec>1000){sec=ts;tick();simulate();checkEvents();save();render();maybeLottery();if(SYNC.id&&ts-lastPull>(PARAM_WALL?60000:30000)){lastPull=ts;pull()}}
  requestAnimationFrame(frame);
 }
 const img=new Image();
@@ -708,6 +715,47 @@ const ready=()=>{if(++loaded<4)return;
 img.onload=fimg.onload=timg.onload=himg.onload=ready;
 img.src=IMG;fimg.src=FIL.img;timg.src=THM.img;himg.src=HTR.img;
 
+/* ---------- スマホ・PCの共有（Googleスプレッドシート＋Apps Script） ---------- */
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+const SYNC={id:qs.get('s')||lsGet('redBeeSync')||'',dirty:false,busy:false,status:'未設定'};
+const syncURL=()=>'https://script.google.com/macros/s/'+SYNC.id+'/exec';
+const hm=()=>new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+function packState(){const o=JSON.parse(JSON.stringify(S));delete o.offset;return o}
+function adopt(st,rev){const off=S.offset||0;S=Object.assign(blank(),st);S.offset=off;S.rev=rev;migrate();syncActors();queue.length=0;LAY.sel=null;tick();simulate();render();save()}
+let pushT=0;
+function markDirty(){if(PARAM_WALL||!SYNC.id)return;SYNC.dirty=true;clearTimeout(pushT);pushT=setTimeout(push,1200)}
+async function push(){
+ if(!SYNC.id||PARAM_WALL)return;if(SYNC.busy){clearTimeout(pushT);pushT=setTimeout(push,1500);return}
+ SYNC.busy=true;SYNC.dirty=false;
+ try{
+  const r=await fetch(syncURL(),{method:'POST',body:JSON.stringify({base:S.rev||0,state:packState()})}),j=await r.json();
+  if(j.ok){S.rev=j.rev;save();SYNC.status='共有OK（'+hm()+' 保存）'}
+  else if(j.state){adopt(j.state,j.rev);toast('別の端末の変更を読み込みました。直前の操作はもう一度お願いします')}
+ }catch(e){SYNC.dirty=true;SYNC.status='共有できません（通信を確認中…あとで送り直します）'}
+ SYNC.busy=false;showSync();
+}
+async function pull(){
+ if(!SYNC.id||SYNC.busy)return;
+ if(SYNC.dirty&&!PARAM_WALL)return push();
+ SYNC.busy=true;
+ try{
+  const r=await fetch(syncURL()+'?t='+Date.now()),j=await r.json();
+  if(!j.state){if(!PARAM_WALL){SYNC.busy=false;return push()}}
+  else if((j.rev||0)!==(S.rev||0))adopt(j.state,j.rev);
+  SYNC.status='共有OK（'+hm()+' 確認）';
+ }catch(e){SYNC.status='共有できません（オフライン？）'}
+ SYNC.busy=false;showSync();
+}
+function showSync(){const e=$('syncStat');if(e)e.textContent=SYNC.id?SYNC.status:'未設定（この端末だけに保存しています）';const i=$('syncIn');if(i&&!i.value&&SYNC.id)i.value=syncURL()}
+$('syncSave').onclick=()=>{const v=$('syncIn').value.trim(),m=v.match(/\/macros\/s\/([^/?#]+)/);
+ if(!m){toast('URLの形が違うようです。…/macros/s/○○○/exec の形のURLを貼ってください');return}
+ SYNC.id=m[1];lsSet('redBeeSync',SYNC.id);SYNC.status='接続中…';showSync();pull().then(()=>toast('共有を設定しました'))};
+$('syncCopy').onclick=()=>{if(!SYNC.id){toast('先に共有のURLを保存してください');return}
+ const u=location.origin+location.pathname+'?wallpaper&s='+encodeURIComponent(SYNC.id);
+ (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast('壁紙用アドレスをコピーしました'),()=>prompt('このアドレスをコピーしてください',u))};
+$('bLog').addEventListener('click',showSync);
+
 /* ---------- 起動 ---------- */
 function maybeLottery(){
  if(PARAM_WALL||document.body.classList.contains('wall')||S.rates[dkey(now())]||$('mLot').classList.contains('open')||$('mNote').classList.contains('open'))return;
@@ -715,7 +763,8 @@ function maybeLottery(){
 }
 tick();simulate();maybeLottery();
 checkEvents();save();render();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){tick();checkEvents();render();maybeLottery()}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){tick();checkEvents();render();maybeLottery();pull()}});
+if(SYNC.id)pull();
 })();
 </script>
 </body></html>

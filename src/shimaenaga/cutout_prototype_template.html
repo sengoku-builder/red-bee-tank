@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>シマエナガの森</title>
+<style>
+html,body{margin:0;height:100%;background:#dfe6ec;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+</style></head><body><canvas id="c"></canvas>
+<script>
+(()=>{
+'use strict';
+const A=__ASSETS__;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const BW=A.bw,BH=A.bh;
+const load=s=>{const i=new Image();i.src=s;return i};
+const bg=load(A.bg),SP={side:load(A.side.img),fly:load(A.fly.img),chick:load(A.chick.img)};
+let W=1,H=1,DPR=1,S=1,OX=0,OY=0;
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=Math.round(innerWidth*DPR);H=Math.round(innerHeight*DPR);cv.width=W;cv.height=H;
+ S=Math.max(W/BW,H/BH);OX=(W-BW*S)/2;OY=(H-BH*S)/2}
+addEventListener('resize',resize);resize();
+const rnd=(a,b)=>a+Math.random()*(b-a);
+
+/* 枝の上面（背景画像の座標） */
+const MAIN=[[0,822],[100,805],[200,792],[300,780],[380,772],[470,776],[550,784],[620,795],[680,812],[740,840]];
+const LOW=[[300,1050],[380,1060],[450,1048],[530,1010],[600,968],[680,918],[720,895]];
+function branchY(pts,x){return branchY0(pts,x)+(pts===MAIN?10:5)}
+function branchY0(pts,x){for(let i=1;i<pts.length;i++)if(x<=pts[i][0]){const [x0,y0]=pts[i-1],[x1,y1]=pts[i],t=(x-x0)/(x1-x0);return y0+(y1-y0)*t}return pts[pts.length-1][1]}
+const PERCH=[{b:MAIN,x0:40,x1:700},{b:LOW,x0:330,x1:690}];
+
+/* 鳥 */
+const birds=[];window.__b=birds;
+const ease=p=>p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function addBird(kind){
+ const p=PERCH[kind==='chick'?0:Math.floor(Math.random()*2)];
+ birds.push({kind,p,x:rnd(p.x0+60,p.x1-60),y:0,dir:Math.random()<.5?-1:1,face:1,state:'sit',t:rnd(1,4),age:0,ph:Math.random()*9,
+  size:kind==='chick'?118:135,lift:0,sq:0,tilt:0,tiltT:0});
+}
+addBird('adult');addBird('adult');addBird('chick');
+function choose(b){
+ b.age=0;
+ if(b.kind==='chick'){
+  if(Math.random()<.55){b.state='sit';b.t=rnd(2,5)}
+  else{b.state='hop';b.sx=b.x;b.tx=Math.min(b.p.x1,Math.max(b.p.x0,b.x+rnd(-50,50)));b.t=b.T=.42;if(Math.abs(b.tx-b.x)>2)b.dir=b.tx<b.x?-1:1}
+  return}
+ const r=Math.random();
+ if(r<.42){b.state='sit';b.t=rnd(2,5);b.tiltT=rnd(-.08,.08)}
+ else if(r<.8){b.state='hop';b.sx=b.x;b.tx=Math.min(b.p.x1,Math.max(b.p.x0,b.x+rnd(-90,90)));b.t=b.T=rnd(.32,.42);if(Math.abs(b.tx-b.x)>2)b.dir=b.tx<b.x?-1:1}
+ else{
+  const np=PERCH[Math.floor(Math.random()*2)],nx=rnd(np.x0+40,np.x1-40);
+  b.state='crouch';b.t=.18;b.np=np;b.nx=nx;b.dir=nx<b.x?-1:1;
+ }
+}
+function step(dt){
+ for(const b of birds){
+  b.t-=dt;b.age+=dt;b.ph+=dt;
+  // 向きの切り替えはなめらかに（紙をめくるように）
+  b.face+= (b.dir-b.face)*Math.min(1,dt*10);
+  b.tilt+=(b.tiltT-b.tilt)*Math.min(1,dt*3);
+  if(b.state==='hop'){const p=1-Math.max(0,b.t)/b.T;b.x=lerp(b.sx,b.tx,ease(p));b.lift=Math.sin(Math.PI*p)*(b.kind==='chick'?6:11);b.sq=Math.sin(Math.PI*p)*.06;
+   if(b.t<=0){b.lift=0;b.sq=-.07;b.state='sit';b.t=rnd(.4,1.6);b.tiltT=0}}
+  else if(b.state==='crouch'){b.sq=-.1*(1-b.t/.18);if(b.t<=0){b.state='fly';b.sx=b.x;b.sy=branchY(b.p.b,b.x);b.ny=branchY(b.np.b,b.nx);b.T=b.t=rnd(1.4,2);b.sq=0}}
+  else if(b.state==='fly'){if(b.t<=0){b.p=b.np;b.x=b.nx;b.state='sit';b.t=rnd(2,5);b.sq=-.12}}
+  else{b.sq*=Math.pow(.02,dt);b.lift=0;if(b.t<=0)choose(b)}
+ }
+}
+/* 雪 */
+const flakes=[];
+for(let i=0;i<160;i++)flakes.push({x:Math.random(),y:Math.random(),z:Math.random(),ph:Math.random()*9});
+function drawSnow(dt,front){
+ for(const f of flakes){
+  if((f.z>.7)!==front)continue;
+  f.y+=dt*(.02+.05*f.z);f.ph+=dt*(.6+f.z);if(f.y>1.05){f.y=-.05;f.x=Math.random()}
+  const x=(f.x+Math.sin(f.ph)*.01)*W,y=f.y*H,r=(1+f.z*3.2)*DPR;
+  ctx.globalAlpha=.35+.55*f.z;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+ }
+ ctx.globalAlpha=1;
+}
+function shadow(x,y,w){
+ const g=ctx.createRadialGradient(x,y,0,x,y,w);g.addColorStop(0,'rgba(40,45,55,.32)');g.addColorStop(1,'rgba(40,45,55,0)');
+ ctx.save();ctx.fillStyle=g;ctx.translate(x,y);ctx.scale(1,.28);ctx.translate(-x,-y);ctx.beginPath();ctx.arc(x,y,w,0,7);ctx.fill();ctx.restore();
+}
+function drawBird(b,t){
+ const scale=S*b.size/(b.kind==='chick'?A.chick.w*.75:A.side.w*.8);
+ if(b.state==='fly'){
+  const p=ease(1-Math.max(0,b.t)/b.T),cxp=(b.sx+b.nx)/2,cyp=Math.min(b.sy,b.ny)-140;
+  const x=(1-p)*(1-p)*b.sx+2*(1-p)*p*cxp+p*p*b.nx, y=(1-p)*(1-p)*b.sy+2*(1-p)*p*cyp+p*p*b.ny;
+  const fl=Math.sin(t*16),flap=1-.16*(fl*.5+.5),bob=fl*3*S;
+  const iw=A.fly.w*scale,ih=A.fly.h*scale;
+  ctx.save();ctx.translate(OX+x*S,OY+y*S+bob);ctx.rotate((b.ny-b.sy)/900*b.dir*.3);ctx.scale(b.face,flap);ctx.drawImage(SP.fly,-iw/2,-ih*.82,iw,ih);ctx.restore();return;
+ }
+ const by=branchY(b.p.b,b.x),key=b.kind==='chick'?'chick':'side',o=A[key];
+ const iw=o.w*scale,ih=o.h*scale;
+ const breath=.012*Math.sin(b.ph*2.1),puff=b.kind==='chick'?.02*Math.sin(b.ph*.6):0;
+ const sway=b.state==='sit'?.025*Math.sin(b.ph*.7):0;
+ const X=OX+b.x*S,Y=OY+by*S;
+ shadow(X,Y+2*S,iw*.32*(1-b.lift/30));
+ ctx.save();ctx.translate(X,Y-b.lift*S);ctx.rotate(b.tilt+sway);
+ const sx=(b.kind==='chick'?1:-b.face)*(1+puff+b.sq*-.5),sy=1+breath+puff+b.sq;
+ ctx.scale(sx,sy);ctx.drawImage(SP[key],-iw/2,-ih*o.foot,iw,ih);ctx.restore();
+}
+let last=0;
+function frame(ts){
+ const dt=Math.min(.1,(ts-last)/1000||0),t=ts/1000;last=ts;
+ if(bg.complete)ctx.drawImage(bg,OX,OY,BW*S,BH*S);
+ drawSnow(dt,false);
+ step(dt);
+ [...birds].sort((a,b)=>(a.state==='fly')-(b.state==='fly')).forEach(b=>drawBird(b,t));
+ drawSnow(dt,true);
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script></body></html>

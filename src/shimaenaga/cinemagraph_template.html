@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>シマエナガの森</title>
+<style>html,body{margin:0;height:100%;background:#dde3e8;overflow:hidden}canvas{position:fixed;inset:0;width:100%;height:100%;display:block}#fx{pointer-events:none}</style>
+</head><body><canvas id="gl"></canvas><canvas id="fx"></canvas>
+<script>
+(()=>{
+'use strict';
+const IMG='__IMG__',IW=__IW__,IH=__IH__;
+// 写真の中の鳥（中心x, 頭の上y, 足元y, 幅の半分）
+const BIRDS=__BIRDS__;
+const cv=document.getElementById('gl'),fx=document.getElementById('fx'),ctx=fx.getContext('2d');
+let W=1,H=1,DPR=1;
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=Math.round(innerWidth*DPR);H=Math.round(innerHeight*DPR);cv.width=fx.width=W;cv.height=fx.height=H}
+addEventListener('resize',resize);resize();
+const N=BIRDS.length;
+const VS='attribute vec2 p;varying vec2 v;void main(){v=vec2((p.x+1.)/2.,(1.-p.y)/2.);gl_Position=vec4(p,0.,1.);}';
+const FS=`precision highp float;
+uniform sampler2D tex;uniform vec4 vw;uniform float t;uniform vec4 bird[${N}];uniform vec4 anim[${N}];varying vec2 v;
+void main(){
+ vec2 px=(vw.xy+v*vw.zw)*vec2(${IW}.,${IH}.);
+ vec2 q=px;
+ for(int i=0;i<${N};i++){
+  vec4 b=bird[i];vec4 a=anim[i];           // b: cx, top, foot, halfW   a: breath, tilt, lean, -
+  float cy=(b.y+b.z)*.5,ry=(b.z-b.y)*.5+8.;
+  vec2 d=(px-vec2(b.x,cy))/vec2(b.w*1.15,ry*1.12);
+  float m=smoothstep(1.,.62,length(d));
+  if(m<=0.)continue;
+  vec2 foot=vec2(b.x,b.z);
+  // 呼吸・ふくらみ（足元を中心に少しだけ大きく）
+  q=foot+(q-foot)/(1.+a.x*m);
+  // 首をかしげる（頭のまわりだけ回す）
+  vec2 neck=vec2(b.x,b.y+(b.z-b.y)*.42);
+  float hm=m*smoothstep(neck.y+10.,neck.y-18.,px.y);
+  float ang=a.y*hm;float cs=cos(ang),sn=sin(ang);
+  vec2 r=q-neck;q=neck+vec2(cs*r.x-sn*r.y,sn*r.x+cs*r.y);
+  // 体を少し傾ける（隣に寄りかかる）
+  float lm=m*smoothstep(b.z,b.y,px.y);
+  q.x-=a.z*lm*(b.z-px.y)*.08;
+  q.y+=a.w*10.*m;
+ }
+ gl_FragColor=vec4(texture2D(tex,clamp(q/vec2(${IW}.,${IH}.),0.,1.)).rgb,1.);
+}`;
+const gl=cv.getContext('webgl');
+function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s}
+const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);gl.useProgram(pr);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+const loc=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+const U=n=>gl.getUniformLocation(pr,n);
+gl.uniform4fv(U('bird'),new Float32Array(BIRDS.flat()));
+const img=new Image();
+img.onload=()=>{const tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,img);
+ [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE));
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);requestAnimationFrame(frame)};
+img.src=IMG;
+// 鳥ごとの「くせ」と、ときどき起こるしぐさ
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const st=BIRDS.map((b,i)=>({ph:rnd(0,9),sp:rnd(1.8,2.4),tilt:0,tiltT:0,next:rnd(.2,1.5),puff:0,puffT:0,lean:0,leanT:0,shake:0,hop:0,hopT:0}));
+const smooth=(x,y,k,dt)=>x+(y-x)*Math.min(1,dt*k);
+function animate(t,dt){
+ const arr=new Float32Array(N*4);
+ st.forEach((s,i)=>{
+  s.next-=dt;
+  if(s.next<=0){
+   const r=Math.random();
+   if(r<.38){s.tiltT=(Math.random()<.5?-1:1)*rnd(.18,.32);s.next=rnd(.7,1.8)}   // 首をかしげる
+   else if(r<.5){s.tiltT=0;s.next=rnd(.5,1.2)}                                   // 正面に戻る
+   else if(r<.68){s.puffT=rnd(.06,.09);s.next=rnd(.6,1.2)}                       // ふわっとふくらむ
+   else if(r<.82){s.leanT=(Math.random()<.5?-1:1)*rnd(.35,.6);s.next=rnd(.9,1.8)} // 隣に寄りかかる
+   else if(r<.92){s.shake=.6;s.next=rnd(.8,1.4)}                                 // ぷるぷるっと羽をふるわせる
+   else{s.hopT=1;s.next=rnd(.8,1.4)}                                             // その場でちょんと跳ねる
+  }
+  if(s.puffT>0&&s.puff>s.puffT*.95)s.puffT=0;
+  s.tilt=smooth(s.tilt,s.tiltT,3.2,dt);s.puff=smooth(s.puff,s.puffT,s.puffT?4:1.6,dt);s.lean=smooth(s.lean,s.leanT,2,dt);if(Math.abs(s.lean-s.leanT)<.02)s.leanT=0;
+  s.shake=Math.max(0,s.shake-dt);
+  if(s.hopT){s.hop+=dt*3.2;if(s.hop>=1){s.hop=0;s.hopT=0}}
+  const sh=s.shake>0?Math.sin(t*38)*.06*s.shake/.6:0,hp=s.hopT?Math.sin(Math.PI*s.hop):0;
+  arr[i*4]=.022*Math.sin(t*s.sp+s.ph)+s.puff+sh*.25;arr[i*4+1]=s.tilt+sh;arr[i*4+2]=s.lean;arr[i*4+3]=hp;
+ });
+ gl.uniform4fv(U('anim'),arr);
+}
+function view(){const s=W/H,a=IW/IH;if(s<a){const vw=s/a;return[(1-vw)/2,0,vw,1]}const vh=a/s;return[0,(1-vh)/2,1,vh]}
+// 雪
+const flakes=[];for(let i=0;i<170;i++)flakes.push({x:Math.random(),y:Math.random(),z:Math.random(),ph:Math.random()*9});
+function snow(dt){ctx.clearRect(0,0,W,H);for(const f of flakes){f.y+=dt*(.015+.045*f.z);f.ph+=dt*(.5+f.z);if(f.y>1.05){f.y=-.05;f.x=Math.random()}
+ const x=(f.x+Math.sin(f.ph)*.012)*W,y=f.y*H,r=(.8+f.z*f.z*4.5)*DPR;ctx.globalAlpha=.25+.6*f.z;
+ if(f.z>.85){ctx.filter='blur('+(1.5*DPR)+'px)'}else ctx.filter='none';
+ ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}ctx.globalAlpha=1;ctx.filter='none'}
+let last=0;
+function frame(ts){const dt=Math.min(.1,(ts-last)/1000||0),t=ts/1000;last=ts;
+ gl.viewport(0,0,W,H);const v=view();gl.uniform4f(U('vw'),v[0],v[1],v[2],v[3]);gl.uniform1f(U('t'),t);animate(t,dt);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+ snow(dt);requestAnimationFrame(frame)}
+})();
+</script></body></html>

@@ -3,7 +3,7 @@
 # 写真を差し替えたり鳥の位置を直したりするときは、下の ASSETS を編集する。
 # birds: [中心x, 頭の上y, 足元y, 幅の半分, 動き方]
 #   動き方 0=首かしげ・ふくらみ・寄りかかり 1=首かしげ・ふくらみ 2=首かしげのみ 3=ヒナのかたまり 4=呼吸とふくらみだけ
-import base64, json, sys, os, io
+import base64, json, sys, os, io, time
 from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 D = os.path.join(HERE, 'images')
@@ -45,7 +45,10 @@ for k, (f, snow, birds) in ASSETS.items():
     b = base64.b64encode(buf.getvalue()).decode()
     out[k] = {'img': 'data:image/jpeg;base64,' + b, 'snow': snow, 'birds': birds}
 t = open(os.path.join(HERE, 'game_template.html'), encoding='utf-8').read()
-s = t.replace('__ASSETS__', json.dumps(out, ensure_ascii=False))
+BUILD = time.strftime('%Y%m%d%H%M%S')
+s = t.replace('__ASSETS__', json.dumps(out, ensure_ascii=False)).replace('__BUILD__', BUILD)
 dst = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'shimaenaga_forest.html')
 open(dst, 'w', encoding='utf-8').write(s)
-print(dst, len(s) // 1024, 'KB')
+# 版の番号（ページはこれを見て、新しい版が出ていたら読み込み直す）
+open(os.path.join(os.path.dirname(os.path.abspath(dst)), 'version.json'), 'w').write(json.dumps({'build': BUILD}))
+print(dst, len(s) // 1024, 'KB', 'build', BUILD)

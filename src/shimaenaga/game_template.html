@@ -109,6 +109,7 @@ body.trialing #bShot,body.paneling #bShot{display:none}
 const A=__ASSETS__;
 const IW=768,IH=1376,MAXN=6;
 const qs=new URLSearchParams(location.search),DEBUG=qs.has('debug'),WALL=qs.has('wallpaper');
+const BUILD='__BUILD__';
 const $=id=>document.getElementById(id);
 
 /* ================= 保存データ ================= */
@@ -307,7 +308,7 @@ function sceneTick(){if(trial){if(performance.now()>trial.until)endTrial();retur
 /* ================= 描画（動く写真：2枚の写真をなめらかに切り替える） ================= */
 const cv=$('gl'),fx=$('fx'),ctx=fx.getContext('2d');
 let W=1,H=1,DPR=1;
-function resize(){DPR=Math.min(devicePixelRatio||1,2);W=Math.round(innerWidth*DPR);H=Math.round(innerHeight*DPR);cv.width=fx.width=W;cv.height=fx.height=H}
+function resize(){DPR=Math.max(1,Math.min(devicePixelRatio||1,2,IH/Math.max(1,innerHeight)*1.05,IW/Math.max(1,innerWidth)*1.05));W=Math.round(innerWidth*DPR);H=Math.round(innerHeight*DPR);cv.width=fx.width=W;cv.height=fx.height=H}
 addEventListener('resize',resize);resize();
 const warp=s=>`
  for(int i=0;i<${MAXN};i++){
@@ -340,7 +341,7 @@ void main(){
  if(mx>0.){vec3 c1=texture2D(t1,clamp(W1(px)/sz,0.,1.)).rgb;c=mix(c0,c1,mx);}
  gl_FragColor=vec4(c,1.);
 }`;
-const gl=cv.getContext('webgl');
+const gl=cv.getContext('webgl',{antialias:false,alpha:false,depth:false,stencil:false,powerPreference:'low-power'});
 function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s}
 const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);gl.useProgram(pr);
 const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
@@ -388,11 +389,19 @@ function view(){const s=W/H,a=IW/IH;if(s<a){const vw=s/a;return[(1-vw)/2,0,vw,1]
 // 雪（場面ごとに量が変わる）
 const flakes=[];for(let i=0;i<170;i++)flakes.push({x:Math.random(),y:Math.random(),z:Math.random(),ph:Math.random()*9});
 let snowAmt=1;
-function snow(dt){ctx.clearRect(0,0,W,H);const tgt=curKey?A[curKey].snow:1;snowAmt=smooth(snowAmt,tgt,.4,dt);const cnt=Math.round(flakes.length*snowAmt);
+// 雪の粒の絵（大きさ8段階×くっきり/ぼけ）を最初に1回だけ作る
+let SPR=[],sprDPR=0;
+function makeSprites(){sprDPR=DPR;SPR=[];
+ for(let k=0;k<8;k++){const z=k/7,r=(.8+z*z*4.5)*DPR,blur=z>.85,R2=Math.ceil(r+(blur?2.5*DPR:1.5)),c=document.createElement('canvas');c.width=c.height=R2*2;
+  const g=c.getContext('2d'),gr=g.createRadialGradient(R2,R2,0,R2,R2,R2);
+  if(blur){gr.addColorStop(0,'rgba(255,255,255,.9)');gr.addColorStop(.45,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)')}
+  else{const e=r/R2;gr.addColorStop(0,'#fff');gr.addColorStop(e*.75,'#fff');gr.addColorStop(Math.min(1,e*1.05),'rgba(255,255,255,.35)');gr.addColorStop(1,'rgba(255,255,255,0)')}
+  g.fillStyle=gr;g.fillRect(0,0,R2*2,R2*2);SPR.push({c,h:R2})}}
+function snow(dt){if(sprDPR!==DPR)makeSprites();ctx.clearRect(0,0,W,H);const tgt=curKey?A[curKey].snow:1;snowAmt=smooth(snowAmt,tgt,.4,dt);const cnt=Math.round(flakes.length*snowAmt);
  for(let k=0;k<cnt;k++){const f=flakes[k];f.y+=dt*(.015+.045*f.z);f.ph+=dt*(.5+f.z);if(f.y>1.05){f.y=-.05;f.x=Math.random()}
-  const x=(f.x+Math.sin(f.ph)*.012)*W,y=f.y*H,r=(.8+f.z*f.z*4.5)*DPR;ctx.globalAlpha=.25+.6*f.z;
-  ctx.filter=f.z>.85?'blur('+(1.5*DPR)+'px)':'none';ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}
- ctx.globalAlpha=1;ctx.filter='none'}
+  const x=(f.x+Math.sin(f.ph)*.012)*W,y=f.y*H,sp=SPR[Math.min(7,Math.round(f.z*7))];ctx.globalAlpha=.25+.6*f.z;
+  ctx.drawImage(sp.c,x-sp.h,y-sp.h)}
+ ctx.globalAlpha=1}
 
 /* ================= 画面の表示 ================= */
 function stageText(){const L=life(),lv=level();
@@ -481,7 +490,8 @@ if(WALL)document.body.classList.add('wall');
 tick();unlock('start');unlock('protect');checkLife();initVisit();save();render();
 scheduleNext();
 let last=0,sec=0,lastSig=level()+'/'+life().phase;
-function frame(ts){const dt=Math.min(.1,(ts-last)/1000||0),t=ts/1000;last=ts;
+function frame(ts){if(WALL&&ts-last<30){requestAnimationFrame(frame);return}
+ const dt=Math.min(.25,(ts-last)/1000||0),t=ts/1000;last=ts;
  if(ts-sec>1000){sec=ts;
   if(WALL&&Math.floor(ts/5000)!==Math.floor((ts-1000)/5000)){load()}
   tick();if(!WALL){checkLife();save()}render();{const sig=level()+'/'+life().phase;if(sig!==lastSig){lastSig=sig;if(!trial)scheduleNext()}}sceneTick();if(!WALL&&!anyModal()&&(evtQ.length||noteQ.length))pump()}
@@ -491,6 +501,20 @@ function frame(ts){const dt=Math.min(.1,(ts-last)/1000||0),t=ts/1000;last=ts;
  snow(dt);if(shotReq&&ready){shotReq=false;try{doShot()}catch(e){toast('撮影できませんでした')}}requestAnimationFrame(frame)}
 requestAnimationFrame(frame);
 setTimeout(pump,800);
+/* ----- 新しい版が公開されていたら読み込み直す（森のデータはそのまま） ----- */
+let updBusy=false;
+function checkUpdate(){if(updBusy||!/^https?:/.test(location.protocol))return;updBusy=true;
+ fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(v=>{updBusy=false;
+  if(!v||!v.build||v.build===BUILD)return;
+  // 同じ版への読み込み直しは10分に1回まで（公開直後の行き違いで繰り返さないように）
+  let tried=null;try{tried=JSON.parse(localStorage.getItem('shimaUpd')||'null')}catch(e){}
+  if(tried&&tried.b===v.build&&Date.now()-tried.t<10*MIN)return;
+  if(!WALL&&(anyModal()||trial||document.querySelector('.panel.open')))return; // 遊んでいる途中は待つ
+  try{localStorage.setItem('shimaUpd',JSON.stringify({b:v.build,t:Date.now()}))}catch(e){}
+  save();const q=new URLSearchParams(location.search);q.set('v',v.build);location.replace(location.pathname+'?'+q.toString())
+ }).catch(()=>{updBusy=false})}
+setTimeout(checkUpdate,4000);setInterval(()=>{if(!document.hidden)checkUpdate()},30*MIN);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(WALL)load();tick();if(!WALL)checkLife();render();scheduleNext();pump()}});
 addEventListener('storage',e=>{if(e.key===KEY&&WALL){load();render();scheduleNext()}});
 })();

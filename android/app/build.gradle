@@ -1,9 +1,9 @@
 plugins { id 'com.android.application' }
 android {
-    namespace 'io.github.sengokubuilder.redbeetank'
+    namespace 'io.github.sengokubuilder.shimaenaga'
     compileSdk 34
     defaultConfig {
-        applicationId 'io.github.sengokubuilder.redbeetank'
+        applicationId 'io.github.sengokubuilder.shimaenaga'
         minSdk 29
         targetSdk 34
         versionCode 1
@@ -12,7 +12,7 @@ android {
     signingConfigs {
         // 毎回同じ鍵で署名して、上書きインストールできるようにする
         fixed {
-            storeFile file('redbee.keystore')
+            storeFile file('shimaenaga.keystore')
             storePassword 'redbeetank'
             keyAlias 'redbee'
             keyPassword 'redbeetank'

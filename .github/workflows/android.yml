@@ -1,7 +1,7 @@
-name: Androidの壁紙アプリを組み立てる
+name: シマエナガの森 壁紙アプリを組み立てる
 on:
   push:
-    branches: [android]
+    branches: [android-shimaenaga]
   workflow_dispatch:
 permissions:
   contents: write
@@ -20,12 +20,13 @@ jobs:
       - name: APKを組み立てる
         run: gradle -p android assembleDebug --no-daemon --stacktrace
       - name: ファイル名を整える
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk RedBeeTank.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk ShimaenagaForest.apk
       - name: リリースに置く
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-latest
-          name: レッドビー水槽 壁紙アプリ（最新版）
-          body: スマホでこのページを開き、下の RedBeeTank.apk を押してダウンロード・インストールしてください。
-          files: RedBeeTank.apk
-          make_latest: true
+          tag_name: shimaenaga-latest
+          target_commitish: android-shimaenaga
+          name: シマエナガの森 壁紙アプリ（最新版）
+          body: スマホでこのページを開き、下の ShimaenagaForest.apk を押してダウンロード・インストールしてください。
+          files: ShimaenagaForest.apk
+          make_latest: false

@@ -1,47 +1,42 @@
-package io.github.sengokubuilder.redbeetank;
+package io.github.sengokubuilder.shimaenaga;
 
 import android.app.Presentation;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
+import android.os.SystemClock;
 import android.service.wallpaper.WallpaperService;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 /**
- * 水槽のWebページを、そのままライブ壁紙として表示するサービス。
- * 壁紙の描画面（Surface）に仮想ディスプレイをつなぎ、その上にWebViewを載せることで、
- * WebGL を含むページをハードウェア描画のまま映す。
+ * シマエナガの森のページを、そのままライブ壁紙として表示するサービス。
+ * 遊ぶ画面（MainActivity）と同じアプリの中なので、ブラウザ保存のデータを共有できる。
+ * 壁紙の描画面に仮想ディスプレイをつなぎ、その上にWebViewを載せて、WebGLのページをそのまま映す。
  */
-public class TankWallpaperService extends WallpaperService {
+public class ForestWallpaperService extends WallpaperService {
 
-    static final String PREFS = "tank";
-    static final String KEY_URL = "url";
-    static final String DEFAULT_URL = "https://sengoku-builder.github.io/red-bee-tank/?wallpaper";
-
-    static String loadUrl(Context c) {
-        SharedPreferences p = c.getSharedPreferences(PREFS, MODE_PRIVATE);
-        return p.getString(KEY_URL, DEFAULT_URL);
-    }
+    static final String GAME_URL = "https://sengoku-builder.github.io/red-bee-tank/shimaenaga/";
+    static final String WALL_URL = GAME_URL + "?wallpaper";
+    /** 新しい版のページを取り込むため、この時間がたったら見えたときに読み直す */
+    static final long RELOAD_MS = 6L * 60 * 60 * 1000;
 
     @Override
     public Engine onCreateEngine() {
-        return new TankEngine();
+        return new ForestEngine();
     }
 
-    class TankEngine extends Engine {
+    class ForestEngine extends Engine {
         private VirtualDisplay display;
         private Presentation presentation;
         private WebView web;
-        private String loadedUrl;
         private int width, height;
+        private long loadedAt;
 
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format, int w, int h) {
@@ -61,19 +56,18 @@ public class TankWallpaperService extends WallpaperService {
             try {
                 DisplayManager dm = (DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
                 int dpi = getResources().getDisplayMetrics().densityDpi;
-                display = dm.createVirtualDisplay("RedBeeTank", width, height, dpi, holder.getSurface(), 0);
-                presentation = new Presentation(TankWallpaperService.this, display.getDisplay());
+                display = dm.createVirtualDisplay("ShimaenagaForest", width, height, dpi, holder.getSurface(), 0);
+                presentation = new Presentation(ForestWallpaperService.this, display.getDisplay());
                 web = new WebView(presentation.getContext());
                 WebSettings s = web.getSettings();
                 s.setJavaScriptEnabled(true);
                 s.setDomStorageEnabled(true);
-                s.setMediaPlaybackRequiresUserGesture(true);
-                web.setBackgroundColor(Color.BLACK);
+                web.setBackgroundColor(Color.rgb(223, 229, 234));
                 web.setWebViewClient(new WebViewClient());
                 presentation.setContentView(web);
                 presentation.show();
-                loadedUrl = loadUrl(TankWallpaperService.this);
-                web.loadUrl(loadedUrl);
+                web.loadUrl(WALL_URL);
+                loadedAt = SystemClock.elapsedRealtime();
             } catch (Throwable e) {
                 stop();
                 drawMessage(holder, "壁紙を表示できませんでした: " + e.getClass().getSimpleName());
@@ -85,9 +79,9 @@ public class TankWallpaperService extends WallpaperService {
             try {
                 c = holder.lockCanvas();
                 if (c == null) return;
-                c.drawColor(Color.rgb(10, 16, 19));
+                c.drawColor(Color.rgb(223, 229, 234));
                 Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-                p.setColor(Color.WHITE);
+                p.setColor(Color.DKGRAY);
                 p.setTextSize(36f);
                 c.drawText(msg, 40, c.getHeight() / 2f, p);
             } catch (Throwable ignored) {
@@ -103,15 +97,17 @@ public class TankWallpaperService extends WallpaperService {
             if (visible) {
                 web.onResume();
                 web.resumeTimers();
-                String url = loadUrl(TankWallpaperService.this);
-                if (!url.equals(loadedUrl)) {
-                    loadedUrl = url;
-                    web.loadUrl(url);
+                if (SystemClock.elapsedRealtime() - loadedAt > RELOAD_MS) {
+                    web.reload();
+                    loadedAt = SystemClock.elapsedRealtime();
+                } else {
+                    // 遊ぶ画面で変わった内容（買った道具など）をすぐ映す
+                    web.evaluateJavascript("document.dispatchEvent(new Event('visibilitychange'))", null);
                 }
             } else {
-                // 見えていない間は止めて電池を節約
+                // 見えていない間は止めて電池を節約。
+                // pauseTimers() はアプリ全体のWebViewを止めてしまう（遊ぶ画面も止まる）ので使わない
                 web.onPause();
-                web.pauseTimers();
             }
         }
 

@@ -10,10 +10,10 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 #ui{position:fixed;inset:0;pointer-events:none}
 #ui>*{pointer-events:auto}
 body.wall #ui{display:none}
-#whud{display:none;position:fixed;right:18px;bottom:64px;padding:8px 12px;border-radius:12px;background:#05100e66;color:#eef6f4e6;font-size:12.5px;line-height:1.6;text-align:right;text-shadow:0 1px 3px #000c;pointer-events:none;font-variant-numeric:tabular-nums}
+#whud{display:none;position:fixed;right:18px;top:18px;padding:8px 12px;border-radius:12px;background:#05100e66;color:#eef6f4e6;font-size:12.5px;line-height:1.6;text-align:right;text-shadow:0 1px 3px #000c;pointer-events:none;font-variant-numeric:tabular-nums}
 #whud b{font-size:15px}
 body.wall.showhud #whud{display:block}
-@media (max-aspect-ratio:1/1){#whud{bottom:16vh;right:12px;font-size:12px}}
+@media (max-aspect-ratio:1/1){#whud{top:calc(env(safe-area-inset-top,0px) + 7vh);right:12px;font-size:12px}}
 .glass{background:#07100fd0;border:1px solid #dff3ee40;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .hud{position:absolute;top:12px;left:12px;padding:10px 13px;border-radius:14px;font-size:13px;line-height:1.65;min-width:170px}
 .hud b{font-size:17px;font-variant-numeric:tabular-nums}
@@ -58,6 +58,12 @@ body.layout .tray{display:flex}
 @media(max-width:600px){.dock button{font-size:12px;padding:9px 2px;white-space:nowrap}.ltool{left:10px;right:10px;transform:none;justify-content:center}.lhint{max-width:none;right:10px}}
 .lhint{display:none;position:absolute;left:12px;top:12px;font-size:12px;padding:7px 10px;border-radius:10px;max-width:60%}
 body.layout .lhint{display:block}
+.adv{border-top:1px solid #ffffff1c;padding:10px 0;display:flex;gap:9px}
+.adv .lv{flex:0 0 auto;font-size:11px;padding:2px 7px;border-radius:8px;height:fit-content;margin-top:2px;white-space:nowrap}
+.adv .lv.l0{background:#c8402f;color:#fff}.adv .lv.l1{background:#ffd9a0;color:#1a1408}.adv .lv.l2{background:#ffffff22;color:#dbe8e4}
+.adv h3{font-size:14px;margin:0 0 3px}.adv div div{font-size:13px;line-height:1.65;color:#d6e4e0}
+.faq{border-top:1px solid #ffffff1c}.faq summary{cursor:pointer;padding:10px 0;font-size:13.5px;list-style:none}.faq summary::before{content:'＋ ';color:#ffd9a0}.faq[open] summary::before{content:'－ '}
+.faq div{font-size:13px;line-height:1.75;color:#d6e4e0;padding:0 0 10px}
 .sec{margin:14px 0 2px;font-size:13px;color:#ffd9a0;font-weight:700}
 .gr{display:inline-block;font-size:11px;padding:1px 6px;border-radius:8px;background:#ffffff1a;margin-left:4px}
 .item .btns{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
@@ -72,7 +78,7 @@ body.layout .lhint{display:block}
 .ttag{position:absolute;pointer-events:none}.debug[hidden]{display:none}
 @media(max-width:600px){
  .hud{top:10px;left:10px;font-size:12px;padding:8px 11px}.hud b{font-size:15px}
- .dock{right:10px;bottom:10px;left:10px}.dock button{flex:1;padding:9px 6px;font-size:13px}
+ .dock{right:8px;bottom:10px;left:8px;gap:4px;flex-wrap:nowrap}.dock button{flex:1 1 auto;padding:9px 3px;font-size:12px}
  .panel{right:10px;left:10px;width:auto;bottom:60px;max-height:66%}
  .toast{top:auto;bottom:62px}
  .debug{bottom:60px}
@@ -88,15 +94,17 @@ body.layout .lhint{display:block}
   <button class="glass" id="bShop">ショップ</button>
   <button class="glass" id="bLay">レイアウト</button>
   <button class="glass" id="bLight">💡照明</button>
+  <button class="glass" id="bAsk">相談</button>
   <button class="glass" id="bNote">知識ノート</button>
   <button class="glass" id="bLog">記録</button>
-  <button class="glass" id="bWall">壁紙表示</button>
+  <button class="glass" id="bWall">壁紙</button>
  </div>
  <section class="panel glass" id="pShop"><h2>アクアショップ</h2><p>入門用の設備はすぐに一式そろいます。上位版は入門用を買うと解放されます。</p><div id="shopList"></div><button class="glass close" data-close>閉じる</button></section>
+ <section class="panel glass" id="pAsk"><h2>飼育の相談</h2><p>今の水槽を見て、次にやるとよいことをお伝えします。</p><div id="askList"></div><div class="sec">よくある質問（実際の飼育）</div><div id="faqList"></div><button class="glass close" data-close>閉じる</button></section>
  <section class="panel glass" id="pNote"><h2>知識ノート</h2><div id="noteList"></div><button class="glass close" data-close>閉じる</button></section>
  <section class="panel glass" id="pLog"><h2>記録</h2><div class="log" id="logList"></div><div class="note"><h3>スマホ・PCの共有</h3><div>Googleスプレッドシートに置いた Apps Script の「ウェブアプリのURL」を貼り付けて保存すると、どの端末でも同じ水槽になります。</div>
  <input id="syncIn" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%;margin:8px 0;padding:8px;border-radius:9px;border:1px solid #dff3ee55;background:#0b1715;color:#eef6f4;font:inherit;font-size:12px">
- <button class="glass" id="syncSave">保存</button> <button class="glass" id="syncCopy">壁紙用アドレスをコピー</button><label style="display:block;font-size:12.5px;margin-top:8px"><input type="checkbox" id="hudChk" checked> 壁紙の右下に状態（Gや水の様子）も表示する</label><p id="syncStat" style="font-size:12px"></p></div>
+ <button class="glass" id="syncSave">保存</button> <button class="glass" id="syncCopy">壁紙用アドレスをコピー</button><label style="display:block;font-size:12.5px;margin-top:8px"><input type="checkbox" id="hudChk" checked> 壁紙の右上に状態（Gや水の様子）も表示する</label><p id="syncStat" style="font-size:12px"></p></div>
  <button class="glass close" data-close>閉じる</button> <button class="glass close" id="bReset">最初からやり直す</button></section>
  <div class="modal glass" id="mLot"><div class="tag">今日のくじ</div><h2 id="lotTitle">今日の単価を決めよう</h2><div class="big" id="lotBig">？</div><p class="body" id="lotMsg" style="text-align:center">くじを引くと、今日1日（0時から）の1分あたりのGが決まります。</p><button class="glass" id="bDraw">くじを引く</button></div>
  <div class="modal glass" id="mImg"><div class="tag" id="miTag">商品の画像</div><h2 id="miTitle"></h2><div class="bigimg" id="miBox"></div><button class="glass" id="miClose">閉じる</button></div>
@@ -408,10 +416,70 @@ function renderLog(){$('logList').innerHTML=S.log.length?S.log.join('<br>'):'ま
 function renderNotes(){
  $('noteList').innerHTML=S.notes.map(id=>'<div class="note"><h3>'+NOTES[id][0]+'</h3><div>'+NOTES[id][1]+'</div></div>').join('')||'<p>まだありません</p>';
 }
+/* ---------- 相談：今の水槽から次の一手を考える ---------- */
+const FAQ=[
+ ['水換えはどうやるの？','レッドビーは急な水質の変化に弱いので、<b>少しずつ・ゆっくり</b>が基本です。目安は1〜2週間に1回、水槽の水の1/5〜1/4ほど。<br>新しい水はカルキ（塩素）を抜き、水槽と同じくらいの温度にしてから、エアチューブなどで点滴のようにゆっくり足します。一度にたくさん換えると、脱皮不全や抱卵中の脱卵の原因になります。'],
+ ['餌はどのくらいあげればいい？','<b>2〜3時間で食べきれる量を、1〜2日に1回</b>が目安です。食べ残しは水を汚すので、残ったらスポイトで取り出しましょう。<br>エビは水草や流木に付く微生物も食べているので、餌が少なめでも案外平気です。餌のあげすぎは、レッドビーが死ぬ原因の上位です。'],
+ ['抱卵したらどうする？','とにかく<b>そっとしておく</b>のがいちばんです。水換えは控えめにし、水温は20〜25℃で安定させます。<br>卵は約3〜4週間でふ化します。暑すぎたり水質が急に変わったりすると、メスが卵を落とす「脱卵」が起きやすくなります。'],
+ ['稚エビが減ってしまう','稚エビはとても小さく、吸い込みの強いフィルターに吸われたり、隠れ場所がなくて弱ったりします。<br>スポンジフィルターを使う、ウィローモスなどの隠れ家を入れる、水換えを少量にする、の3つで生き残りやすくなります。'],
+ ['夏の暑さ対策は？','レッドビーは28℃を超えると危険です。水面に風を当てる<b>冷却ファン</b>で2〜4℃下げられます。それでも足りない真夏は、部屋のエアコンを併用するのが確実です。<br>ファンで水が蒸発するので、カルキを抜いた水で足し水をしましょう。'],
+ ['冬はヒーターが必要？','水温が20℃を下回ると、エビの動きがにぶくなり繁殖も止まります。冬は<b>ヒーターで22〜23℃前後</b>に保つと、一年中繁殖が楽しめます。<br>反対に、あえて冬は加温せず休ませる飼い方もあります。'],
+ ['オスとメスの見分け方','大人になると見分けやすくなります。<b>メス</b>は体が大きめで、お腹（卵を抱える部分）が丸く張り出し、横から見ると背中が高く見えます。<b>オス</b>は小柄で細身、お腹がすっきりしています。<br>抱卵前のメスは、頭の後ろに黄色っぽい卵巣（サドル）が透けて見えることがあります。'],
+ ['グレードを上げるには？','子どものグレードは両親に似るので、<b>白が多く、模様のきれいな親を選んで殖やす</b>（選別交配）のが基本です。<br>グレードの低い個体を別の水槽に分けたり、ショップで良いオスを迎えたりして、少しずつ質を上げていきます。このゲームでも、子のグレードは両親の平均から決まります。'],
+ ['エビが急に死んでしまう','よくある原因は、①水温の急変や高水温 ②水換えのしすぎによる水質の急変 ③餌のあげすぎで水が汚れる ④脱皮の失敗（脱皮不全）です。<br>1匹ずつ死ぬ場合は寿命のこともありますが、続く場合は水温と水質を見直しましょう。'],
+ ['コケが増えてきた','照明の点けすぎ、餌のあげすぎ、水の汚れが主な原因です。照明は1日8〜10時間にして、毎日同じ時刻に点け消しします。<br>レッドビー自身もコケをつまんで食べてくれますが、増えすぎたら手で取り除きましょう。'],
+ ['立ち上げはどれくらい待つ？','ソイルを入れてから、エビを入れられる水になるまで<b>2週間〜1か月</b>ほど待つのが一般的です。バクテリアが増えて、エビに有害なアンモニアなどを分解できるようになるのを待ちます。<br>焦って早く入れることが、レッドビー飼育でいちばん多い失敗です。']
+];
+function untilG(price){ // 足りないときに「あと何時間で買えるか」
+ if(S.g>=price)return '';const r=S.rates[dkey(now())]||1,m=(price-S.g)/r;
+ return '（あと'+G(price-S.g)+'、'+(m<60?'約'+Math.ceil(m)+'分':m<1440?'約'+Math.ceil(m/60)+'時間':'約'+Math.ceil(m/1440)+'日')+'で買えます）';
+}
+function advise(){
+ tick();const A=[],add=(lv,t,b)=>A.push({lv,t,b});
+ const t=now(),w=waterState(),T=waterTemp(),q=waterQ(),d=gday(t),l=alive(),mo=new Date(t).getMonth()+1;
+ const adults=l.filter(s=>d-s.bd>=ADULT),F=adults.filter(s=>s.sex==='F').length,M=adults.length-F,juv=l.length-adults.length,berry=l.filter(s=>s.egg!=null).length;
+ const moss=S.layout.some(o=>ITEMS[o.k]&&ITEMS[o.k].moss),seiryu=S.layout.some(o=>ITEMS[o.k]&&ITEMS[o.k].seiryu);
+ const own=id=>!!S.owned[id];
+ // 急ぎ
+ if(own('thermo')&&T>=27)add(0,'水温が'+T+'℃と高すぎます','レッドビーは28℃を超えると弱って死んでしまいます。'+(own('fan')?'冷却ファンは動いています。真夏は部屋のエアコンも使いましょう。':'<b>冷却ファン</b>（2,500G）で26℃までに抑えられます。'+untilG(2500)));
+ else if(!own('thermo')&&!own('fan')&&roomT(t)>=27&&l.length)add(0,'今の季節は水温が上がりすぎるかもしれません','夏は室温とともに水温が28℃前後まで上がります。<b>冷却ファン</b>（2,500G）があると安心です。'+untilG(2500));
+ if(own('tester')&&(q.ph>=7.2||q.gh>=9))add(0,'水質がアルカリ寄り・硬めになっています','pH '+q.ph.toFixed(1)+'・GH '+Math.round(q.gh)+'で、レッドビーには合わない水です。'+(seiryu?'原因は<b>青龍石</b>です。「レイアウト」で青龍石を選んで「しまう」と、それ以上は悪くなりません。':''));
+ else if(seiryu&&!own('tester'))add(1,'青龍石の影響を確かめましょう','青龍石は少しずつ水を硬く、pHを高くします。<b>水質テスター</b>（1,000G）で今の水を見てみましょう。'+untilG(1000));
+ // 立ち上げ
+ if(!own('filter'))add(1,'まずはろ過フィルターを','水がにごったままで、エビを迎えられません。ショップの<b>小型スポンジフィルター</b>（2,000G）を置くと、水が澄んで「水づくり」が始まります。'+untilG(2000));
+ else if(w.mat<1){const left=Math.ceil(21*(1-w.mat)/SCALE);add(2,'水づくり中（'+Math.floor(w.mat*100)+'%）','バクテリアが増えるのを待っています。あと<b>約'+left+'日</b>でエビを迎えられます。待っている間に、水温計やヒーターなどの設備をそろえておくと、迎えたあとが安心です。')}
+ if(!own('thermo'))add(1,'水温計を置きましょう','水温が見えないと、暑さ寒さに気づけません。<b>ガラス水温計</b>は400Gと手ごろです。'+untilG(400));
+ if(own('thermo')&&T<20&&!own('heater')&&!own('heater2'))add(1,'水温が'+T+'℃と低めです','20℃を下回ると繁殖が止まります。<b>オートヒーター</b>（2,000G）で23℃前後に保てます。'+untilG(2000));
+ else if(!own('heater')&&!own('heater2')&&[10,11,12,1,2,3].includes(mo)&&own('filter'))add(1,'寒い季節にはヒーターを','これから水温が下がる季節です。<b>オートヒーター</b>（2,000G）があると冬も繁殖が続きます。'+untilG(2000));
+ if(own('heater')&&!own('heater2')&&roomT(t)<=13&&own('thermo'))add(2,'真冬はヒーターが少し力不足','入門用ヒーターは真冬に22℃前後まで下がることがあります。気になるなら<b>温度調整式ヒーター</b>（5,000G）で安定します。'+untilG(5000));
+ // エビ
+ if(w.mat>=1&&!l.length)add(1,'エビを迎えましょう','水ができました。最初は<b>並〜Sグレードを、メス2〜3匹・オス1〜2匹</b>くらいで迎えると、繁殖まで進みやすいです。迎えたら「水合わせ」を忘れずに。');
+ else if(l.length){
+  if(!F&&!juv)add(1,'メスがいません','繁殖にはメスが必要です。ショップでメスを迎えましょう。');
+  else if(!M&&!juv)add(1,'オスがいません','繁殖にはオスが必要です。ショップでオスを迎えましょう。');
+  else if((!F||!M)&&juv)add(2,'子どもの成長を待ちましょう','稚エビが大人になる（ゲーム内100日・現実で約1か月）と、オスとメスがそろって繁殖が始まります。');
+  if(berry)add(2,'抱卵中のメスが'+berry+'匹います','そっと見守りましょう。約25日（現実で8日ほど）でふ化します。水温は25℃以下だと、たくさん生まれます。'+(T>25&&own('thermo')?'<br>今は'+T+'℃なので少し多めです。':''));
+  if(juv&&!moss)add(1,'稚エビの隠れ家を','稚エビが'+juv+'匹います。<b>ウィローモス</b>の流木を置くと、隠れ場所と餌場になって生き残りやすくなります。');
+  if(l.length>=popMax()*.8)add(1,'水槽が混み合ってきました','今'+l.length+'匹で、上限は'+popMax()+'匹です。混むと抱卵しにくくなります。'+(own('filter2')?'グレードの低い個体を選んで減らすのも手です。':'<b>ダブルスポンジフィルター</b>（4,500G）で上限が100匹に増えます。'+untilG(4500)));
+  if(F&&M&&!berry&&!juv&&own('thermo')&&T>=20&&T<=26)add(2,'繁殖の条件はそろっています','水温もちょうどよく、オスとメスがいます。抱卵は気長に待ちましょう。');
+  const gs=adults.map(s=>s.gr??2);if(gs.length>=3&&F&&M)add(2,'グレードを上げるには','子のグレードは両親の平均で決まります。<b>白の多い（グレードの高い）オス</b>を1匹迎えると、次の世代が底上げされます。');
+ }
+ // 照明・水草
+ if(!own('light')&&!own('light2')&&own('filter'))add(2,'照明があると水草が育ちます','照明がないと、ロタラなどの水草がひょろひょろと伸びます（徒長）。<b>クリップ式LED</b>は3,000Gです。'+untilG(3000));
+ for(const o of S.layout)if(ITEMS[o.k]&&ITEMS[o.k].rot){const st=rotState(o);if(st==='droop'){add(1,'ロタラが伸びすぎています','「レイアウト」でロタラを選んで「トリミング」しましょう。こんもり茂ります。');break}if(st==='leggy'){add(2,'ロタラが徒長しています','光が足りません。照明を用意するか、明るい照明にすると改善します。');break}}
+ if(!A.length)add(2,'順調です','今のところ心配はありません。水草のレイアウトを楽しんだり、グレードの高いエビを目指したりしてみましょう。');
+ return A.sort((a,b)=>a.lv-b.lv);
+}
+function renderAsk(){
+ const LV=['急ぎ','おすすめ','ようす'];
+ $('askList').innerHTML=advise().map(a=>'<div class="adv"><span class="lv l'+a.lv+'">'+LV[a.lv]+'</span><div><h3>'+a.t+'</h3><div>'+a.b+'</div></div></div>').join('');
+ if(!$('faqList').childElementCount)$('faqList').innerHTML=FAQ.map(f=>'<details class="faq"><summary>'+f[0]+'</summary><div>'+f[1]+'</div></details>').join('');
+}
 let tt;function toast(s){const e=$('toast');e.textContent=s;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),3500)}
 function openPanel(id){document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('open',p.id===id&&!p.classList.contains('open')))}
 $('bShop').onclick=()=>{tick();renderShop();openPanel('pShop')};
 $('bNote').onclick=()=>{renderNotes();openPanel('pNote')};
+$('bAsk').onclick=()=>{renderAsk();openPanel('pAsk')};
 $('bLog').onclick=()=>{renderLog();openPanel('pLog')};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('.panel').classList.remove('open'));
 let resetArm=0;$('bReset').onclick=()=>{if(Date.now()-resetArm<3000){const rv=S.rev;S=blank();S.rev=rv;save();if(SYNC.id){push().then(()=>location.reload())}else location.reload()}else{resetArm=Date.now();toast('もう一度押すと、すべてのデータを消して最初から始めます')}};
@@ -451,6 +519,7 @@ void main(){
  vec2 d;
  d.x=surf*2.*ag*sin(px.x*.02+t*1.1)+(water*.6+soil)*wob*1.5*sin(px.y*.03+px.x*.01+t*.8);
  d.y=surf*1.3*ag*sin(px.x*.035-t*1.4)+(water*.6+soil)*wob*1.2*sin(px.x*.025-t*1.1+px.y*.01);
+ d*=.5;
  vec3 c=texture2D(tex,clamp((px+d)/vec2(${IW}.,${IH}.),0.,1.)).rgb;
  if(heat>.5){
   float cd=1e5;
@@ -487,9 +556,9 @@ void main(){
  c=mix(c,vec3(.62,.66,.63),(1.-clar)*.27*water);
  float ca=sin(px.x*.045+t*.65+sin(px.y*.05+t*.42)*2.)+sin(px.y*.06-t*.78+sin(px.x*.03-t*.54)*2.)+sin((px.x+px.y)*.025+t*.36);
  ca=pow(max(ca/3.,0.),2.);
- c+=ca*(soil*.22+water*clamp((px.y-350.)/340.,0.,1.)*.07)*bright*(.4+.6*clar)*inner;
+ c+=ca*(soil*.14+water*clamp((px.y-350.)/340.,0.,1.)*.045)*bright*(.4+.6*clar)*inner;
  float sh=.5+.5*sin(px.x*.012+px.y*.004+t*.85)*sin(px.x*.031-t*1.3);
- c*=1.+water*topw*.16*(sh-.4)*bright;
+ c*=1.+water*topw*.09*(sh-.4)*bright;
  if(thermo>.5){
   vec2 tu=(px+d*.08-trect.xy)/trect.zw;
   if(tu.x>0.&&tu.x<1.&&tu.y>0.&&tu.y<1.){
@@ -783,11 +852,21 @@ const glc=$('gl');glc.style.touchAction='none';
 glc.addEventListener('pointerdown',ev=>{if(PARAM_WALL)return;if(panStart(ev))glc.setPointerCapture(ev.pointerId)});
 glc.addEventListener('pointermove',panMove);
 glc.addEventListener('pointerup',ev=>{if(panEnd()){ev.preventDefault();PAN.justPanned=performance.now()}});
+/* Androidの壁紙アプリから：ホーム画面のスワイプに合わせて左右に動かす（この端末の壁紙だけの見え方） */
+window.wallpaperPan=(type,v)=>{
+ if(W/H>=IW/IH)return;PAN.local=true;
+ if(type==='offset'){PAN.v=0;PAN.drag=null;PAN.target=Math.min(1,Math.max(0,v));return}
+ PAN.target=null;
+ if(type==='down'){PAN.drag={x:0,px:PAN.x,lx:0,lt:performance.now()};PAN.v=0}
+ else if(type==='move'&&PAN.drag)panMove({clientX:v});
+ else if(type==='up')panEnd();
+};
 
 /* ---------- ループ ---------- */
 let sec=0,lastPull=0;
 function frame(ts){
  const dt=Math.min(.1,(ts-lastTs)/1000||0);lastTs=ts;
+ if(PAN.target!=null){PAN.x+=(PAN.target-PAN.x)*Math.min(1,dt*6)}
  if(!PAN.drag&&Math.abs(PAN.v)>1e-4){PAN.x=Math.min(1,Math.max(0,PAN.x+PAN.v*dt));PAN.v*=Math.pow(.04,dt);if(Math.abs(PAN.v)<1e-3){PAN.v=0;savePan()}}
  const w=waterState(),L=lighting(),vw=view(ts);curView=vw;
  if(gl&&prog){
@@ -816,7 +895,7 @@ const SYNC={id:qs.get('s')||lsGet('redBeeSync')||'',dirty:false,busy:false,statu
 const syncURL=()=>'https://script.google.com/macros/s/'+SYNC.id+'/exec';
 const hm=()=>new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
 function packState(){const o=JSON.parse(JSON.stringify(S));delete o.offset;return o}
-function adopt(st,rev){const off=S.offset||0;S=Object.assign(blank(),st);S.offset=off;S.rev=rev;if(!PAN.drag&&S.panX!=null)PAN.x=S.panX;migrate();syncActors();queue.length=0;LAY.sel=null;tick();simulate();render();save()}
+function adopt(st,rev){const off=S.offset||0;S=Object.assign(blank(),st);S.offset=off;S.rev=rev;if(!PAN.drag&&!PAN.local&&S.panX!=null)PAN.x=S.panX;migrate();syncActors();queue.length=0;LAY.sel=null;tick();simulate();render();save()}
 let pushT=0;
 function markDirty(){if(PARAM_WALL||!SYNC.id)return;SYNC.dirty=true;clearTimeout(pushT);pushT=setTimeout(push,1200)}
 async function push(){

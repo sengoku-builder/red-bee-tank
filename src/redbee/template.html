@@ -595,18 +595,29 @@ function initGL(img,fimg){
 
 /* ---------- 泡 ---------- */
 const bubbles=[];let lastTs=0;
-function spawn(x,y,big){bubbles.push({x:x+(Math.random()-.5)*6,y,r:(big?1.8:1)+Math.random()*(big?2:1.4),vy:55+Math.random()*40,ph:Math.random()*6,w:1.5+Math.random()*3})}
+function spawn(x,y,big){bubbles.push({x:x+(Math.random()-.5)*6,y,y0:y,r:(big?1.8:1)+Math.random()*(big?2:1.4),vy:55+Math.random()*40,vx:0,ph:Math.random()*6,w:1.5+Math.random()*3,fs:4})}
+/* エアポンプの泡：細かい泡が多く、ときどき大きな泡。上に行くほど左右に散らばる */
+let airT=0,airBurst=0;
+function spawnAir(x,y){
+ const r=Math.random(),rad=r<.62?.6+Math.random()*.9:r<.92?1.5+Math.random()*1.3:2.8+Math.random()*1.8;
+ bubbles.push({x:x+(Math.random()-.5)*7,y:y+Math.random()*4,y0:y,r:rad,vy:40+rad*9+Math.random()*25,vx:(Math.random()-.5)*(10+rad*3),ph:Math.random()*6.3,w:.8+Math.random()*2.2+rad*.5,fs:2.5+Math.random()*4})
+}
 function stepBubbles(dt){
- if(S.owned.filter){const n=dt*7;for(let i=0;i<n;i++)if(Math.random()<n/Math.ceil(n))spawn(FIL.bubble[0],FIL.bubble[1],true)}
+ if(S.owned.filter){
+  airT+=dt;if(airBurst<=0&&Math.random()<dt*.45)airBurst=.25+Math.random()*.5; // ときどきポコポコまとめて出る
+  airBurst-=dt;
+  const rate=(9+6*Math.sin(airT*1.7)+4*Math.sin(airT*4.3+1))*(airBurst>0?2.6:1),n=dt*Math.max(2,rate);
+  let k=Math.floor(n)+(Math.random()<n%1?1:0);while(k--)spawnAir(FIL.bubble[0],FIL.bubble[1]);
+ }
  if(Math.random()<dt*.35)spawn(250+Math.random()*(IW-500),700+Math.random()*30,false);
- for(const b of bubbles){b.y-=b.vy*dt;b.vy=Math.min(b.vy+dt*20,120);b.ph+=dt*4}
+ for(const b of bubbles){b.y-=b.vy*dt;b.vy=Math.min(b.vy+dt*20,120);b.ph+=dt*b.fs;b.x+=b.vx*dt;b.vx+=(Math.random()-.5)*dt*30;b.vx*=Math.pow(.6,dt)}
  for(let i=bubbles.length-1;i>=0;i--)if(bubbles[i].y<115)bubbles.splice(i,1);
 }
 function drawBubbles(vw,L){
  const sx=W/(vw[2]*IW);
  ctx.lineWidth=Math.max(1,sx*.9);
  for(const b of bubbles){
-  const x=((b.x+Math.sin(b.ph)*b.w)/IW-vw[0])/vw[2]*W,y=(b.y/IH-vw[1])/vw[3]*H,r=b.r*sx*(1+(700-b.y)/1200);
+  const x=((b.x+Math.sin(b.ph)*b.w*(1+Math.min(2,(b.y0-b.y)/220)))/IW-vw[0])/vw[2]*W,y=(b.y/IH-vw[1])/vw[3]*H,r=b.r*sx*(1+(700-b.y)/1200);
   if(x<-10||x>W+10)continue;
   const a=(.35+.45*L.bright)*Math.min(1,(b.y-115)/40);
   ctx.strokeStyle='rgba(235,250,255,'+a+')';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.stroke();

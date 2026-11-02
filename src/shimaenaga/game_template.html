@@ -277,14 +277,20 @@ let closeKey=null,closeAt=0;
 function pastKids(){const L=life(),out=[];for(const k in S.broods){if(L.phase==='winter'||+k<L.k)for(const n of S.broods[k].names)if(n)out.push(n)}return out}
 function visit(){const L=life();if(!(L.phase==='pre'||L.phase==='winter'))return;
  visiting=true;S.visits++;const first=!S.notes.includes('visit');unlock('visit');
- const key=jackpot()&&Math.random()<.5?'dango_old':'s1';
+ // 道具に合わせて来る羽数が変わる：なし＝1羽、エサ台＝2〜3羽、水鉢から＝群れ
+ const lv=level(),flock=lv>=2;
+ let key=lv===0?pick(['v0a','v0b']):lv===1?pick(['v1a','v1b']):'s1_lv'+lv;
+ if(jackpot()&&Math.random()<.5)key='dango_old';
+ const cnt=A[key].birds.length;
  showScene(key);
  const stay=rnd(45,90)*1000,g=visitGap();leaveAt=performance.now()+stay;setNextVisit(now()+stay+rnd(g[0],g[1]));
  // 観察小屋があると、途中で何羽かがすぐ近くまで来てくれる
- closeKey=null;if(S.owned.hide&&Math.random()<.65){closeKey=pick(['c1','c2','c3']);closeAt=performance.now()+stay*rnd(.3,.45);leaveAt+=rnd(20,40)*1000}
- let msg=key==='dango_old'?'大当たりの日のごほうび。ふわふわの団子がやってきました！':pick(['シマエナガの群れがやってきました','シマエナガたちが遊びに来ました','白いまんまるが枝に並びました']);
- let logx='';
- if(S.owned.binoc){const n=Math.round(rnd(8,18));msg+='。双眼鏡で数えると'+n+'羽';logx='・'+n+'羽';
+ closeKey=null;if(S.owned.hide&&Math.random()<.65){closeKey=pick(cnt===1?['c1','c3']:['c1','c2','c3']);closeAt=performance.now()+stay*rnd(.3,.45);leaveAt+=rnd(20,40)*1000}
+ let msg=key==='dango_old'?'大当たりの日のごほうび。ふわふわの団子がやってきました！'
+  :!flock?(cnt===1?pick(['シマエナガが1羽、通りかかりました','1羽のシマエナガが枝にとまりました']):pick([cnt+'羽のシマエナガがエサ台に寄っていきました',cnt+'羽のシマエナガが遊びに来ました']))
+  :pick(['シマエナガの群れがやってきました','シマエナガたちが遊びに来ました','白いまんまるが枝に並びました']);
+ let logx=flock?'':'・'+cnt+'羽';
+ if(S.owned.binoc){if(flock&&key!=='dango_old'){const n=Math.round(rnd(8,18));msg+='。双眼鏡で数えると'+n+'羽';logx='・'+n+'羽'}
   const kids=pastKids();if(kids.length&&Math.random()<.6){const a=kids.slice().sort(()=>Math.random()-.5).slice(0,Math.random()<.5?1:2);msg+='。'+a.join('と')+'の姿も見えます！';logx+='・'+a.join('と')+'も'}}
  toast(msg,S.owned.binoc?7000:4500);
  addLog('シマエナガが来た（'+S.visits+'回目'+logx+'）');save();if(first)pump()}
@@ -432,7 +438,7 @@ const ALBUM_MAX=60;
 function idb(){return new Promise((res,rej)=>{try{const r=indexedDB.open('shimaenagaAlbum',1);r.onupgradeneeded=()=>r.result.createObjectStore('p',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
 function idbDo(mode,fn){return idb().then(db=>new Promise((res,rej)=>{const tx=db.transaction('p',mode),st=tx.objectStore('p');const r=fn(st);tx.oncomplete=()=>res(r&&r.result);tx.onerror=()=>rej(tx.error)}))}
 const albumAll=()=>idbDo('readonly',st=>st.getAll()).then(a=>(a||[]).sort((x,y)=>y.id-x.id));
-const SCENE_NAME={s1:'冬の群れ',c1:'すぐ近くの1羽',c2:'寄り添う2羽',c3:'毛繕い',s2:'巣作り',s3:'巣の中のヒナ',s4:'エナガ団子',s5:'巣立ち後の親子',dango_old:'ごほうびの団子',s0b:'晩冬の森',s0c:'早春の森'};
+const SCENE_NAME={s1:'冬の群れ',s1_lv2:'冬の群れ',s1_lv3:'冬の群れ',s1_lv4:'冬の群れ',v0a:'通りかかった1羽',v0b:'通りかかった1羽',v1a:'エサ台に来た2羽',v1b:'エサ台に来た3羽',c1:'すぐ近くの1羽',c2:'寄り添う2羽',c3:'毛繕い',s2:'巣作り',s3:'巣の中のヒナ',s4:'エナガ団子',s5:'巣立ち後の親子',dango_old:'ごほうびの団子',s0b:'晩冬の森',s0c:'早春の森'};
 function shotLabel(){const k=curKey;let n=SCENE_NAME[k]||'冬の森';const L=life();
  if((k==='s3'||k==='s4')&&S.broods[L.k]){const a=S.broods[L.k].names.filter(Boolean);if(a.length)n+='（'+a.join('・')+'）'}
  if(k==='s2'&&(S.parents.a||S.parents.b))n+='（'+parentNames()+'）';return n}

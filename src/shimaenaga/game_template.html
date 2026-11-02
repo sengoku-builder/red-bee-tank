@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#dfe5ea">
+<title>シマエナガの森</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#dfe5ea;color:#26313b;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;-webkit-tap-highlight-color:transparent}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#fx{pointer-events:none}
+#ui{position:fixed;inset:0;pointer-events:none}
+#ui>*{pointer-events:auto}
+body.wall #ui{display:none}
+.glass{background:rgba(250,252,253,.74);border:1px solid rgba(255,255,255,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 6px 24px rgba(40,60,80,.12)}
+button{font:inherit;color:#26313b;border-radius:14px;padding:10px 14px;cursor:pointer;border:1px solid rgba(255,255,255,.9)}
+button:disabled{opacity:.45;cursor:default}
+button.main{background:#3e6f8e;color:#fff;border-color:#3e6f8e}
+.hud{position:absolute;top:calc(10px + env(safe-area-inset-top));left:10px;right:10px;padding:10px 13px;border-radius:16px;font-size:13px;line-height:1.6;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.hud b{font-size:17px;font-variant-numeric:tabular-nums}
+.hud .muted{color:#5d6b77;font-size:12px}
+.hud .stage{text-align:right;font-size:12.5px;max-width:60%}
+.dock{position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;gap:6px}
+.dock button{flex:1;padding:11px 4px;font-size:13px;white-space:nowrap}
+.panel{display:none;position:absolute;left:10px;right:10px;bottom:calc(64px + env(safe-area-inset-bottom));max-height:68%;overflow:auto;padding:16px;border-radius:18px}
+.panel.open{display:block}
+.panel h2{font-size:17px;margin:0 0 6px}
+.panel p{font-size:13px;color:#4a5864;line-height:1.65;margin:6px 0}
+.item{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid rgba(60,80,100,.12)}
+.item .info{flex:1;min-width:0}
+.item small{display:block;color:#5d6b77;font-size:12px;margin-top:2px;line-height:1.5}
+.item .price{color:#9a5b1e;font-variant-numeric:tabular-nums;font-weight:600}
+.item .btns{display:flex;flex-direction:column;gap:5px}
+.item .btns button{padding:7px 11px;font-size:12.5px;white-space:nowrap}
+.thumb{flex:0 0 54px;width:54px;height:54px;border-radius:12px;overflow:hidden;background:#cfd8de}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.note{border-top:1px solid rgba(60,80,100,.12);padding:10px 0}
+.note h3{font-size:14px;margin:0 0 4px;color:#3e6f8e}
+.note div{font-size:13px;line-height:1.75;color:#33414d}
+.note.locked h3{color:#8995a0}
+.log{font-size:12.5px;line-height:1.85;color:#4a5864}
+.sec{margin:14px 0 4px;font-size:13px;color:#3e6f8e;font-weight:700}
+.modal{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100% - 28px));max-height:86%;overflow:auto;padding:20px;border-radius:20px;text-align:center;z-index:30}
+.modal.open{display:block}
+.modal .tag{font-size:12px;color:#9a5b1e;letter-spacing:.08em}
+.modal h2{margin:4px 0 6px;font-size:19px}
+.modal .body{font-size:14px;line-height:1.85;text-align:left;margin:10px 0 14px;color:#33414d}
+.big{font-size:42px;font-weight:700;margin:8px 0;color:#3e6f8e;font-variant-numeric:tabular-nums}
+.names{display:flex;flex-direction:column;gap:7px;margin:10px 0 14px}
+.names label{display:flex;align-items:center;gap:8px;font-size:13px;color:#4a5864}
+.names input{flex:1;padding:9px 10px;border-radius:10px;border:1px solid #c5d0d8;font:inherit;font-size:15px;background:#fff;color:#26313b}
+.toast{display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:calc(70px + env(safe-area-inset-bottom));max-width:calc(100% - 24px);padding:10px 15px;border-radius:14px;font-size:13.5px;text-align:center;z-index:25}
+.toast.show{display:block}
+.trial{display:none;position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));padding:10px;border-radius:16px;gap:8px;align-items:center;z-index:20}
+.trial.show{display:flex}
+.trial span{flex:1;font-size:13px}
+body.trialing .dock,body.trialing .panel{display:none}
+.debug{position:absolute;left:10px;bottom:calc(64px + env(safe-area-inset-bottom));display:flex;gap:5px;flex-wrap:wrap}
+.debug button{font-size:11.5px;padding:6px 8px}
+.debug[hidden]{display:none}
+#whud{display:none;position:fixed;top:calc(14px + env(safe-area-inset-top));right:14px;padding:7px 11px;border-radius:12px;background:rgba(255,255,255,.42);color:#26313b;font-size:12px;line-height:1.6;text-align:right;pointer-events:none;font-variant-numeric:tabular-nums;max-width:62%}
+body.wall.showhud #whud{display:block}
+.fam{border-top:1px solid rgba(60,80,100,.12);padding:10px 0;font-size:13px;line-height:1.7}
+.fam b{color:#3e6f8e}
+</style></head>
+<body>
+<canvas id="gl"></canvas><canvas id="fx"></canvas>
+<div id="whud"></div>
+<div id="ui">
+ <div class="hud glass" id="hud"></div>
+ <div class="toast glass" id="toast"></div>
+ <div class="dock">
+  <button class="glass" id="bShop">ショップ</button>
+  <button class="glass" id="bFam">家族</button>
+  <button class="glass" id="bNote">知識ノート</button>
+  <button class="glass" id="bLog">記録</button>
+ </div>
+ <section class="panel glass" id="pShop"><h2>森の道具屋</h2><p>道具をそろえるほど、シマエナガがよく来る森になります。「試し置き」で買う前に森に置いた様子を見られます。</p><div id="shopList"></div></section>
+ <section class="panel glass" id="pFam"><h2>シマエナガの家族</h2><div id="famList"></div></section>
+ <section class="panel glass" id="pNote"><h2>知識ノート</h2><p>出来事が起きると、カードが1枚ずつ増えていきます。</p><div id="noteList"></div></section>
+ <section class="panel glass" id="pLog"><h2>記録</h2><div class="log" id="logList"></div>
+  <div class="sec">壁紙</div><div id="wpBox"></div><label style="display:block;font-size:13px;margin:4px 0"><input type="checkbox" id="hudChk"> 壁紙の右上に状態（Gや子育ての様子）を表示する</label>
+  <div class="sec">やり直し</div><button class="glass" id="bReset">最初からやり直す</button></section>
+ <div class="trial glass" id="trial"><span id="trialMsg"></span><button class="main" id="trialBuy">買う</button><button class="glass" id="trialEnd">やめる</button></div>
+ <div class="modal glass" id="mLot"><div class="tag">今日のくじ</div><h2 id="lotTitle">今日の単価を決めよう</h2><div class="big" id="lotBig">？</div><p class="body" id="lotMsg" style="text-align:center"></p><button class="main" id="bDraw">くじを引く</button></div>
+ <div class="modal glass" id="mNote"><div class="tag">知識カード</div><h2 id="mnTitle"></h2><div class="body" id="mnBody"></div><button class="main" id="bNoteOk">わかった</button></div>
+ <div class="modal glass" id="mEvt"><div class="tag" id="meTag"></div><h2 id="meTitle"></h2><div class="body" id="meBody"></div><div class="names" id="meNames"></div><button class="main" id="meOk">OK</button></div>
+ <div class="debug" id="debug" hidden><button class="glass" data-skip="3600000">＋1時間</button><button class="glass" data-skip="86400000">＋1日</button><button class="glass" id="dRich">＋1万G</button><button class="glass" id="dVisit">来訪</button></div>
+</div>
+<script>
+(()=>{
+'use strict';
+/* ================= 素材（写真と鳥の位置） ================= */
+// birds: [中心x, 頭の上y, 足元y, 幅の半分, 動き方]
+// 動き方: 0=首かしげ・ふくらみ・寄りかかり 1=首かしげ・ふくらみ 2=首かしげのみ 3=ヒナのかたまり 4=呼吸とふくらみだけ
+const A=__ASSETS__;
+const IW=768,IH=1376,MAXN=6;
+const qs=new URLSearchParams(location.search),DEBUG=qs.has('debug'),WALL=qs.has('wallpaper');
+const $=id=>document.getElementById(id);
+
+/* ================= 保存データ ================= */
+const KEY='shimaenagaForest_v1',MIN=60000,HOUR=3600000,DAY=86400000,SCALE=3,BASE=1;
+const blank=()=>({ver:1,g:1000,created:Date.now(),lastTick:Date.now(),rates:{},owned:{},notes:[],seen:{},log:[],visits:0,offset:0,lv3At:0,broods:{},parents:{},hud:true});
+let S;
+function load(){try{S=Object.assign(blank(),JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){S=S||blank()}}
+load();
+const save=()=>{if(WALL)return;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const now=()=>Date.now()+(S.offset||0);
+const pad=n=>String(n).padStart(2,'0');
+const dkey=t=>{const d=new Date(t);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const dayStart=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
+const G=n=>Math.floor(n).toLocaleString('ja-JP')+'G';
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function addLog(s,at){const d=new Date(at||now());S.log.unshift((d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes())+'　'+s);if(S.log.length>80)S.log.length=80}
+function toast(s,ms){const e=$('toast');e.textContent=s;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),ms||3500)}
+
+/* ================= お金：閉じていた間も日ごとの単価で貯まる ================= */
+function tick(){const t=now();let a=S.lastTick;
+ while(a<t){const e=Math.min(t,dayStart(a)+DAY);S.g+=(e-a)/MIN*(S.rates[dkey(a)]||BASE);a=e}
+ S.lastTick=Math.max(S.lastTick,t)}
+
+/* ================= くじ ================= */
+const LOT=[[1,67,'今日はいつもどおり。のんびり森を見守りましょう。'],[2,25,'いい日！今日は1分2G。'],[3,8,'大当たり！今日は1分3G。森でいいことがあるかも…！']];
+function drawLot(){tick();const t=now(),k=dkey(t);if(S.rates[k])return;
+ let r=Math.random()*100,p=LOT[0];for(const L of LOT){if((r-=L[1])<0){p=L;break}}
+ S.rates[k]=p[0];const from=Math.max(dayStart(t),S.created);S.g+=(p[0]-BASE)*Math.max(0,t-from)/MIN;
+ for(const d of Object.keys(S.rates))if(d<dkey(t-40*DAY))delete S.rates[d];
+ addLog('くじ：1分'+p[0]+'G');save();
+ $('lotTitle').textContent=p[0]===3?'大当たり！':'今日の単価';$('lotBig').textContent=p[0]+'G / 分';$('lotMsg').textContent=p[2];
+ $('bDraw').textContent='閉じる';$('bDraw').onclick=()=>{$('mLot').classList.remove('open');pump()};render()}
+function maybeLottery(){if(WALL||S.rates[dkey(now())]||anyModal())return;
+ $('lotTitle').textContent='今日の単価を決めよう';$('lotBig').textContent='？';$('lotMsg').textContent='くじを引くと、今日1日（0時から）の1分あたりのGが決まります。';
+ $('bDraw').textContent='くじを引く';$('bDraw').onclick=drawLot;$('mLot').classList.add('open');return true}
+const jackpot=()=>S.rates[dkey(now())]===3;
+
+/* ================= 道具（買うほど森が育つ） ================= */
+const ITEMS=[
+ {id:'feeder',name:'脂身のエサ台（バードケーキ）',price:1500,img:'lv1',desc:'木の実を練り込んだ脂のかたまり。冬の小鳥の大切なごちそう。',note:'feeder'},
+ {id:'water',name:'石の水鉢',price:4000,img:'lv2',need:'feeder',desc:'凍りにくい浅い水場。雪の季節は水が貴重です。',note:'water'},
+ {id:'nest',name:'巣材（苔・地衣類・羽根）',price:8000,img:'lv3',need:'water',desc:'巣作りの材料を森にそっと置いておきます。つがいが生まれるきっかけに。',note:'nestmat'},
+ {id:'icicle',name:'つららの枝',price:0,soon:true,desc:'準備中。つららをなめに来るシマエナガが見られるように。'},
+];
+const level=()=>S.owned.nest?3:S.owned.water?2:S.owned.feeder?1:0;
+function buy(it){tick();if(S.owned[it.id]||S.g<it.price||(it.need&&!S.owned[it.need]))return false;
+ S.g-=it.price;S.owned[it.id]=now();if(it.id==='nest')S.lv3At=now();
+ addLog(it.name+'を置いた');unlock(it.note);save();toast(it.name+'を森に置きました');if(trial){trial=null;document.body.classList.remove('trialing');$('trial').classList.remove('show')}scheduleNext();render();renderShop();pump();return true}
+let trial=null;
+function startTrial(it){closePanels();trial={it,until:performance.now()+20000};document.body.classList.add('trialing');$('trial').classList.add('show');
+ $('trialBuy').disabled=S.g<it.price;$('trialBuy').textContent='買う（'+G(it.price)+'）';$('trialBuy').onclick=()=>buy(it);
+ showScene(it.img,true)}
+function endTrial(){if(!trial)return;trial=null;document.body.classList.remove('trialing');$('trial').classList.remove('show');scheduleNext()}
+$('trialEnd').onclick=()=>endTrial();
+
+/* ================= 子育てのこよみ（ゲーム内時間＝現実の3倍） ================= */
+// 巣材を置いてから2時間後に最初のつがいが生まれ、以後は1年ごとにくり返す
+const PH=[['nest',14],['egg',15],['chick',16],['dango',4],['family',12],['winter',10]];
+const CYCLE=PH.reduce((a,p)=>a+p[1],0);
+const PAIR_DELAY=2*HOUR;
+const gday=ms=>ms*SCALE/DAY;
+function life(t){t=t||now();
+ if(!S.lv3At||t<S.lv3At+PAIR_DELAY)return{phase:'pre'};
+ const gd=gday(t-S.lv3At-PAIR_DELAY),k=Math.floor(gd/CYCLE);let r=gd-k*CYCLE;
+ for(const [p,d] of PH){if(r<d)return{phase:p,k,left:(d-r)*DAY/SCALE,start:t-r*DAY/SCALE};r-=d}
+ return{phase:'winter',k,left:0}}
+const PNAME={pre:'冬の森',nest:'巣作り',egg:'卵をあたためる',chick:'巣の中のヒナ',dango:'エナガ団子',family:'巣立ち後の親子',winter:'冬の群れ'};
+function leftText(ms){const h=ms/HOUR;return h<1?'あと少し':h<24?'あと約'+Math.ceil(h)+'時間':'あと約'+Math.round(h/24)+'日'}
+const brood=k=>S.broods[k]||(S.broods[k]={names:[],at:0});
+function parentNames(){const p=S.parents;return p.a||p.b?(p.a||'？')+'と'+(p.b||'？'):'つがい'}
+
+/* ================= 知識カード ================= */
+const NOTES={
+ start:['シマエナガってどんな鳥？','シマエナガは、エナガという小鳥のうち北海道にすむ仲間（亜種）です。本州のエナガは目の上に黒い線がありますが、シマエナガは顔が真っ白。体長は約14cmで、そのうち半分ほどが長い尾です。体重は7〜8gほどで、1円玉7〜8枚くらいしかありません。'],
+ protect:['わたしたちは「森の見守り役」','シマエナガなどの野鳥は、法律（鳥獣保護管理法）で捕まえたり飼ったりすることが禁止されています。このゲームのあなたは、森を整えて、やってくるシマエナガをそっと見守る役。実際の観察でも、巣に近づきすぎないこと、ヒナにさわらないことが大切です。'],
+ visit:['冬の群れ','冬のシマエナガは10〜20羽ほどの群れで森をめぐり、エサを探します。シジュウカラやコガラなど、ほかの小鳥と一緒に「混群」をつくることもあります。寒い夜は、枝の上で体を寄せ合って眠ります。'],
+ feeder:['シマエナガは何を食べる？','主なエサは小さな虫やクモ、その卵です。冬は虫が少ないので、木の皮のすき間に隠れた虫の卵などを細かく探して食べます。カエデの樹液も大好物。脂身や、脂に木の実を練り込んだバードケーキは、冬を越すための大切なエネルギーになります。実際にエサ台を置くときは、冬の間だけにして、清潔に保つのがマナーです。'],
+ water:['冬の水場','雪と氷に囲まれた冬の森では、飲み水や水浴びの場所が貴重です。シマエナガは雪を食べたり、つららの先をなめて水分をとったりします。カエデの樹液が凍った甘いつららをなめに来る姿は、北海道の冬の名場面です。'],
+ nestmat:['巣の材料','シマエナガの巣は、コケをクモの糸でつなぎ合わせて作ります。外側には地衣類（木につく白っぽい苔のようなもの）を貼りつけて、木の皮そっくりに目立たなくします。中には鳥の羽毛を1,000枚以上、多いときは2,000枚を超えて敷きつめ、ふかふかのベッドにします。'],
+ pair:['つがいの誕生','2〜3月ごろ、冬の群れの中でつがいが生まれ、群れを離れて子育ての準備を始めます。シマエナガの夫婦は、巣作りも子育ても2羽で協力して行います。'],
+ nest:['巣作り','夫婦で2週間ほどかけて巣を作ります。巣は横に小さな出入り口がある卵のような形（ドーム形）。クモの糸で編んであるので伸び縮みし、ヒナが大きくなっても巣が広がります。'],
+ egg:['卵とあたため','卵は1日に1個ずつ産み、全部で7〜12個ほど。卵をあたためるのは主にメスで、その間オスがメスにエサを運びます。卵はおよそ2週間でかえります。'],
+ chick:['巣の中のヒナ','ヒナがかえると、両親は1日に何百回もエサを運びます。子育てに失敗した近くの仲間（親戚のことが多い）が「ヘルパー」としてエサ運びを手伝うこともある、めずらしい鳥です。ヒナは約16〜17日で巣立ちます。'],
+ dango:['エナガ団子','巣立ったばかりのヒナたちは、枝の上に一列にぎゅっと並んで、親が運ぶエサを待ちます。体を寄せ合って体温を逃がさないためとも言われ、この姿が「エナガ団子」と呼ばれています。見られるのは巣立ち直後の数日だけです。'],
+ family:['巣立ち後の親子','巣立ったばかりの幼鳥は、顔にこげ茶色の部分があり、まだ大人のように真っ白ではありません。しばらくは家族で一緒に行動し、親からエサをもらいながら、自分でエサをとる練習をします。'],
+ winter:['季節がめぐる','夏から秋にかけて、家族はほかの家族と合流して群れになり、冬を迎えます。翌年の春、その群れの中からまた新しいつがいが生まれます。'],
+};
+const NOTE_ORDER=['start','protect','visit','feeder','water','nestmat','pair','nest','egg','chick','dango','family','winter'];
+const noteQ=[];
+function unlock(id){if(!id||!NOTES[id]||S.notes.includes(id))return;S.notes.push(id);save();if(!WALL)noteQ.push(id)}
+function showNoteNow(id){const n=NOTES[id];$('mnTitle').textContent=n[0];$('mnBody').textContent=n[1];$('mNote').classList.add('open')}
+$('bNoteOk').onclick=()=>{$('mNote').classList.remove('open');setTimeout(pump,250)};
+
+/* ================= 出来事（つがい・ふ化・巣立ち） ================= */
+const evtQ=[];
+function checkLife(){const L=life();if(L.phase==='pre')return;
+ // 途中の段階を飛ばしても、カードと記録は順番にそろえる
+ const order=['nest','egg','chick','dango','family','winter'];
+ for(let k=0;k<=L.k;k++){
+  const upto=k<L.k?order.length-1:order.indexOf(L.phase);
+  for(let i=0;i<=upto;i++){const p=order[i],id=k+'_'+p;if(S.seen[id])continue;S.seen[id]=1;onPhase(p,k)}
+ }
+ save()}
+function onPhase(p,k){
+ if(p==='nest'){unlock('pair');unlock('nest');addLog((k?(k+1)+'回目の':'')+'つがいが生まれ、巣作りを始めた');
+  if(k===0&&!S.parents.a)evtQ.push({type:'pair'});else evtQ.push({type:'info',tag:'森の出来事',title:'今年もつがいが巣作りを始めました',body:'冬の群れの中から、新しいつがいが生まれました。'})}
+ if(p==='egg'){unlock('egg');addLog('巣の中で卵をあたため始めた')}
+ if(p==='chick'){unlock('chick');addLog('ヒナがかえった');evtQ.push({type:'hatch',k})}
+ if(p==='dango'){unlock('dango');const n=brood(k).names.filter(Boolean);addLog('ヒナが巣立ってエナガ団子に');evtQ.push({type:'info',tag:'森の出来事',title:'巣立ち！エナガ団子です',body:(n.length?n.join('・')+'たちが':'ヒナたちが')+'巣から出て、枝の上に一列に並びました。'})}
+ if(p==='family'){unlock('family');addLog('親子で森をめぐり始めた')}
+ if(p==='winter'){unlock('winter');addLog('季節がめぐり、家族は冬の群れに加わった')}
+}
+const DEF_NAMES=['ゆき','もち','ふわ','しろ','まる','こはる','つらら','ましゅ'];
+function showEvt(e){const N=$('meNames');N.innerHTML='';$('meOk').textContent='OK';
+ if(e.type==='pair'){$('meTag').textContent='森の出来事';$('meTitle').textContent='つがいが生まれました';
+  $('meBody').textContent='エサ台と水場と巣材のそろった森で、2羽のシマエナガがつがいになりました。これから巣作りが始まります。夫婦に名前を付けてあげましょう（あとから「家族」で変えられます）。';
+  [['a','お父さん'],['b','お母さん']].forEach(([k,l])=>N.insertAdjacentHTML('beforeend','<label>'+l+'<input data-k="'+k+'" maxlength="10" placeholder="名前"></label>'));
+  $('meOk').textContent='この名前にする';
+  $('meOk').onclick=()=>{N.querySelectorAll('input').forEach(i=>S.parents[i.dataset.k]=i.value.trim());save();closeEvt()}}
+ else if(e.type==='hatch'){const b=brood(e.k);$('meTag').textContent='森の出来事';$('meTitle').textContent='ヒナがかえりました！';
+  $('meBody').textContent='巣の入り口から、小さなヒナたちが顔を出しています。見えている5羽に名前を付けてあげましょう（あとから「家族」で変えられます）。';
+  const base=DEF_NAMES.slice().sort(()=>Math.random()-.5);
+  for(let i=0;i<5;i++)N.insertAdjacentHTML('beforeend','<label>'+(i+1)+'羽目<input data-i="'+i+'" maxlength="10" placeholder="'+base[i]+'" value="'+(b.names[i]||'')+'"></label>');
+  $('meOk').textContent='この名前にする';
+  $('meOk').onclick=()=>{N.querySelectorAll('input').forEach(i=>b.names[+i.dataset.i]=i.value.trim()||i.placeholder);b.at=b.at||now();addLog('ヒナに名前を付けた：'+b.names.join('・'));save();closeEvt()}}
+ else{$('meTag').textContent=e.tag;$('meTitle').textContent=e.title;$('meBody').textContent=e.body;$('meOk').onclick=closeEvt}
+ $('mEvt').classList.add('open')}
+function closeEvt(){$('mEvt').classList.remove('open');render();setTimeout(pump,250)}
+const anyModal=()=>['mLot','mNote','mEvt'].some(id=>$(id).classList.contains('open'));
+// 出来事 → 知識カード → くじ の順に1つずつ出す
+function pump(){if(WALL||anyModal())return;if(evtQ.length){showEvt(evtQ.shift());return}if(noteQ.length){showNoteNow(noteQ.shift());return}maybeLottery()}
+
+/* ================= 場面の選び方 ================= */
+const BASE_IMG=['lv0','lv1','lv2','lv3'];
+function idleScene(){const L=life();
+ switch(L.phase){
+  case 'nest':case 'egg':return Math.random()<.65?'s2':'s0b';
+  case 'chick':return 's3';
+  case 'dango':return 's4';
+  case 'family':return Math.random()<.7?'s5':'s0c';
+  default:return BASE_IMG[level()];
+ }}
+// 子育て前と冬の群れの間は、ときどきシマエナガがやってくる
+function visitGap(){return [[18,35],[9,18],[5,11],[3,7]][level()].map(m=>m*MIN)}
+let curKey=null,nextAt=0,visiting=false;
+function scheduleNext(){const L=life();visiting=false;
+ if(L.phase==='pre'||L.phase==='winter'){showScene(BASE_IMG[level()]);const g=visitGap();nextAt=performance.now()+rnd(g[0],g[1])}
+ else{showScene(idleScene());nextAt=performance.now()+rnd(2.5,5)*MIN}
+}
+function visit(){const L=life();if(!(L.phase==='pre'||L.phase==='winter'))return;
+ visiting=true;S.visits++;const first=!S.notes.includes('visit');unlock('visit');
+ const key=jackpot()&&Math.random()<.5?'dango_old':'s1';
+ showScene(key);toast(key==='dango_old'?'大当たりの日のごほうび。ふわふわの団子がやってきました！':pick(['シマエナガの群れがやってきました','シマエナガたちが遊びに来ました','白いまんまるが枝に並びました']),4500);
+ addLog('シマエナガが来た（'+S.visits+'回目）');save();nextAt=performance.now()+rnd(45,90)*1000;if(first)pump()}
+function sceneTick(){if(trial){if(performance.now()>trial.until)endTrial();return}
+ if(performance.now()<nextAt)return;const L=life();
+ if((L.phase==='pre'||L.phase==='winter')&&!visiting)visit();else scheduleNext()}
+
+/* ================= 描画（動く写真：2枚の写真をなめらかに切り替える） ================= */
+const cv=$('gl'),fx=$('fx'),ctx=fx.getContext('2d');
+let W=1,H=1,DPR=1;
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=Math.round(innerWidth*DPR);H=Math.round(innerHeight*DPR);cv.width=fx.width=W;cv.height=fx.height=H}
+addEventListener('resize',resize);resize();
+const warp=s=>`
+ for(int i=0;i<${MAXN};i++){
+  if(i>=n${s})break;
+  vec4 b=b${s}[i];vec4 a=a${s}[i];
+  float cy=(b.y+b.z)*.5,ry=(b.z-b.y)*.5+8.;
+  vec2 d=(px-vec2(b.x,cy))/vec2(b.w*1.15,ry*1.12);
+  float m=smoothstep(1.,.62,length(d));
+  if(m<=0.)continue;
+  vec2 foot=vec2(b.x,b.z);
+  q=foot+(q-foot)/(1.+a.x*m);
+  vec2 neck=vec2(b.x,b.y+(b.z-b.y)*.42);
+  float hm=m*smoothstep(neck.y+10.,neck.y-18.,px.y);
+  float ang=a.y*hm;float cs=cos(ang),sn=sin(ang);
+  vec2 r=q-neck;q=neck+vec2(cs*r.x-sn*r.y,sn*r.x+cs*r.y);
+  float lm=m*smoothstep(b.z,b.y,px.y);
+  q.x-=a.z*lm*(b.z-px.y)*.08;
+  q.y+=a.w*m*smoothstep(b.z,b.y,px.y)*(b.z-b.y)*.06;
+ }`;
+const VS='attribute vec2 p;varying vec2 v;void main(){v=vec2((p.x+1.)/2.,(1.-p.y)/2.);gl_Position=vec4(p,0.,1.);}';
+const FS=`precision highp float;
+uniform sampler2D t0,t1;uniform vec4 vw;uniform float mx;uniform int n0,n1;
+uniform vec4 b0[${MAXN}],a0[${MAXN}],b1[${MAXN}],a1[${MAXN}];varying vec2 v;
+vec2 W0(vec2 px){vec2 q=px;${warp(0)}return q;}
+vec2 W1(vec2 px){vec2 q=px;${warp(1)}return q;}
+void main(){
+ vec2 px=(vw.xy+v*vw.zw)*vec2(${IW}.,${IH}.),sz=vec2(${IW}.,${IH}.);
+ vec3 c0=texture2D(t0,clamp(W0(px)/sz,0.,1.)).rgb;
+ vec3 c=c0;
+ if(mx>0.){vec3 c1=texture2D(t1,clamp(W1(px)/sz,0.,1.)).rgb;c=mix(c0,c1,mx);}
+ gl_FragColor=vec4(c,1.);
+}`;
+const gl=cv.getContext('webgl');
+function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s}
+const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);gl.useProgram(pr);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+const loc=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+const U=n=>gl.getUniformLocation(pr,n);
+function mkTex(){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);[gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE));
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);return t}
+gl.uniform1i(U('t0'),0);gl.uniform1i(U('t1'),1);
+const smooth=(x,y,k,dt)=>x+(y-x)*Math.min(1,dt*k);
+function makeState(b){return{mode:b[4],ph:rnd(0,9),sp:rnd(1.0,1.4),tilt:0,tiltT:0,next:rnd(1,5),puff:0,puffT:0,puffHold:0,lean:0,leanT:0,leanHold:0,beg:0,begT:0,begHold:0}}
+// slot: 写真1枚ぶん（テクスチャ・鳥・しぐさ）
+const slots=[{tex:mkTex(),key:null,st:[]},{tex:mkTex(),key:null,st:[]}];
+let mx=0,fading=null,ready=false;
+const imgCache={};
+function getImg(key,cb){let im=imgCache[key];if(!im){im=imgCache[key]=new Image();im.src=A[key].img}if(im.complete&&im.naturalWidth)cb(im);else im.addEventListener('load',()=>cb(im),{once:true})}
+function upload(slot,key,im){gl.activeTexture(gl.TEXTURE0+slot);gl.bindTexture(gl.TEXTURE_2D,slots[slot].tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,im);
+ slots[slot].key=key;slots[slot].st=A[key].birds.map(makeState);
+ const arr=new Float32Array(MAXN*4);A[key].birds.forEach((b,j)=>arr.set(b.slice(0,4),j*4));gl.uniform4fv(U('b'+slot),arr);gl.uniform1i(U('n'+slot),A[key].birds.length)}
+function showScene(key,quick){if(!A[key])return;curKey=key;
+ if(!ready){getImg(key,im=>{upload(0,key,im);ready=true});return}
+ if(slots[0].key===key&&!fading)return;
+ getImg(key,im=>{if(curKey!==key)return;upload(1,key,im);fading={t:0,dur:quick?1.2:3.2};mx=0.0001})}
+function finishFade(){const a=slots[0];slots[0]=slots[1];slots[1]=a;
+ // テクスチャのユニット番号と鳥の情報を入れ替える
+ gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,slots[0].tex);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,slots[1].tex);
+ const k=slots[0].key,arr=new Float32Array(MAXN*4);A[k].birds.forEach((b,j)=>arr.set(b.slice(0,4),j*4));gl.uniform4fv(U('b0'),arr);gl.uniform1i(U('n0'),A[k].birds.length);gl.uniform1i(U('n1'),0);
+ mx=0;fading=null}
+function animSlot(slot,t,dt){const s0=slots[slot],arr=new Float32Array(MAXN*4);
+ s0.st.forEach((s,i)=>{const M=s.mode;s.next-=dt;
+  if(s.next<=0){
+   if(M===3){s.begT=rnd(.6,1);s.begHold=rnd(1,2);s.next=rnd(4,8)}
+   else if(M===4){s.puffT=rnd(.025,.04);s.puffHold=rnd(1.5,2.5);s.next=rnd(4,7)}
+   else{const r=Math.random(),canPuff=M<=1,canLean=M===0;
+    if(r<.40||(!canPuff&&r<.75)){s.tiltT=(Math.random()<.5?-1:1)*rnd(.07,.13);s.next=rnd(3,6)}
+    else if(r<.60||!canPuff){s.tiltT=0;s.next=rnd(2.5,5)}
+    else if(r<.80||!canLean){s.puffT=rnd(.03,.045);s.puffHold=rnd(1.2,2.2);s.next=rnd(3,6)}
+    else{s.leanT=(Math.random()<.5?-1:1)*rnd(.18,.3);s.leanHold=rnd(2,4);s.next=rnd(4,7)}}}
+  if(s.puffT>0&&s.puff>s.puffT*.95){s.puffHold-=dt;if(s.puffHold<=0)s.puffT=0}
+  if(s.leanT!==0&&Math.abs(s.lean-s.leanT)<.02){s.leanHold-=dt;if(s.leanHold<=0)s.leanT=0}
+  if(s.begT>0&&s.beg>s.begT*.95){s.begHold-=dt;if(s.begHold<=0)s.begT=0}
+  s.tilt=smooth(s.tilt,s.tiltT,1.1,dt);s.puff=smooth(s.puff,s.puffT,s.puffT?1.3:.7,dt);s.lean=smooth(s.lean,s.leanT,.8,dt);s.beg=smooth(s.beg,s.begT,s.begT?1.6:.9,dt);
+  arr[i*4]=(M===3?.008:.012)*Math.sin(t*s.sp+s.ph)+s.puff;arr[i*4+1]=s.tilt;arr[i*4+2]=s.lean;arr[i*4+3]=s.beg});
+ gl.uniform4fv(U('a'+slot),arr)}
+function view(){const s=W/H,a=IW/IH;if(s<a){const vw=s/a;return[(1-vw)/2,0,vw,1]}const vh=a/s;return[0,(1-vh)/2,1,vh]}
+// 雪（場面ごとに量が変わる）
+const flakes=[];for(let i=0;i<170;i++)flakes.push({x:Math.random(),y:Math.random(),z:Math.random(),ph:Math.random()*9});
+let snowAmt=1;
+function snow(dt){ctx.clearRect(0,0,W,H);const tgt=curKey?A[curKey].snow:1;snowAmt=smooth(snowAmt,tgt,.4,dt);const cnt=Math.round(flakes.length*snowAmt);
+ for(let k=0;k<cnt;k++){const f=flakes[k];f.y+=dt*(.015+.045*f.z);f.ph+=dt*(.5+f.z);if(f.y>1.05){f.y=-.05;f.x=Math.random()}
+  const x=(f.x+Math.sin(f.ph)*.012)*W,y=f.y*H,r=(.8+f.z*f.z*4.5)*DPR;ctx.globalAlpha=.25+.6*f.z;
+  ctx.filter=f.z>.85?'blur('+(1.5*DPR)+'px)':'none';ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}
+ ctx.globalAlpha=1;ctx.filter='none'}
+
+/* ================= 画面の表示 ================= */
+function stageText(){const L=life(),lv=level();
+ switch(L.phase){
+  case 'pre':return lv===0?'まだ静かな森。ときどきシマエナガが通りかかります':lv===1?'エサ台にシマエナガが寄るようになりました':lv===2?'水場もできて、群れでやってくる森に':'巣材がそろいました。つがいが生まれそう…';
+  case 'nest':return parentNames()+'が巣作り中・'+leftText(L.left);
+  case 'egg':return '卵をあたためています・ふ化まで'+leftText(L.left);
+  case 'chick':return 'ヒナ5羽が巣の中に・巣立ちまで'+leftText(L.left);
+  case 'dango':return 'エナガ団子！（'+leftText(L.left)+'）';
+  case 'family':return '親子で森をめぐっています';
+  case 'winter':return '冬の群れの季節・次のつがいまで'+leftText(L.left);
+ }}
+function render(){tick();const r=S.rates[dkey(now())];
+ $('hud').innerHTML='<div><b>'+G(S.g)+'</b><div class="muted">今日 '+(r?r+'G/分':'1G/分（くじ未）')+'</div></div><div class="stage">'+stageText()+'</div>';
+ $('whud').innerHTML=G(S.g)+'<br>'+stageText();
+ document.body.classList.toggle('showhud',S.hud!==false&&!qs.has('nohud'));
+ if($('pShop').classList.contains('open'))renderShop(true)}
+let shopSig='';
+function renderShop(soft){const sig=ITEMS.map(it=>(S.owned[it.id]?1:0)+''+(S.g>=it.price?1:0)).join('');if(soft&&sig===shopSig)return;shopSig=sig;const L=$('shopList');L.innerHTML='';
+ for(const it of ITEMS){const owned=S.owned[it.id],locked=it.need&&!S.owned[it.need];
+  const d=document.createElement('div');d.className='item';
+  d.innerHTML=(it.img?'<div class="thumb"><img alt="" src="'+A[it.img].img+'"></div>':'<div class="thumb"></div>')+
+   '<div class="info"><div>'+it.name+'</div><small>'+it.desc+'</small><small class="price">'+(it.soon?'準備中':owned?'置いてあります':locked?'前の道具を置くと買えます':G(it.price))+'</small></div><div class="btns"></div>';
+  const B=d.querySelector('.btns');
+  if(!it.soon&&!owned&&!locked){const t=document.createElement('button');t.className='glass';t.textContent='試し置き';t.onclick=()=>startTrial(it);B.appendChild(t);
+   const b=document.createElement('button');b.className='main';b.textContent='買う';b.disabled=S.g<it.price;b.onclick=()=>buy(it);B.appendChild(b)}
+  L.appendChild(d)}}
+function renderNotes(){const L=$('noteList');L.innerHTML='';
+ for(const id of NOTE_ORDER){const n=NOTES[id],has=S.notes.includes(id),d=document.createElement('div');d.className='note'+(has?'':' locked');
+  d.innerHTML='<h3>'+(has?n[0]:'？？？')+'</h3>'+(has?'<div>'+n[1]+'</div>':'');L.appendChild(d)}}
+function renderFam(){const L=$('famList');L.innerHTML='';const lf=life();
+ if(lf.phase==='pre'){L.innerHTML='<p>まだつがいはいません。道具をそろえて、シマエナガが安心して子育てできる森にしましょう。</p><p>これまでに来たシマエナガ：'+S.visits+'回</p>';return}
+ const p=document.createElement('div');p.className='fam';p.innerHTML='<b>つがい</b><div class="names"><label>お父さん<input data-p="a" maxlength="10" value="'+(S.parents.a||'')+'"></label><label>お母さん<input data-p="b" maxlength="10" value="'+(S.parents.b||'')+'"></label></div>';L.appendChild(p);
+ p.querySelectorAll('input').forEach(i=>i.onchange=()=>{S.parents[i.dataset.p]=i.value.trim();save();render()});
+ for(let k=lf.k;k>=0;k--){const b=S.broods[k];if(!b||!b.names.length)continue;const d=document.createElement('div');d.className='fam';
+  d.innerHTML='<b>'+(k+1)+'年目のヒナ</b><div class="names">'+b.names.map((n,i)=>'<label>'+(i+1)+'羽目<input data-i="'+i+'" maxlength="10" value="'+n+'"></label>').join('')+'</div>';
+  d.querySelectorAll('input').forEach(i=>i.onchange=()=>{b.names[+i.dataset.i]=i.value.trim();save()});L.appendChild(d)}
+ const f=document.createElement('p');f.textContent='今の様子：'+PNAME[lf.phase]+'（'+(lf.k+1)+'年目）。これまでに来たシマエナガ：'+S.visits+'回';L.appendChild(f)}
+function closePanels(){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open'))}
+function toggle(id,fn){const p=$(id),o=p.classList.contains('open');closePanels();if(!o){fn&&fn();p.classList.add('open')}}
+$('bShop').onclick=()=>toggle('pShop',renderShop);
+$('bFam').onclick=()=>toggle('pFam',renderFam);
+$('bNote').onclick=()=>toggle('pNote',renderNotes);
+$('bLog').onclick=()=>toggle('pLog',()=>{$('logList').innerHTML=S.log.slice(0,40).join('<br>')||'まだ記録はありません';$('hudChk').checked=S.hud!==false});
+(function(){const b=$('wpBox');if(window.ShimaApp){b.innerHTML='<button class="main" id="bWp">この森を壁紙にする</button><p>ホーム画面の壁紙が、この森の動く写真になります。遊んだ内容はそのまま壁紙に反映されます。</p>';$('bWp').onclick=()=>{try{ShimaApp.setWallpaper()}catch(e){}}}
+ else b.innerHTML='<p>スマホの「シマエナガの森」アプリで開くと、この森をそのまま壁紙にできます。</p>'})();
+$('hudChk').onchange=e=>{S.hud=e.target.checked;save();render()};
+cv.addEventListener('click',closePanels);
+$('bReset').onclick=()=>{if(confirm('森を最初からやり直しますか？（G・道具・家族・カードがすべて消えます）')){try{localStorage.removeItem(KEY)}catch(e){}location.reload()}};
+if(DEBUG){$('debug').hidden=false;document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{S.offset=(S.offset||0)+ +b.dataset.skip;tick();checkLife();save();render();scheduleNext();pump()});
+ $('dRich').onclick=()=>{S.g+=10000;save();render()};$('dVisit').onclick=()=>{nextAt=0;visiting=false}}
+
+/* ================= 起動 ================= */
+if(WALL)document.body.classList.add('wall');
+tick();unlock('start');unlock('protect');checkLife();save();render();
+scheduleNext();
+let last=0,sec=0,lastSig=level()+'/'+life().phase;
+function frame(ts){const dt=Math.min(.1,(ts-last)/1000||0),t=ts/1000;last=ts;
+ if(ts-sec>1000){sec=ts;
+  if(WALL&&Math.floor(ts/5000)!==Math.floor((ts-1000)/5000)){load()}
+  tick();if(!WALL){checkLife();save()}render();{const sig=level()+'/'+life().phase;if(sig!==lastSig){lastSig=sig;if(!trial)scheduleNext()}}sceneTick();if(!WALL&&!anyModal()&&(evtQ.length||noteQ.length))pump()}
+ if(ready){if(fading){fading.t+=dt;const x=Math.min(1,fading.t/fading.dur);mx=x*x*(3-2*x);if(x>=1)finishFade()}
+  gl.viewport(0,0,W,H);const v=view();gl.uniform4f(U('vw'),v[0],v[1],v[2],v[3]);gl.uniform1f(U('mx'),mx);
+  animSlot(0,t,dt);if(fading)animSlot(1,t,dt);gl.drawArrays(gl.TRIANGLE_STRIP,0,4)}
+ snow(dt);requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+setTimeout(pump,800);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(WALL)load();tick();if(!WALL)checkLife();render();scheduleNext();pump()}});
+addEventListener('storage',e=>{if(e.key===KEY&&WALL){load();render();scheduleNext()}});
+})();
+</script>
+</body></html>

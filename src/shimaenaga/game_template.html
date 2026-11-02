@@ -138,11 +138,12 @@ const ITEMS=[
  {id:'feeder',name:'脂身のエサ台（バードケーキ）',price:1500,img:'lv1',desc:'木の実を練り込んだ脂のかたまり。冬の小鳥の大切なごちそう。',note:'feeder'},
  {id:'water',name:'石の水鉢',price:4000,img:'lv2',need:'feeder',desc:'凍りにくい浅い水場。雪の季節は水が貴重です。',note:'water'},
  {id:'nest',name:'巣材（苔・地衣類・羽根）',price:8000,img:'lv3',need:'water',desc:'巣作りの材料を森にそっと置いておきます。つがいが生まれるきっかけに。',note:'nestmat'},
- {id:'icicle',name:'つららの枝',price:0,soon:true,desc:'準備中。つららをなめに来るシマエナガが見られるように。'},
+ {id:'icicle',name:'つららの枝',price:6000,img:'lv4',need:'nest',desc:'枝先に下がるつらら。冬のシマエナガのお気に入りの水飲み場です。',note:'icicle'},
 ];
-const level=()=>S.owned.nest?3:S.owned.water?2:S.owned.feeder?1:0;
+const level=()=>S.owned.icicle&&S.owned.nest?4:S.owned.nest?3:S.owned.water?2:S.owned.feeder?1:0;
 function buy(it){tick();if(S.owned[it.id]||S.g<it.price||(it.need&&!S.owned[it.need]))return false;
  S.g-=it.price;S.owned[it.id]=now();if(it.id==='nest')S.lv3At=now();
+ {const g=visitGap();if(nextVisit()>now()+g[1])setNextVisit(now()+rnd(g[0],g[1]))}
  addLog(it.name+'を置いた');unlock(it.note);save();toast(it.name+'を森に置きました');if(trial){trial=null;document.body.classList.remove('trialing');$('trial').classList.remove('show')}scheduleNext();render();renderShop();pump();return true}
 let trial=null;
 function startTrial(it){closePanels();trial={it,until:performance.now()+20000};document.body.classList.add('trialing');$('trial').classList.add('show');
@@ -173,7 +174,8 @@ const NOTES={
  protect:['わたしたちは「森の見守り役」','シマエナガなどの野鳥は、法律（鳥獣保護管理法）で捕まえたり飼ったりすることが禁止されています。このゲームのあなたは、森を整えて、やってくるシマエナガをそっと見守る役。実際の観察でも、巣に近づきすぎないこと、ヒナにさわらないことが大切です。'],
  visit:['冬の群れ','冬のシマエナガは10〜20羽ほどの群れで森をめぐり、エサを探します。シジュウカラやコガラなど、ほかの小鳥と一緒に「混群」をつくることもあります。寒い夜は、枝の上で体を寄せ合って眠ります。'],
  feeder:['シマエナガは何を食べる？','主なエサは小さな虫やクモ、その卵です。冬は虫が少ないので、木の皮のすき間に隠れた虫の卵などを細かく探して食べます。カエデの樹液も大好物。脂身や、脂に木の実を練り込んだバードケーキは、冬を越すための大切なエネルギーになります。実際にエサ台を置くときは、冬の間だけにして、清潔に保つのがマナーです。'],
- water:['冬の水場','雪と氷に囲まれた冬の森では、飲み水や水浴びの場所が貴重です。シマエナガは雪を食べたり、つららの先をなめて水分をとったりします。カエデの樹液が凍った甘いつららをなめに来る姿は、北海道の冬の名場面です。'],
+ water:['冬の水場','雪と氷に囲まれた冬の森では、飲み水や水浴びの場所が貴重です。シマエナガは雪を食べたり、つららの先をなめたりして水分をとります。'],
+ icicle:['つららをなめるシマエナガ','冬の終わりごろ、イタヤカエデなどの枝の傷から樹液がしみ出し、凍って甘いつららになります。シマエナガはこの「樹液のつらら」を好んでなめに来ます。昼に解けて夜に凍る、春が近づいた頃によく見られる、北海道の冬の名場面です。'],
  nestmat:['巣の材料','シマエナガの巣は、コケをクモの糸でつなぎ合わせて作ります。外側には地衣類（木につく白っぽい苔のようなもの）を貼りつけて、木の皮そっくりに目立たなくします。中には鳥の羽毛を1,000枚以上、多いときは2,000枚を超えて敷きつめ、ふかふかのベッドにします。'],
  pair:['つがいの誕生','2〜3月ごろ、冬の群れの中でつがいが生まれ、群れを離れて子育ての準備を始めます。シマエナガの夫婦は、巣作りも子育ても2羽で協力して行います。'],
  nest:['巣作り','夫婦で2週間ほどかけて巣を作ります。巣は横に小さな出入り口がある卵のような形（ドーム形）。クモの糸で編んであるので伸び縮みし、ヒナが大きくなっても巣が広がります。'],
@@ -183,7 +185,7 @@ const NOTES={
  family:['巣立ち後の親子','巣立ったばかりの幼鳥は、顔にこげ茶色の部分があり、まだ大人のように真っ白ではありません。しばらくは家族で一緒に行動し、親からエサをもらいながら、自分でエサをとる練習をします。'],
  winter:['季節がめぐる','夏から秋にかけて、家族はほかの家族と合流して群れになり、冬を迎えます。翌年の春、その群れの中からまた新しいつがいが生まれます。'],
 };
-const NOTE_ORDER=['start','protect','visit','feeder','water','nestmat','pair','nest','egg','chick','dango','family','winter'];
+const NOTE_ORDER=['start','protect','visit','feeder','water','icicle','nestmat','pair','nest','egg','chick','dango','family','winter'];
 const noteQ=[];
 function unlock(id){if(!id||!NOTES[id]||S.notes.includes(id))return;S.notes.push(id);save();if(!WALL)noteQ.push(id)}
 function showNoteNow(id){const n=NOTES[id];$('mnTitle').textContent=n[0];$('mnBody').textContent=n[1];$('mNote').classList.add('open')}
@@ -229,7 +231,7 @@ const anyModal=()=>['mLot','mNote','mEvt'].some(id=>$(id).classList.contains('op
 function pump(){if(WALL||anyModal())return;if(evtQ.length){showEvt(evtQ.shift());return}if(noteQ.length){showNoteNow(noteQ.shift());return}maybeLottery()}
 
 /* ================= 場面の選び方 ================= */
-const BASE_IMG=['lv0','lv1','lv2','lv3'];
+const BASE_IMG=['lv0','lv1','lv2','lv3','lv4'];
 function idleScene(){const L=life();
  switch(L.phase){
   case 'nest':case 'egg':return Math.random()<.65?'s2':'s0b';
@@ -239,20 +241,31 @@ function idleScene(){const L=life();
   default:return BASE_IMG[level()];
  }}
 // 子育て前と冬の群れの間は、ときどきシマエナガがやってくる
-function visitGap(){return [[18,35],[9,18],[5,11],[3,7]][level()].map(m=>m*MIN)}
-let curKey=null,nextAt=0,visiting=false;
+function visitGap(){return [[18,35],[9,18],[5,11],[3,7],[2.5,6]][level()].map(m=>m*MIN)}
+let curKey=null,nextAt=0,visiting=false,leaveAt=0,localNext=0;
+// 次に来る時刻（実時刻）。画面を閉じても数え直さない。壁紙側は保存しないので localNext で覚えておく
+const nextVisit=()=>Math.max(S.nextVisitAt||0,localNext);
+function setNextVisit(t){S.nextVisitAt=t;localNext=t}
+function initVisit(){const t=now();
+ if(!S.visits&&(!S.nextVisitAt||S.nextVisitAt>t+2*MIN))setNextVisit(t+rnd(1,2)*MIN); // 初めては1〜2分で来る
+ else if(!S.nextVisitAt){const g=visitGap();setNextVisit(t+rnd(g[0],g[1]))}}
 function scheduleNext(){const L=life();visiting=false;
- if(L.phase==='pre'||L.phase==='winter'){showScene(BASE_IMG[level()]);const g=visitGap();nextAt=performance.now()+rnd(g[0],g[1])}
+ if(L.phase==='pre'||L.phase==='winter')showScene(BASE_IMG[level()]);
  else{showScene(idleScene());nextAt=performance.now()+rnd(2.5,5)*MIN}
 }
 function visit(){const L=life();if(!(L.phase==='pre'||L.phase==='winter'))return;
  visiting=true;S.visits++;const first=!S.notes.includes('visit');unlock('visit');
  const key=jackpot()&&Math.random()<.5?'dango_old':'s1';
  showScene(key);toast(key==='dango_old'?'大当たりの日のごほうび。ふわふわの団子がやってきました！':pick(['シマエナガの群れがやってきました','シマエナガたちが遊びに来ました','白いまんまるが枝に並びました']),4500);
- addLog('シマエナガが来た（'+S.visits+'回目）');save();nextAt=performance.now()+rnd(45,90)*1000;if(first)pump()}
+ const stay=rnd(45,90)*1000,g=visitGap();leaveAt=performance.now()+stay;setNextVisit(now()+stay+rnd(g[0],g[1]));
+ addLog('シマエナガが来た（'+S.visits+'回目）');save();if(first)pump()}
 function sceneTick(){if(trial){if(performance.now()>trial.until)endTrial();return}
- if(performance.now()<nextAt)return;const L=life();
- if((L.phase==='pre'||L.phase==='winter')&&!visiting)visit();else scheduleNext()}
+ const L=life();
+ if(L.phase==='pre'||L.phase==='winter'){
+  if(visiting){if(performance.now()>leaveAt){visiting=false;showScene(BASE_IMG[level()])}return}
+  if(now()>=nextVisit())visit();
+  return}
+ if(performance.now()>=nextAt)scheduleNext()}
 
 /* ================= 描画（動く写真：2枚の写真をなめらかに切り替える） ================= */
 const cv=$('gl'),fx=$('fx'),ctx=fx.getContext('2d');
@@ -393,11 +406,11 @@ $('hudChk').onchange=e=>{S.hud=e.target.checked;save();render()};
 cv.addEventListener('click',closePanels);
 $('bReset').onclick=()=>{if(confirm('森を最初からやり直しますか？（G・道具・家族・カードがすべて消えます）')){try{localStorage.removeItem(KEY)}catch(e){}location.reload()}};
 if(DEBUG){$('debug').hidden=false;document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{S.offset=(S.offset||0)+ +b.dataset.skip;tick();checkLife();save();render();scheduleNext();pump()});
- $('dRich').onclick=()=>{S.g+=10000;save();render()};$('dVisit').onclick=()=>{nextAt=0;visiting=false}}
+ $('dRich').onclick=()=>{S.g+=10000;save();render()};$('dVisit').onclick=()=>{visiting=false;setNextVisit(0)}}
 
 /* ================= 起動 ================= */
 if(WALL)document.body.classList.add('wall');
-tick();unlock('start');unlock('protect');checkLife();save();render();
+tick();unlock('start');unlock('protect');checkLife();initVisit();save();render();
 scheduleNext();
 let last=0,sec=0,lastSig=level()+'/'+life().phase;
 function frame(ts){const dt=Math.min(.1,(ts-last)/1000||0),t=ts/1000;last=ts;

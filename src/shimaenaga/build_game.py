@@ -12,6 +12,7 @@ ASSETS = {
     'lv1': ('scenes/lv1_winter_feeder.jpg', 1.0, []),
     'lv2': ('scenes/lv2_winter_feeder_water.jpg', 1.0, []),
     'lv3': ('scenes/lv3_winter_nest_material.jpg', 1.0, []),
+    'lv4': ('scenes/lv4_winter_icicles.jpg', 1.0, []),
     # 季節ちがいの鳥のいない森
     's0b': ('scenes/s0b_late_winter_empty.jpg', .5, []),
     's0c': ('scenes/s0c_early_spring_empty.jpg', .3, []),

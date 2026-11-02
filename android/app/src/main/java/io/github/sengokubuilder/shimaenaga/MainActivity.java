@@ -3,6 +3,13 @@ package io.github.sengokubuilder.shimaenaga;
 import android.app.Activity;
 import android.app.WallpaperManager;
 import android.content.ComponentName;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.net.Uri;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Base64;
+import java.io.OutputStream;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -45,8 +52,32 @@ public class MainActivity extends Activity {
         web.loadUrl(ForestWallpaperService.GAME_URL);
     }
 
-    /** ページの「この森を壁紙にする」ボタンから呼ばれる */
+    /** ページから呼ばれる窓口 */
     class Bridge {
+        /** アルバムの写真を、スマホの「Pictures/シマエナガの森」に保存する */
+        @JavascriptInterface
+        public boolean savePhoto(String dataUrl, String name) {
+            try {
+                String b64 = dataUrl.substring(dataUrl.indexOf(',') + 1);
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                ContentValues v = new ContentValues();
+                v.put(MediaStore.Images.Media.DISPLAY_NAME, name);
+                v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+                v.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/シマエナガの森");
+                ContentResolver r = getContentResolver();
+                Uri uri = r.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+                if (uri == null) return false;
+                try (OutputStream os = r.openOutputStream(uri)) {
+                    if (os == null) return false;
+                    os.write(bytes);
+                }
+                return true;
+            } catch (Throwable e) {
+                return false;
+            }
+        }
+
+        /** ページの「この森を壁紙にする」ボタンから呼ばれる */
         @JavascriptInterface
         public void setWallpaper() {
             runOnUiThread(() -> {

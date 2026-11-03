@@ -110,8 +110,8 @@ body.layout .lhint{display:block}
  <div class="modal glass" id="mImg"><div class="tag" id="miTag">商品の画像</div><h2 id="miTitle"></h2><div class="bigimg" id="miBox"></div><button class="glass" id="miClose">閉じる</button></div>
  <div class="modal glass" id="mNote"><div class="tag">知識カード</div><h2 id="mnTitle"></h2><div class="body" id="mnBody"></div><button class="glass" id="bNoteOk">わかった</button></div>
  <div id="lay"></div>
- <div class="lhint glass" id="lhint">水草や石をドラッグして配置。上下に動かすと奥・手前に移動します。</div>
- <div class="ltool glass" id="ltool"><button class="glass" id="lFlip">左右反転</button><button class="glass" id="lTrim">トリミング</button><button class="glass" id="lBack">しまう</button><button class="glass" id="lBuy" style="display:none"></button><button class="glass" id="lCancel" style="display:none">やめる</button></div>
+ <div class="lhint glass" id="lhint">水草や石をドラッグして配置。上下に動かすと奥・手前に移動します。選んで「小さく」「大きく」（スマホは2本指でつまむ、PCはホイール）で大きさを変えられます。</div>
+ <div class="ltool glass" id="ltool"><button class="glass" id="lSm">小さく</button><button class="glass" id="lBg">大きく</button><button class="glass" id="lFlip">左右反転</button><button class="glass" id="lTrim">トリミング</button><button class="glass" id="lBack">しまう</button><button class="glass" id="lBuy" style="display:none"></button><button class="glass" id="lCancel" style="display:none">やめる</button></div>
  <div class="tray glass" id="tray"></div>
  <div class="debug" id="debug" hidden><button class="glass" data-skip="3600000">＋1時間</button><button class="glass" data-skip="86400000">＋1日</button><button class="glass" id="bAddShrimp">メス＋1</button><button class="glass" id="bAddMale">オス＋1</button><button class="glass" data-skip="864000000">＋10日</button><button class="glass" id="bRich">＋1万G</button></div>
 </div>
@@ -171,7 +171,11 @@ const tOfDay=d=>S.created+d*DAY/SCALE;
 const has=(id,t)=>!!S.owned[id]&&S.owned[id]<=t;
 function waterState(t=now()){
  let clar=Math.min(.25,gdays(t-S.created)/4*.25),mat=0;
- if(has('filter',t)){const f=gdays(t-S.owned.filter);clar=Math.max(clar,Math.min(1,f/7));mat=Math.min(1,f/21)}
+ if(has('filter',t)){const f=gdays(t-S.owned.filter);clar=Math.max(clar,Math.min(1,f/7));
+  const since=id=>has(id,t)?Math.max(0,gdays(t-Math.max(S.owned[id],S.owned.filter))):0;
+  // バクテリア剤：2倍速／熟成スポンジ：ゲーム内3日（現実で約1日）で完成
+  mat=Math.min(1,(f+since('bact')+Math.min(21,since('sponge')*7))/21);
+  clar=Math.max(clar,Math.min(1,mat*1.15))}
  return{clar,mat};
 }
 const ROOM=[12,13,15,18,21,24,28,29,26,21,17,14]; // 月ごとの室内水温のめやす
@@ -217,6 +221,8 @@ const NOTES={
  leggy:['徒長','光が足りないと、有茎草は光を求めて茎だけがひょろひょろと伸び、葉の間隔が広がります。これを「徒長」といいます。<br>照明を用意するか、もっと明るい照明にすると改善します。'],
  droop:['伸びすぎ','ロタラが水面まで伸びて、先が垂れてきました。トリミングの合図です。<br>レイアウト画面でロタラを選んで「トリミング」を押しましょう。'],
  light:['照明','照明は水草の光合成に欠かせません。点灯時間は1日8〜10時間程度が目安で、毎日同じ時刻に点け消しすることが大切です。長く点けすぎるとコケが増えます。<br>この水槽は9時〜19時に点灯します。'],
+ bact:['バクテリア剤','ろ過バクテリアを液体や粉にした商品で、立ち上げを早める目的でよく使われます。<br>ただし、入れたからといってすぐに安全な水になるわけではありません。バクテリアが住みつくには、エサになる有機物と時間が必要です。実際の飼育では、使ったうえで1〜2週間は様子を見るのが安心です。'],
+ sponge:['熟成スポンジ（種スポンジ）','すでにエビが元気に暮らしている水槽で使い込んだフィルタースポンジには、ろ過バクテリアがびっしり住みついています。これを新しい水槽に入れると、バクテリアごと引っ越すので、立ち上げが一気に早くなります。<br>レッドビー仲間やショップから分けてもらう方法で、実際にも「種スポンジ」「種水」と呼ばれてよく使われます。<br>もらう相手の水槽が病気やコケだらけでないかは、必ず確かめましょう。'],
  ready:['水ができた','バクテリアが十分に増えて、エビを迎えられる水になりました。<br>実際の飼育でも、立ち上げから2週間〜1か月ほど待ってからエビを入れるのが一般的です。早く入れたくて焦ることが、レッドビー飼育でいちばん多い失敗の原因です。<br>ショップでエビを迎えられるようになりました。オスとメスがそろうと、繁殖が始まります。']
 };
 const queue=[];
@@ -274,7 +280,11 @@ const ITEMS={ // 水草・流木・石（cm＝実物の大きさのめやす）
 };
 const ROT_SPR={straight:'rot_straight',leggy:'rot_leggy',droop:'rot_droop',bushy:'rot_bushy'};
 const secT=(t)=>{const p=document.createElement('div');p.className='sec';p.textContent=t;return p};
-const EQ_ICON={light:'💡',light2:'💡',fan:'🌀',tester:'🧪'};
+const EQ_ICON={light:'💡',light2:'💡',fan:'🌀',tester:'🧪',bact:'🧴',sponge:'🧽'};
+const BOOST=[
+ {id:'bact',name:'バクテリア剤',price:1500,desc:'ろ過バクテリアを水に足して、水づくりを2倍の速さで進める'},
+ {id:'sponge',name:'熟成スポンジ（種スポンジ）',price:3000,desc:'別の水槽で使い込んだスポンジ。バクテリアごと移すので、水づくりが約1日で終わる'}
+];
 function eqImg(id){return id==='filter'||id==='filter2'?FIL.img:id==='thermo'?THM.img:id==='heater'||id==='heater2'?HTR.img:null}
 function itemImgKey(k){return ITEMS[k]&&ITEMS[k].rot?'rot_straight':k}
 function makeThumb(src,title,big){ // src: 画像URL / canvas / 絵文字
@@ -299,6 +309,9 @@ function renderShop(){
  box.append(secT('設備（入門用）'));
  EQUIP.filter(e=>e.tier===1).forEach(e=>{const own=!!S.owned[e.id];
   buyRow(box,e.name,e.desc,e.price,own?'購入済み':S.g<e.price?'G不足':'購入',!own&&S.g>=e.price,()=>buyEquip(e),makeThumb(eqImg(e.id)||EQ_ICON[e.id],e.name))});
+ box.append(secT('水づくりを早める'));
+ {const wm=waterState().mat;BOOST.forEach(e=>{const own=!!S.owned[e.id],nf=!S.owned.filter,done=wm>=1;
+  buyRow(box,e.name,nf?'ろ過フィルターを置くと使えます':done&&!own?'水はもうできています':e.desc,e.price,own?'使用済み':nf?'フィルターが必要':done?'不要':S.g<e.price?'G不足':'購入',!own&&!nf&&!done&&S.g>=e.price,()=>buyEquip(e),makeThumb(EQ_ICON[e.id],e.name))})}
  box.append(secT('設備（上位版）'));
  EQUIP.filter(e=>e.tier===2).forEach(e=>{const own=!!S.owned[e.id],lock=!S.owned[e.need];
   buyRow(box,lock?'？？？':e.name,lock?'入門用を買うと解放されます':e.desc,e.price,own?'購入済み':lock?'未解放':S.g<e.price?'G不足':'購入',!own&&!lock&&S.g>=e.price,()=>buyEquip(e),makeThumb(lock?'？':(eqImg(e.id)||EQ_ICON[e.id]),e.name))});
@@ -332,7 +345,7 @@ function renderShop(){
  });
 }
 function buyEquip(e){tick();if(S.owned[e.id]||S.g<e.price)return;S.g-=e.price;S.owned[e.id]=now();addLog('購入：'+e.name+'（'+G(e.price)+'）');
- const card={filter:'filter',thermo:'thermo',heater:'heater',light:'light',fan:'fan',tester:'water'}[e.id];if(card)unlock(card);
+ const card={filter:'filter',thermo:'thermo',heater:'heater',light:'light',fan:'fan',tester:'water',bact:'bact',sponge:'sponge'}[e.id];if(card)unlock(card);
  save();markDirty();render();renderShop();toast(e.name+'を設置しました');nextNote()}
 const POP_BASE=50,ADULT=100,HATCH=25;
 const popMax=()=>S.owned.filter2?100:POP_BASE;
@@ -447,7 +460,9 @@ function advise(){
  else if(seiryu&&!own('tester'))add(1,'青龍石の影響を確かめましょう','青龍石は少しずつ水を硬く、pHを高くします。<b>水質テスター</b>（1,000G）で今の水を見てみましょう。'+untilG(1000));
  // 立ち上げ
  if(!own('filter'))add(1,'まずはろ過フィルターを','水がにごったままで、エビを迎えられません。ショップの<b>小型スポンジフィルター</b>（2,000G）を置くと、水が澄んで「水づくり」が始まります。'+untilG(2000));
- else if(w.mat<1){const left=Math.ceil(21*(1-w.mat)/SCALE);add(2,'水づくり中（'+Math.floor(w.mat*100)+'%）','バクテリアが増えるのを待っています。あと<b>約'+left+'日</b>でエビを迎えられます。待っている間に、水温計やヒーターなどの設備をそろえておくと、迎えたあとが安心です。')}
+ else if(w.mat<1){const rate=1+(own('bact')?1:0)+(own('sponge')?7:0),left=Math.max(1,Math.ceil(21*(1-w.mat)/rate/SCALE));
+  add(2,'水づくり中（'+Math.floor(w.mat*100)+'%）','バクテリアが増えるのを待っています。あと<b>約'+left+'日</b>でエビを迎えられます。待っている間に、水温計やヒーターなどの設備をそろえておくと、迎えたあとが安心です。');
+  if(!own('sponge'))add(1,'早くエビを迎えたいなら','<b>熟成スポンジ</b>（3,000G）なら水づくりが約1日で終わります。'+(own('bact')?'':'手ごろな<b>バクテリア剤</b>（1,500G）でも2倍の速さになります。')+untilG(own('bact')?3000:1500))}
  if(!own('thermo'))add(1,'水温計を置きましょう','水温が見えないと、暑さ寒さに気づけません。<b>ガラス水温計</b>は400Gと手ごろです。'+untilG(400));
  if(own('thermo')&&T<20&&!own('heater')&&!own('heater2'))add(1,'水温が'+T+'℃と低めです','20℃を下回ると繁殖が止まります。<b>オートヒーター</b>（2,000G）で23℃前後に保てます。'+untilG(2000));
  else if(!own('heater')&&!own('heater2')&&[10,11,12,1,2,3].includes(mo)&&own('filter'))add(1,'寒い季節にはヒーターを','これから水温が下がる季節です。<b>オートヒーター</b>（2,000G）があると冬も繁殖が続きます。'+untilG(2000));
@@ -750,7 +765,7 @@ function objGeom(o){ // 水槽画像上の位置と大きさ
  const it=ITEMS[o.k];if(!it)return null;
  const st=it.rot?rotState(o):null,key=it.rot?ROT_SPR[st]:o.k,sp=LAYOUT_IMG[key];if(!sp)return null;
  const cm=it.rot?ROT_CM[st]:it.cm,ppc=26*(.85+.3*o.z),sc=cm*ppc/(it.by==='h'||it.rot?sp.h:sp.w);
- const w=sp.w*sc,h=sp.h*sc*(1-(it.sink||0)),by=groundY(o.z)+4;
+ const us=o.s||1,w=sp.w*sc*us,h=sp.h*sc*us*(1-(it.sink||0)),by=groundY(o.z)+4;
  return{key,sp,sc,w,h,x0:o.x-w/2,y0:by-h,by,it};
 }
 function drawObj(o,vw,L,w,t,sx,sy){
@@ -837,20 +852,34 @@ $('bLight').onclick=()=>{
  if((S.lightOn||0)>now()){S.lightOn=0;toast('自動（9時〜19時に点灯）に戻しました')}
  else{const h=new Date(now()).getHours();S.lightOn=now()+3*3600000;toast(h>=9&&h<19?'今は点灯時間です。19時を過ぎても3時間は点いたままにします':'照明を点けました。3時間たつと自動に戻ります')}
  save();markDirty();render()};
+const SMIN=.4,SMAX=2.5;
+function setSize(o,v,quiet){o.s=+Math.min(SMAX,Math.max(SMIN,v)).toFixed(3);if(!o.trial){save();markDirty()}if(!quiet)toast('大きさ '+Math.round(o.s*100)+'%')}
+$('lSm').onclick=()=>{if(LAY.sel)setSize(LAY.sel,(LAY.sel.s||1)/1.15)};
+$('lBg').onclick=()=>{if(LAY.sel)setSize(LAY.sel,(LAY.sel.s||1)*1.15)};
 $('lFlip').onclick=()=>{if(LAY.sel){LAY.sel.flip=!LAY.sel.flip;save();markDirty()}};
 $('lTrim').onclick=()=>{const o=LAY.sel;if(!o)return;o.since=gday(now());o.trim=1;addLog('ロタラをトリミングしました');unlock('trim');save();markDirty();nextNote();toast('トリミングしました。脇芽が出てこんもり茂ります')};
 $('lBack').onclick=()=>{const o=LAY.sel;if(!o)return;S.layout=S.layout.filter(x=>x!==o);S.inv[o.k]=(S.inv[o.k]||0)+1;LAY.sel=null;save();markDirty();renderTray();showTool()};
 const lay=$('lay');
+const cap=ev=>{try{lay.setPointerCapture(ev.pointerId)}catch(e){}};const PTR=new Map();let PINCH=null;
+const pdist=()=>{const [a,b]=[...PTR.values()];return Math.hypot(a.x-b.x,a.y-b.y)};
+lay.addEventListener('wheel',ev=>{if(!LAY.sel)return;ev.preventDefault();setSize(LAY.sel,(LAY.sel.s||1)*(ev.deltaY<0?1.08:1/1.08),true)},{passive:false});
 lay.addEventListener('pointerdown',ev=>{
+ PTR.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+ if(PTR.size===2&&LAY.sel){PINCH={d:pdist(),s:LAY.sel.s||1};LAY.drag=null;PAN.drag=null;cap(ev);return}
+ if(PTR.size>1)return;
  const p=toImg(ev);let hit=null;
  for(const o of [...S.layout,...TRIAL].sort((a,b)=>b.z-a.z)){const g=objGeom(o);if(g&&p.x>=g.x0&&p.x<=g.x0+g.w&&p.y>=g.y0-6&&p.y<=g.by+6){hit=o;break}}
  LAY.sel=hit;showTool();
- if(hit){LAY.drag={dx:hit.x-p.x,dy:groundY(hit.z)-p.y};lay.setPointerCapture(ev.pointerId)}
- else if(panStart(ev))lay.setPointerCapture(ev.pointerId);
+ if(hit){LAY.drag={dx:hit.x-p.x,dy:groundY(hit.z)-p.y};cap(ev)}
+ else if(panStart(ev))cap(ev);
 });
-lay.addEventListener('pointermove',ev=>{if(PAN.drag){panMove(ev);return}if(!LAY.drag||!LAY.sel)return;const p=toImg(ev),o=LAY.sel;
+lay.addEventListener('pointermove',ev=>{if(PTR.has(ev.pointerId))PTR.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+ if(PINCH){if(PTR.size===2&&LAY.sel)setSize(LAY.sel,PINCH.s*pdist()/PINCH.d,true);return}
+ if(PAN.drag){panMove(ev);return}if(!LAY.drag||!LAY.sel)return;const p=toImg(ev),o=LAY.sel;
  o.x=Math.min(1460,Math.max(210,p.x+LAY.drag.dx));o.z=Math.min(1,Math.max(0,(p.y+LAY.drag.dy-700)/88))});
-lay.addEventListener('pointerup',()=>{panEnd();if(LAY.drag){const tr=LAY.sel&&LAY.sel.trial;LAY.drag=null;if(!tr){save();markDirty()}}});
+const ptrEnd=ev=>{PTR.delete(ev.pointerId);if(PINCH&&PTR.size<2){PINCH=null;LAY.drag=null;if(LAY.sel)toast('大きさ '+Math.round((LAY.sel.s||1)*100)+'%')}};
+lay.addEventListener('pointercancel',ptrEnd);
+lay.addEventListener('pointerup',ev=>{ptrEnd(ev);panEnd();if(LAY.drag){const tr=LAY.sel&&LAY.sel.trial;LAY.drag=null;if(!tr){save();markDirty()}}});
 migrate();syncActors();
 /* 指で左右に見回す（縦長の画面だけ）。止めた位置は共有して、壁紙でも同じ場所を映す */
 PAN.x=S.panX??.5;

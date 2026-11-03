@@ -43,6 +43,37 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
 .note{font-size:12px;color:var(--muted);line-height:1.5;margin:0}
 .wp #gear{display:none}
 [hidden]{display:none!important}
+#sheet{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));max-width:640px;margin:0 auto;background:var(--paper);border-radius:16px;box-shadow:0 8px 30px rgba(20,30,40,.3);display:flex;flex-direction:column;overflow:hidden;font-size:14px}
+.sh-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.sh-head .seg{flex:1;grid-template-columns:repeat(2,1fr);max-width:260px}
+.xbtn{margin-left:auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--chip);font-size:18px;line-height:1;cursor:pointer;color:var(--ink)}
+.sh-body{flex:1;overflow:auto;padding:12px 14px 18px;display:flex;flex-direction:column;gap:14px}
+.sh-body h3{font-size:14px;margin:0 0 6px;font-weight:700}
+.tpick{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tpick button{font-family:var(--font);font-size:14px;font-weight:700;border:2px solid var(--line);background:#fff;border-radius:10px;padding:8px 4px;cursor:pointer;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:6px;min-width:0}
+.tpick button[aria-pressed="true"]{border-color:var(--navy)}
+.dot{width:12px;height:12px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.field{display:flex;flex-direction:column;gap:5px}
+.field input[type=text]{font-family:var(--font);font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);min-width:0}
+.sw{display:flex;flex-wrap:wrap;gap:6px}
+.sw button{display:flex;align-items:center;gap:5px;font-family:var(--font);font-size:12px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 9px 4px 5px;cursor:pointer;color:var(--ink)}
+.sw button[aria-pressed="true"]{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy)}
+.sw .dot{width:16px;height:16px}
+.roster{display:flex;flex-direction:column;gap:6px}
+.prow{display:grid;grid-template-columns:34px 1fr 92px;gap:6px;align-items:center}
+.num{font-variant-numeric:tabular-nums;font-weight:700;text-align:center;background:var(--chip);border-radius:6px;padding:6px 0;font-size:13px}
+.prow input{font-family:var(--font);font-size:15px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);min-width:0;width:100%;box-sizing:border-box}
+.gseg{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.gseg button{font-family:var(--font);font-size:12px;border:1px solid var(--line);background:var(--chip);border-radius:7px;padding:6px 0;cursor:pointer;color:var(--ink)}
+.gseg button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.tbl{overflow-x:auto}
+.tbl table{border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap;width:100%}
+.tbl th,.tbl td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right}
+.tbl th{font-weight:700;color:var(--muted);font-size:11.5px}
+.tbl td:first-child,.tbl th:first-child,.tbl .l{text-align:left}
+.log li{font-size:13px;padding:3px 0;border-bottom:1px dashed var(--line);list-style:none;font-variant-numeric:tabular-nums}
+.log{margin:0;padding:0}
+.danger{font-family:var(--font);font-size:13px;border:1px solid #d9a4a0;background:#fff;color:#a5372f;border-radius:8px;padding:7px 10px;cursor:pointer;align-self:flex-start}
 </style>
 
 <div id="stage">
@@ -82,9 +113,18 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
         <span class="tval" id="hourV">--:--</span>
       </div>
     </div>
+    <button class="appbtn" id="bTeams" style="background:#2f6b4a">チーム・成績</button>
     <div id="appBox" hidden><button class="appbtn" id="bWp">この野球場を壁紙にする</button></div>
     <p class="note">朝練7:00〜、試合8:30〜15:30、整備〜16:30、夕方以降は誰もいないグラウンドになります。スマホでは指で左右に見回せます。</p>
   </div>
+</div>
+
+<div id="sheet" hidden role="dialog" aria-label="チームと成績">
+  <div class="sh-head">
+    <div class="seg" id="shTabs"><button data-t="team" aria-pressed="true">チーム登録</button><button data-t="stats">成績</button></div>
+    <button class="xbtn" id="shClose" aria-label="閉じる">×</button>
+  </div>
+  <div class="sh-body" id="shBody"></div>
 </div>
 
 <script>
@@ -100,7 +140,8 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk}))}catch(e){}}
-const BUILD='20261104081804';
+const BUILD='20261104084313';
+const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 if(WALL)document.body.classList.add('wp');
 function loadS(){try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}');if(v.talk!=null)S.talk=v.talk}catch(e){}}
@@ -218,19 +259,68 @@ function nearestUmp(x,z){let b=G.umps[1],bd=1e9;for(const u of G.umps.slice(1)){
 function umpsToPosts(){G.umps.forEach((u,i)=>{u.idleFace=i===0?'b':'f';u.walkTo(UMP_POS[i][0],UMP_POS[i][1],2.2)})}
 let phaseName='', switching=null;
 
-function makeTeam(def,side){
-  const gn=shuffle(GIRL_NAMES);
-  const kids=def.names.map((n,i)=>{const girl=chance(.1);return new Ent({name:girl?gn.pop():n,team:def,num:i+1,size:rnd(.88,1.08),girl,spd:rnd(4.0,4.9)})});
-  const coach=new Ent({kind:'adult',role:'coach',team:def,size:1});
-  return{def,side,kids,coach,order:shuffle(kids),bi:0,parents:[]};
+/* ---------- my teams & records ---------- */
+const BOY_NAMES=['はると','そうた','ゆうま','りく','こうた','ひなた','いつき','みなと','あさひ','たいが','しゅん','けんた','れん','だいち','かい','ゆうと','ゆうせい','しょう','あらた','そら','こうき','はやと','りょう','たいち','たくみ','けいた','まさと','ゆうき','あきと','なおや','ひろと','つばさ','こうへい','げんき','りょうま','かずま','こはく','いぶき','たける','じん','しおん','そうま','わたる','けんと','はるき','ゆうご','かなた','しんや','てつ','りゅうせい'];
+const CAPS=[{k:'navy',l:'紺',c:'#25408a',d:'#182c63'},{k:'red',l:'赤',c:'#c9443b',d:'#90302a'},{k:'green',l:'緑',c:'#2f8a58',d:'#1f6440'},{k:'orange',l:'オレンジ',c:'#d9822b',d:'#a3601c'},{k:'sky',l:'水色',c:'#3b93d4',d:'#2a6fa3'},{k:'purple',l:'紫',c:'#7a4fb3',d:'#5a3889'},{k:'black',l:'黒',c:'#2b2f3a',d:'#15181f'},{k:'yellow',l:'黄',c:'#e0b021',d:'#a88210'},{k:'pink',l:'ピンク',c:'#e0679a',d:'#b04a74'},{k:'brown',l:'茶',c:'#8a5a34',d:'#633e22'}];
+const BODIES=[{k:'white',l:'白',c:'#f7f6ef',p:'#f4f3ec'},{k:'gray',l:'グレー',c:'#a9b1bc',p:'#e9ebee'},{k:'cream',l:'クリーム',c:'#f1ece0',p:'#f1ece0'},{k:'pale',l:'うす水色',c:'#dcebf5',p:'#eef4f8'},{k:'navy',l:'紺',c:'#2c3c66',p:'#e9ebee'}];
+function teamDef(t){const c=CAPS.find(x=>x.k===t.cap)||CAPS[0],b=BODIES.find(x=>x.k===t.body)||BODIES[0];return{name:t.name||'マイチーム',cap:c.c,capD:c.d,body:b.c,trim:c.c,pants:b.p,sock:c.c}}
+function uid(){return Math.random().toString(36).slice(2,9)}
+function defaultData(){
+  const used=new Set();
+  const mk=(id,name,cap,body)=>({id,name,cap,body,players:Array.from({length:13},(_,i)=>{const girl=chance(.1);const pool=girl?GIRL_NAMES:BOY_NAMES;let n;do{n=pick(pool)}while(used.has(n));used.add(n);return{id:'p'+uid(),num:i+1,name:n,girl}})});
+  return{v:1,teams:[mk('t1','かもめ','navy','white'),mk('t2','いるか','sky','white'),mk('t3','ひまわり','orange','cream')],st:{p:{},t:{}},rr:0,log:[]};
 }
-function benchPos(t,i){return i<5?[t.side*(10.9+i*1.45),-3.5]:[t.side*(11.6+(i-5)*1.5),-1.6]}
-function benchIdle(t,k,i){k.role=null;k.helmet=false;k.carry=null;k.distracted=false;k.idlePose=i<5?'sit':'stand';k.idleFace=t.side<0?'r':'l'}
-function sendToBench(t,k){const i=t.kids.indexOf(k);const [x,z]=benchPos(t,i);benchIdle(t,k,i);k.walkTo(x,z,k.speed>2.4?3.2:2.2)}
-function benchKids(t){return t.kids.filter(k=>!k.role)}
-function parentsOf(t){return t.parents}
+const DKEY='kawajiki.data.v1';
+function loadD(){try{const v=JSON.parse(localStorage.getItem(DKEY)||'null');if(v&&v.teams&&v.teams.length===3){v.st=v.st||{p:{},t:{}};v.st.p=v.st.p||{};v.st.t=v.st.t||{};v.log=v.log||[];return v}}catch(e){}
+  const d=defaultData();saveD(d);return d}
+function saveD(d){try{localStorage.setItem(DKEY,JSON.stringify(d))}catch(e){}}
+let DB=loadD();
+function editD(fn){const d=loadD();fn(d);saveD(d);DB=d}
+const REC=WALL||!window.KawaApp;
+
+/* ---------- teams in a game ---------- */
+function finishTeam(def,side,kids,subs,mine,tid){
+  return{def,side,kids,subs:subs.slice(),all:kids.concat(subs),order:shuffle(kids),bi:0,coach:new Ent({kind:'adult',role:'coach',team:def,size:1}),parents:[],mine,tid,pitchers:[kids[0]]};
+}
+function buildMine(ti,side){
+  const t=DB.teams[ti],def=teamDef(t);
+  const ranked=t.players.map(p=>({p,g:((DB.st.p[p.id]||{}).g||0)+Math.random()*1.2})).sort((a,b)=>a.g-b.g);
+  const ks=ranked.map(({p})=>new Ent({name:p.name||`${p.num}ばん`,girl:!!p.girl,num:p.num,pid:p.id,team:def,size:rnd(.88,1.08),spd:rnd(4.0,4.9)}));
+  return finishTeam(def,side,shuffle(ks.slice(0,9)),ks.slice(9),true,t.id);
+}
+function buildCpu(def,side){
+  const gn=shuffle(GIRL_NAMES),extra=shuffle(BOY_NAMES.filter(n=>!def.names.includes(n))).slice(0,3);
+  const ks=def.names.concat(extra).map((n,i)=>{const girl=chance(.1);return new Ent({name:girl?gn.pop():n,team:def,num:i+1,size:rnd(.88,1.08),girl,spd:rnd(4.0,4.9)})});
+  return finishTeam(def,side,ks.slice(0,9),ks.slice(9),false,null);
+}
+function benchPos(t,k){const i=Math.max(0,t.all.indexOf(k));
+  if(i<5)return[t.side*(10.9+i*1.45),-3.5];if(i<9)return[t.side*(11.4+(i-5)*1.5),-1.6];return[t.side*(12+(i-9)*1.5),.4]}
+function benchIdle(t,k){const i=t.all.indexOf(k);k.role=null;k.helmet=false;k.carry=null;k.distracted=false;k.idlePose=i<5?'sit':'stand';k.idleFace=t.side<0?'r':'l'}
+function sendToBench(t,k){const [x,z]=benchPos(t,k);benchIdle(t,k);k.walkTo(x,z,k.speed>2.4?3.2:2.2)}
+function benchKids(t){return t.all.filter(k=>!k.role)}
 function dist(a,x,z){return Math.hypot(a.x-x,a.z-z)}
 function faceTo(a,b){const dx=b.x-a.x,dz=b.z-a.z;return Math.abs(dx)>Math.abs(dz)*.7?(dx>0?'r':'l'):(dz>0?'b':'f')}
+
+/* ---------- box score ---------- */
+function bx(k){if(!k||!k.pid)return null;return G.box[k.pid]||(G.box[k.pid]={g:0,pa:0,ab:0,h:0,hr:0,rbi:0,bb:0,so:0,pg:0,po:0,pk:0,pr:0,w:0,l:0})}
+function st(k,key,n=1){const b=bx(k);if(b)b[key]+=n}
+function appear(k,pitch=false){const b=bx(k);if(!b)return;b.g=1;if(pitch)b.pg=1}
+function bv(k,key){const b=bx(k);return b?b[key]:0}
+function addOut(){G.outs++;st(fielder('P'),'po');updateHUD()}
+function commitGame(){
+  if(!REC)return;
+  const sh=G.score[0],sa=G.score[1];
+  if(sh!==sa){const win=sh>sa?G.home:G.away,lose=sh>sa?G.away:G.home;
+    st(win.pitchers.slice().sort((a,b)=>bv(b,'po')-bv(a,'po'))[0],'w');
+    st(lose.pitchers.slice().sort((a,b)=>bv(b,'pr')-bv(a,'pr'))[0],'l')}
+  editD(d=>{
+    for(const [pid,b] of Object.entries(G.box)){const s=d.st.p[pid]||(d.st.p[pid]={});for(const k in b)s[k]=(s[k]||0)+b[k]}
+    [[G.home,G.away,sh,sa],[G.away,G.home,sa,sh]].forEach(([t,o,rf,ra])=>{if(!t.mine)return;
+      const s=d.st.t[t.tid]||(d.st.t[t.tid]={g:0,w:0,l:0,d:0,rf:0,ra:0,vs:{}});const r=rf>ra?'w':rf<ra?'l':'d';
+      s.g++;s.rf+=rf;s.ra+=ra;s[r]++;const v=s.vs[o.def.name]||(s.vs[o.def.name]={w:0,l:0,d:0});v[r]++});
+    d.log.unshift({t:Date.now(),a:G.away.def.name,h:G.home.def.name,sa,sh,c:G.cold?1:0});d.log=d.log.slice(0,30);
+  });
+}
 
 function updateHUD(){
   const board=$('#board'),ph=$('#phase');
@@ -278,7 +368,7 @@ function walkBatter(batter){
   ps.push(runBases(batter,0,1));G.bases=nb;return Promise.all(ps);
 }
 function scoreRun(k){
-  const ti=G.bat===G.home?0:1;G.score[ti]++;G.runsThis++;updateHUD();
+  const ti=G.bat===G.home?0:1;G.score[ti]++;G.runsThis++;G.playRuns++;st(fielder('P'),'pr');updateHUD();
   k.role=null;k.helmet=false;
   const t=G.bat;sendToBench(t,k);
   if(chance(.4))call(G.ump,'safe',0);
@@ -293,6 +383,7 @@ function fielder(role){return G.field.kids[POSN.indexOf(role)]}
 function nearest(x,z,exclude=[]){let best=null,bd=1e9;for(const k of G.field.kids){if(exclude.includes(k.role))continue;const d=dist(k,x,z);if(d<bd){bd=d;best=k}}return best}
 function resetFielders(){for(const k of G.field.kids){if(k.distracted||k.stunUntil>simT)continue;const [x,z]=POS[k.role];k.walkTo(x,z,3);k.res=null}}
 function cutoffFor(x){return fielder(x<0?'SS':'2B')}
+function setRole(t,k,i){k.role=POSN[i];k.helmet=k.role==='C';k.carry=null;k.idlePose=k.role==='C'?'squat':'ready';k.idleFace=k.role==='C'?'b':'f'}
 
 async function relayToPitcher(){
   const b=G.ball,h=b.holder,p=fielder('P');
@@ -336,9 +427,9 @@ async function playGrounder(tx,tz,d,batter){
     say(pick(benchKids(G.bat)),'まわれまわれー!',1);
     await sleep(.2);await throwTo(of,cutoffFor(of.x),14);
     await runs;if(chance(.5))call(G.umps[1],'safe',0);
-    say(pick(G.field.kids),pick(['ドンマイドンマイ!','ドンマイ!','切りかえていこー!']),1);
+    if(ev!=='through')say(pick(G.field.kids),pick(['ドンマイドンマイ!','ドンマイ!','切りかえていこー!']),1);
     if(ev==='tunnel'){await sleep(1.2);say(G.field.coach,'腰を落とせー!',1)}
-    return;
+    return ev==='through'?'1B':'E';
   }
   b.holder=f;f.setPose('ready',.3);await sleep(.25);
   if(ev==='wild'){
@@ -346,12 +437,13 @@ async function playGrounder(tx,tz,d,batter){
     say(fb,'あ〜っ!',2);fb.walkTo(fb.x+3.5,fb.z-4,4.5);
     await sleep(1.2);b.holder=fb;
     await runs;call(G.umps[2],'safe',1);await sleep(.8);say(G.field.coach,'落ちついていけー!',1);
-    return;
+    return'E';
   }
   if(f===fb){await fb.goto(16.3,16.3,5)}else{await throwTo(f,fb,16)}
-  call(G.umps[1],'out');G.outs++;updateHUD();
+  call(G.umps[1],'out');addOut();
   await batterRun;sendToBench(G.bat,batter);
   await runs;
+  return'O';
 }
 
 async function playFly(tx,tz,d,batter){
@@ -365,9 +457,9 @@ async function playFly(tx,tz,d,batter){
   else if(t1>hang-.1)ev='drop';
   else ev=chance(.76)?'catch':'muff';
   const bp=b.flyTo(tx,tz,hang,arc,.9,.15);
-  let runs;
+  let runs,adv=1;
   if(ev==='catch'){runs=(async()=>{await batter.goto(7,7.5,batter.spd);batter.idlePose='stand'})()}
-  else{const adv=ev==='collide'?2:(ev==='drop'&&d>40)?2:1;runs=advanceAll(adv,batter,adv)}
+  else{adv=ev==='collide'?2:(ev==='drop'&&d>40)?2:1;runs=advanceAll(adv,batter,adv)}
   if(ev==='collide'){
     say(f1,'オーライ!',2);f1.walkTo(tx-.4,tz,4.6);await sleep(.5);
     say(f2,'オーライ!',2);f2.walkTo(tx+.4,tz,4.6);
@@ -379,7 +471,7 @@ async function playFly(tx,tz,d,batter){
     await throwTo(f1,cutoffFor(f1.x),13);
     await runs;
     say(G.field.coach,'声かけあえー!',1);
-    return;
+    return'E';
   }
   say(f1,'オーライ!',1);f1.walkTo(tx,tz,4.6);
   if(ev==='drop'){
@@ -388,21 +480,22 @@ async function playFly(tx,tz,d,batter){
     await b.flyTo(rx,rz,.6,.4,.15,.05,true);
     await f1.goto(rx,rz,4.6);b.holder=f1;
     await throwTo(f1,cutoffFor(f1.x),14);
-    await runs;return;
+    await runs;return adv>1?'2B':'1B';
   }
   await sleep(Math.max(0,hang-.7));f1.setPose('catchUp',1.2,'f');
   await bp;
   if(ev==='catch'){
-    b.holder=f1;call(nearestUmp(tx,tz),'out');G.outs++;updateHUD();
+    b.holder=f1;call(nearestUmp(tx,tz),'out');addOut();
     if(chance(.6))say(pick(G.field.parents),'ナイスキャッチ!',0);
     await runs;sendToBench(G.bat,batter);
-    return;
+    return'O';
   }
   say(f1,'あっ!',2);
   await b.flyTo(tx+rnd(-1.5,1.5),tz-1,.5,.5,.4,.05,true);
   await f1.goto(b.x,b.z,4);b.holder=f1;
   await throwTo(f1,cutoffFor(f1.x),14);
   await runs;say(pick(G.field.kids),'ドンマイ!',1);
+  return'E';
 }
 
 async function playLine(tx,tz,d,batter){
@@ -421,6 +514,7 @@ async function playLine(tx,tz,d,batter){
   say(pick(benchKids(G.bat)),adv>1?'まわれまわれー!':'ナイスバッティング!',1);
   await sleep(.2);await throwTo(of,cutoffFor(of.x),14);
   await runs;
+  return adv>1?'2B':'1B';
 }
 
 async function playHomer(tx,tz,batter){
@@ -441,6 +535,7 @@ async function playHomer(tx,tz,batter){
   await runs;
   const [hx,hz]=POS[fetch.role];await fetch.goto(hx,hz,3.4);
   b.holder=null;b.x=0;b.z=15.6;b.holder=fielder('P');
+  return'HR';
 }
 
 async function contact(batter){
@@ -453,23 +548,68 @@ async function contact(batter){
   G.inPlay=true;G.balls=G.strikes=0;updateHUD();
   b.holder=null;b.path=null;b.x=-.3;b.z=.6;b.h=.9;
   batter.role='R';batter.idlePose='stand';batter.idleFace='f';
-  if(kind==='grd')await playGrounder(tx,tz,d,batter);
-  else if(kind==='fly')await playFly(tx,tz,d,batter);
-  else if(kind==='line')await playLine(tx,tz,d,batter);
-  else if(d>=63)await playHomer(tx*1.0,Math.min(tz,74),batter);
-  else await playLine(tx*.92,tz*.92,d*.92,batter);
+  let res;
+  if(kind==='grd')res=await playGrounder(tx,tz,d,batter);
+  else if(kind==='fly')res=await playFly(tx,tz,d,batter);
+  else if(kind==='line')res=await playLine(tx,tz,d,batter);
+  else if(d>=63)res=await playHomer(tx*1.0,Math.min(tz,74),batter);
+  else res=await playLine(tx*.92,tz*.92,d*.92,batter);
   G.inPlay=false;
   if(G.outs>0&&G.outs<3&&chance(.7))say(pick(G.field.kids),['','ワンアウトー!','ツーアウトー!'][G.outs],1);
   await relayToPitcher();
+  return res;
 }
 
 function nextBatter(t){for(let i=0;i<9;i++){const k=t.order[t.bi%9];t.bi++;if(k.role!=='R')return k}return t.order[0]}
 
+async function pinchHit(bat,batter){
+  if(G.inning<3||!bat.subs.length||!(G.bases[1]||G.bases[2])||!chance(.22))return batter;
+  const sub=bat.subs.shift();
+  say(bat.coach,`代打、${sub.name}!`,2);await sleep(1);
+  const i=bat.kids.indexOf(batter),o=bat.order.indexOf(batter);
+  if(i>=0)bat.kids[i]=sub;if(o>=0)bat.order[o]=sub;
+  batter.out=true;sendToBench(bat,batter);
+  appear(sub);say(sub,'はいっ!',1);benchKids(bat).forEach(k=>k.setPose('cheer',1.5));
+  return sub;
+}
+async function pitchingChange(fld){
+  const key=G.inning+(G.top?'t':'b');
+  if(G.inning<2||G.pchg===key)return;
+  const loaded=G.bases[0]&&G.bases[1]&&G.bases[2];
+  if(!(loaded||G.runsThis>=4)||!chance(.35))return;
+  G.pchg=key;
+  const old=fielder('P'),co=fld.coach,home=[co.x,co.z];
+  say(co,'タイム!',1);G.ump.setPose('safe',1);await sleep(.8);
+  await co.goto(1.4,14.2,2.4);co.idleFace='l';
+  fld.kids.filter(k=>['C','1B','2B','3B','SS'].includes(k.role)).forEach(k=>k.walkTo(rnd(-1.6,1.6),rnd(13.5,17),3));
+  await sleep(1.6);say(co,'ピッチャー交代!',2);await sleep(1.4);
+  let nw;
+  if(fld.subs.length&&chance(.6)){
+    nw=fld.subs.shift();appear(nw);
+    const o=fld.order.indexOf(old);if(o>=0)fld.order[o]=nw;
+    fld.kids[0]=nw;old.out=true;sendToBench(fld,old);say(old,'おねがい!',1);
+    setRole(fld,nw,0);await nw.goto(0,15.6,4.2);
+  }else{
+    const j=pick([2,3,4,5,6,7,8]);const other=fld.kids[j];
+    fld.kids[j]=old;fld.kids[0]=other;
+    setRole(fld,old,j);setRole(fld,other,0);
+    say(old,'あとはまかせた!',1);old.walkTo(...POS[old.role],3.6);
+    await other.goto(0,15.6,4.2);
+  }
+  nw=fielder('P');appear(nw,true);if(!fld.pitchers.includes(nw))fld.pitchers.push(nw);
+  say(nw,'まかせて!',1);G.ball.holder=nw;
+  co.idleFace=fld.side<0?'r':'l';co.walkTo(home[0],home[1],2.4);
+  resetFielders();await sleep(1.5);
+  fld.kids.forEach(k=>k.setPose('cheer',.8));say(pick(fld.kids),'しまっていこー!',1);await sleep(1);
+}
+
 async function atBat(){
   const bat=G.bat,fld=G.field,p=fielder('P'),c=fielder('C');
-  const batter=nextBatter(bat);
+  let batter=nextBatter(bat);
+  batter=await pinchHit(bat,batter);
   batter.helmet=true;batter.role='B';batter.idlePose='bat';batter.idleFace='r';
   await batter.goto(-.95,.15,3);
+  G.playRuns=0;
   if(chance(.7))say(pick(benchKids(bat)),pick([`かっとばせー!${batter.name}!`,`${batter.name}、打てるぞー!`,'ボールよく見てー!']),0);
   let balls=0,strikes=0;G.balls=G.strikes=0;updateHUD();
   while(true){
@@ -482,7 +622,13 @@ async function atBat(){
     const out=r<.28?'ball':r<.45?'look':r<.58?'miss':r<.7?'foul':'hit';
     const bp=G.ball.flyTo(.05,-.95,.75,.3,1.6,.7);
     if(out==='miss'||out==='foul'||out==='hit'){await sleep(.6);batter.setPose('swing',.5,'r')}
-    if(out==='hit'){await sleep(.08);await contact(batter);return}
+    if(out==='hit'){
+      await sleep(.08);G.playRuns=0;const res=await contact(batter);
+      st(batter,'pa');st(batter,'ab');
+      if(res==='1B'||res==='2B'||res==='HR'){st(batter,'h');if(res==='HR')st(batter,'hr')}
+      if(res!=='E')st(batter,'rbi',G.playRuns);
+      return;
+    }
     if(out==='foul'){
       await sleep(.08);
       const sx=chance(.5)?1:-1;const fz=rnd(-4,8);const fx=sx*(Math.max(fz,0)+rnd(4,11));
@@ -498,10 +644,12 @@ async function atBat(){
     else{strikes++;G.strikes=Math.min(2,strikes);updateHUD();say(G.ump,'ストライク!',0);if(out==='miss'&&chance(.5))say(pick(benchKids(bat)),'ドンマイ!',0)}
     if(balls>=4){
       say(G.ump,'フォアボール!',2);G.balls=G.strikes=0;updateHUD();batter.role='R';batter.idlePose='stand';batter.idleFace='f';
-      await walkBatter(batter);await sleep(.3);await throwTo(c,p,10);return;
+      G.playRuns=0;await walkBatter(batter);st(batter,'pa');st(batter,'bb');st(batter,'rbi',G.playRuns);
+      await sleep(.3);await throwTo(c,p,10);return;
     }
     if(strikes>=3){
-      G.ump.setPose('outCall',1.4);say(G.ump,'バッターアウト!',2);G.outs++;G.balls=G.strikes=0;updateHUD();
+      G.ump.setPose('outCall',1.4);say(G.ump,'バッターアウト!',2);G.balls=G.strikes=0;
+      st(batter,'pa');st(batter,'ab');st(batter,'so');st(p,'pk');addOut();
       await sleep(.6);say(batter,pick(['くやしい〜','うぅ…','あ〜あ']),1);
       sendToBench(bat,batter);await sleep(.4);await throwTo(c,p,10);
       if(G.outs<3&&chance(.6))say(pick(fld.kids),['','ワンアウトー!','ツーアウトー!'][G.outs],1);
@@ -514,14 +662,16 @@ async function atBat(){
 async function halfInning(bat,fld){
   umpsToPosts();
   G.bat=bat;G.field=fld;G.outs=0;G.balls=G.strikes=0;G.bases=[null,null,null];G.runsThis=0;updateHUD();
-  fld.kids.forEach((k,i)=>{k.role=POSN[i];k.helmet=k.role==='C';k.carry=null;k.idlePose=k.role==='C'?'squat':'ready';k.idleFace=k.role==='C'?'b':'f';const[x,z]=POS[k.role];k.walkTo(x,z,4.3)});
-  bat.kids.forEach((k,i)=>{const[x,z]=benchPos(bat,i);benchIdle(bat,k,i);k.walkTo(x,z,3.6)});
+  fld.kids.forEach((k,i)=>{setRole(fld,k,i);const[x,z]=POS[k.role];k.walkTo(x,z,4.3)});
+  fld.all.filter(k=>!fld.kids.includes(k)).forEach(k=>{const[x,z]=benchPos(fld,k);benchIdle(fld,k);k.walkTo(x,z,3.6)});
+  bat.all.forEach(k=>{const[x,z]=benchPos(bat,k);benchIdle(bat,k);k.walkTo(x,z,3.6)});
   G.ball.holder=fielder('P');
   await sleep(7);
   say(fielder('C'),'しまっていこー!',1);await sleep(.6);
   fld.kids.forEach(k=>k.setPose('cheer',.8));say(pick(fld.kids.slice(2)),'おー!',0);
   await sleep(1.5);
   while(G.outs<3){
+    await pitchingChange(fld);
     await atBat();
     if(G.walkoff)return;
   }
@@ -531,17 +681,17 @@ async function halfInning(bat,fld){
 }
 
 async function lineUp(words){
-  const all=[...G.home.kids,...G.away.kids];
+  const all=[...G.home.all,...G.away.all];
   all.forEach(k=>{k.role=null;k.helmet=false;k.distracted=false});
   const ps=[];
-  G.home.kids.forEach((k,i)=>{k.idlePose='stand';k.idleFace='r';ps.push(k.goto(-2.7,1.0+i*1.8,3.6))});
-  G.away.kids.forEach((k,i)=>{k.idlePose='stand';k.idleFace='l';ps.push(k.goto(2.7,1.0+i*1.8,3.6))});
+  [[G.home,-2.7,'r'],[G.away,2.7,'l']].forEach(([t,x,f])=>{const n=t.all.length,sp=Math.min(1.8,15.5/Math.max(1,n-1));
+    t.all.forEach((k,i)=>{k.idlePose='stand';k.idleFace=f;ps.push(k.goto(x,1.0+i*sp,3.6))})});
   G.umps.forEach((u,i)=>{u.idleFace='b';ps.push(u.goto(-1.65+i*1.1,-.95,1.8))});
   await Promise.race([Promise.all(ps),sleep(22)]);
   await sleep(1.2);
   say(G.ump,'気をつけ!礼!',2);await sleep(.9);
   all.forEach(k=>k.setPose('bow',1.7));G.umps.forEach(u=>u.setPose('bow',1.7));
-  say(G.away.kids[4],words,2);await sleep(.3);say(G.home.kids[2],words,1);
+  say(G.away.all[4],words,2);await sleep(.3);say(G.home.all[2],words,1);
   await sleep(2.6);
 }
 
@@ -551,6 +701,7 @@ async function playGame(){
   await sleep(6);
   await lineUp('おねがいしまーす!');
   G.pre=false;
+  [G.home,G.away].forEach(t=>t.all.forEach(k=>{const[x,z]=benchPos(t,k);benchIdle(t,k);k.walkTo(x,z,3.6)}));
   umpsToPosts();
   say(G.ump,'プレイボール!',2);
   for(G.inning=1;;G.inning++){
@@ -565,26 +716,39 @@ async function playGame(){
     if(G.inning>=LAST)break;
     if(phaseAt(hourNow())!=='game'&&G.inning>=2)break;
   }
-  if(G.cold){const w=G.score[0]>G.score[1]?G.home:G.away;say(pick(benchKids(w).length?benchKids(w):w.kids),'コールドだー!',2);await sleep(1.5)}
+  if(G.cold){const w=G.score[0]>G.score[1]?G.home:G.away;say(pick(benchKids(w).length?benchKids(w):w.all),'コールドだー!',2);await sleep(1.5)}
   G.over=true;updateHUD();
+  commitGame();
   say(G.ump,'ゲーム!',2);await sleep(1.5);
   await lineUp('ありがとうございましたー!');
-  [G.home,G.away].forEach(t=>t.kids.forEach(k=>sendToBench(t,k)));
+  [G.home,G.away].forEach(t=>t.all.forEach(k=>sendToBench(t,k)));
   G.umps.forEach((u,i)=>{u.idleFace='f';u.walkTo(-4.5-i*1.2,-4.6,1.4)});
   const win=G.score[0]>G.score[1]?G.home:G.score[1]>G.score[0]?G.away:null;
   await sleep(4);
-  if(win){benchKids(win).forEach(k=>k.setPose('cheer',2.5));say(pick(win.kids),'かったー!',1);say(win.coach,'よくがんばった!',1)}
+  if(win){benchKids(win).forEach(k=>k.setPose('cheer',2.5));say(pick(win.all),'かったー!',1);say(win.coach,'よくがんばった!',1)}
   else say(G.home.coach,'引き分けか〜',1);
   await sleep(26);
 }
 
+function pickMatch(){
+  DB=loadD();
+  if(chance(.5)){
+    const pairs=[[0,1],[0,2],[1,2]],r=DB.rr||0,[a,b]=pairs[r%3],flip=Math.floor(r/3)%2;
+    editD(d=>{d.rr=r+1});
+    return{home:buildMine(flip?b:a,-1),away:buildMine(flip?a:b,1)};
+  }
+  const mi=DB.teams.map((t,i)=>({i,g:((DB.st.t[t.id]||{}).g||0)+Math.random()*.5})).sort((x,y)=>x.g-y.g)[0].i;
+  const cpu=pick(AWAYS);
+  return chance(.5)?{home:buildMine(mi,-1),away:buildCpu(cpu,1)}:{home:buildCpu(cpu,-1),away:buildMine(mi,1)};
+}
+
 function setupGame(){
   ents=ents.filter(e=>!e.gameEnt);
-  const away=pick(AWAYS);
-  const home=makeTeam(HOME,-1),aw=makeTeam(away,1);
-  Object.assign(G,{home,away:aw,score:[0,0],inning:1,top:true,outs:0,balls:0,strikes:0,bases:[null,null,null],over:false,walkoff:false,cold:false,inPlay:false,pre:true});
+  const {home,away:aw}=pickMatch();
+  Object.assign(G,{home,away:aw,score:[0,0],inning:1,top:true,outs:0,balls:0,strikes:0,bases:[null,null,null],over:false,walkoff:false,cold:false,inPlay:false,pre:true,box:{},pchg:null,playRuns:0});
   [home,aw].forEach(t=>{
-    t.kids.forEach((k,i)=>{const[x,z]=benchPos(t,i);k.place(x,z);benchIdle(t,k,i);k.gameEnt=true;ents.push(k)});
+    t.all.forEach(k=>{const[x,z]=benchPos(t,k);k.place(x,z);benchIdle(t,k);k.gameEnt=true;ents.push(k)});
+    t.kids.forEach(k=>appear(k));appear(t.kids[0],true);
     t.coach.place(t.side*9.4,-2.4);t.coach.idleFace=t.side<0?'r':'l';t.coach.gameEnt=true;ents.push(t.coach);
     for(let i=0;i<4;i++){const pa=new Ent({kind:'adult',role:'parent',size:rnd(.92,1.04),idlePose:'sit',idleFace:t.side<0?'r':'l',shirt:pick(['#e7a24a','#7aa7d6','#e88b8b','#9c8bd1','#6fbf9b','#f2f2ee']),hat:chance(.5)});
       pa.place(t.side*(18.5+(i%2)*1.6),4.6+(i>>1)*1.8);pa.gameEnt=true;t.parents.push(pa);ents.push(pa)}
@@ -628,7 +792,7 @@ async function idleBit(){
 
 /* ---------- other phases ---------- */
 async function warmup(ep){
-  const t=makeTeam(HOME,-1);const kids=t.kids;kids.forEach(k=>k.glove=true);
+  DB=loadD();const t=buildMine(0,-1);const kids=t.kids;kids.forEach(k=>k.glove=true);
   const spots=[[-16,-6,22],[6,16,22],[-17,-7,35],[7,17,35]];
   const pairs=[];
   for(let i=0;i<4;i++){const a=kids[i*2],b=kids[i*2+1],[x0,x1,z]=spots[i];a.place(x0,z);b.place(x1,z+rnd(-.5,.5));a.idleFace='r';b.idleFace='l';a.idlePose=b.idlePose='ready';a.home=[x0,z];b.home=[x1,b.z];const ball=new Ball();ball.holder=a;pairs.push([a,b,ball]);ents.push(a,b,ball)}
@@ -656,7 +820,7 @@ async function catchLoop([a,b,ball],ep){
   }
 }
 async function maintenance(ep){
-  const t=makeTeam(HOME,-1);const crew=t.kids.slice(0,7);
+  DB=loadD();const t=buildMine(0,-1);const crew=t.kids.slice(0,7);
   crew.forEach((k,i)=>{k.place(-19,4+i*3.4);k.carry='rake';k.idlePose='rake';k.idleFace='r';ents.push(k)});
   t.coach.place(-12,-2);t.coach.idleFace='r';ents.push(t.coach);
   const helpers=t.kids.slice(7);helpers.forEach((k,i)=>{k.place(5+i*3,-3);k.carry='rake';k.idlePose='rake';ents.push(k)});
@@ -968,31 +1132,45 @@ function drawTrain(c,tr,lights){
 }
 
 /* ---------- camera ---------- */
-let W=0,Hh=0,dpr=1,scale=1,vw=1200,vh=800,portrait=false;
-const cam={x:600,y:430};let manual=null,manualUntil=0,drag=null;
+let W=0,Hh=0,dpr=1,scale=1,base=1,Z=1,vw=1200,vh=800,portrait=false,stL=0,stT=0;
+const cam={x:600,y:430};let manual=null,manualY=null,manualUntil=0,drag=null,pinch=null;
+function zMin(){return Math.max(W/(1200*base),Hh/(1800*base),portrait?0:1)}
+function applyScale(){Z=clamp(Z,zMin(),3);scale=base*Z;vw=W/scale;vh=Hh/scale}
 function layout(){
-  const r=$('#stage').getBoundingClientRect();W=r.width;Hh=r.height;dpr=Math.min(window.devicePixelRatio||1,2);
+  const r=$('#stage').getBoundingClientRect();W=r.width;Hh=r.height;stL=r.left;stT=r.top;dpr=Math.min(window.devicePixelRatio||1,2);
   cv.width=Math.round(W*dpr);cv.height=Math.round(Hh*dpr);
   portrait=Hh>W*1.05;
-  scale=portrait?W/500:Math.max(W/1200,Hh/800);
-  vw=W/scale;vh=Hh/scale;
+  base=portrait?W/500:Math.max(W/1200,Hh/800);
+  applyScale();
   renderBG(hourNow());
 }
+let bgTimer=0;function bgSoon(){clearTimeout(bgTimer);bgTimer=setTimeout(()=>renderBG(hourNow()),250)}
 let baseX=600,panStart=null;
 window.wallpaperPan=(t,v)=>{const lo=vw/2,hi=Math.max(lo,1200-vw/2);
   if(t==='offset'){baseX=lo+(hi-lo)*clamp(+v,0,1)}
   else if(t==='down'){panStart=cam.x}
   else if(t==='move'&&panStart!=null){manual=clamp(panStart-(+v)/scale,lo,hi);manualUntil=simT+10;cam.x=manual}
   else if(t==='up'){panStart=null}};
+function defY(){return portrait?440:430}
 function camTarget(){
-  let fx=baseX;
-  if(G.inPlay&&G.ball&&phaseName==='game'){fx=P(G.ball.x,G.ball.z).x}
-  if(manual!=null&&simT<manualUntil)fx=manual;else manual=null;
-  return clamp(fx,vw/2,1200-vw/2);
+  let fx=baseX,fy=defY();
+  if(G.inPlay&&G.ball&&phaseName==='game'){const p=P(G.ball.x,G.ball.z);fx=p.x;if(Z>1.15)fy=p.y}
+  if(manual!=null&&simT<manualUntil){fx=manual;if(manualY!=null)fy=manualY}else{manual=null;manualY=null}
+  return[fx,fy];
 }
-cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,cx:cam.x};cv.setPointerCapture(e.pointerId)});
-cv.addEventListener('pointermove',e=>{if(!drag)return;manual=clamp(drag.cx-(e.clientX-drag.x)/scale,vw/2,1200-vw/2);manualUntil=simT+10;cam.x=manual});
-const endDrag=()=>{drag=null};cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
+function clampCam(){cam.x=clamp(cam.x,vw/2,Math.max(vw/2,1200-vw/2));cam.y=clamp(cam.y,-450+vh/2,Math.max(-450+vh/2,1350-vh/2))}
+function zoomAt(nz,sx,sy){const wx=cam.x+(sx-W/2)/scale,wy=cam.y+(sy-Hh/2)/scale;Z=nz;applyScale();cam.x=wx-(sx-W/2)/scale;cam.y=wy-(sy-Hh/2)/scale;clampCam();manual=cam.x;manualY=cam.y;manualUntil=simT+15}
+const ptrs=new Map();let lastTap=0;
+cv.addEventListener('pointerdown',e=>{try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  const x=e.clientX-stL,y=e.clientY-stT;ptrs.set(e.pointerId,{x,y});
+  if(ptrs.size===1){drag={x,y,cx:cam.x,cy:cam.y};const now=performance.now();if(now-lastTap<300){Z=1;applyScale();manual=manualY=null;bgSoon()}lastTap=now}
+  else if(ptrs.size===2){drag=null;const [a,b]=[...ptrs.values()];pinch={d:Math.max(10,Math.hypot(a.x-b.x,a.y-b.y)),z:Z}}});
+cv.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const x=e.clientX-stL,y=e.clientY-stT;ptrs.set(e.pointerId,{x,y});
+  if(pinch&&ptrs.size>=2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);zoomAt(clamp(pinch.z*d/pinch.d,zMin(),3),(a.x+b.x)/2,(a.y+b.y)/2)}
+  else if(drag){cam.x=drag.cx-(x-drag.x)/scale;cam.y=drag.cy-(y-drag.y)/scale;clampCam();manual=cam.x;manualY=cam.y;manualUntil=simT+10}});
+const endPtr=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2&&pinch){pinch=null;bgSoon();const r=[...ptrs.values()][0];drag=r?{x:r.x,y:r.y,cx:cam.x,cy:cam.y}:null}if(!ptrs.size)drag=null};
+cv.addEventListener('pointerup',endPtr);cv.addEventListener('pointercancel',endPtr);
+cv.addEventListener('wheel',e=>{e.preventDefault();zoomAt(clamp(Z*Math.exp(-e.deltaY*.0015),zMin(),3),e.clientX-stL,e.clientY-stT);bgSoon()},{passive:false});
 
 /* ---------- main draw ---------- */
 let snap=null,snapT=0;
@@ -1066,16 +1244,15 @@ function startPhase(ph){
 let last=performance.now();
 function frame(ts){
   if(WALL&&ts-last<30){requestAnimationFrame(frame);return}
-  const dt=Math.min(.1,(ts-last)/1000);last=ts;simT+=dt;
+  const dt=Math.min(.1,(ts-last)/1000)*SPEED;last=ts;simT+=dt;
   if(waiters.length){const due=[],rest=[];for(const w of waiters)(w.t<=simT?due:rest).push(w);waiters=rest;due.forEach(w=>w.res())}
   for(const e of ents)e.update(dt);
   ents=ents.filter(e=>!e.dead);
   clouds.forEach(cl=>{cl.x+=cl.v*dt;if(cl.x>1300)cl.x=-140});
   trains.forEach(tr=>tr.x+=tr.d*tr.sp*dt);trains=trains.filter(tr=>tr.x>-900&&tr.x<2100);
   planes.forEach(p=>p.x+=p.d*14*dt);planes=planes.filter(p=>p.x>-200&&p.x<1400);
-  const tx=camTarget();if(!drag)cam.x+=(tx-cam.x)*Math.min(1,dt*1.4);
-  cam.y=portrait?440:clamp(430,vh/2-450,1350-vh/2);
-  cam.x=clamp(cam.x,vw/2,1200-vw/2);
+  const [tx,ty]=camTarget();if(!drag&&!pinch){const k=Math.min(1,dt*1.4);cam.x+=(tx-cam.x)*k;cam.y+=(ty-cam.y)*k}
+  clampCam();
   const h=hourNow();if(Math.abs(h-bgHour)>.05&&Math.abs(h-bgHour)<23.9||bgHour<0)renderBG(h);
   draw();
   requestAnimationFrame(frame);
@@ -1096,9 +1273,62 @@ $('#timeChips').addEventListener('click',e=>{const b=e.target.closest('button');
 $('#hourR').addEventListener('input',e=>{S.hour=+e.target.value;$('#hourV').textContent=fmtH(S.hour);renderBG(S.hour);const ph=phaseAt(S.hour);if(ph!==phaseName)startPhase(ph);syncUI()});
 setInterval(()=>{if(S.hour==null&&!panel.hidden)$('#hourV').textContent=fmtH(hourNow())},20000);
 
+/* ---------- teams & stats sheet ---------- */
+const sheet=$('#sheet'),shBody=$('#shBody');let shTab='team',shTeam=0,shConfirm=false;
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function capOf(t){return(CAPS.find(c=>c.k===t.cap)||CAPS[0]).c}
+function teamPick(){return`<div class="tpick">${DB.teams.map((t,i)=>`<button data-team="${i}" aria-pressed="${i===shTeam}"><span class="dot" style="background:${capOf(t)}"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.name||'マイチーム')}</span></button>`).join('')}</div>`}
+function avg(h,ab){if(!ab)return'-';const v=(h/ab).toFixed(3);return v.startsWith('0')?v.slice(1):v}
+function ip(o){o=o||0;const r=o%3;return`${Math.floor(o/3)}${r?` ${r}/3`:''}`}
+function renderSheet(){
+  DB=loadD();
+  document.querySelectorAll('#shTabs button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.t===shTab)));
+  const t=DB.teams[shTeam];
+  if(shTab==='team'){
+    shBody.innerHTML=`${teamPick()}
+    <div class="field"><label class="lbl" for="tName">チーム名</label><input type="text" id="tName" maxlength="10" value="${esc(t.name)}"></div>
+    <div><div class="lbl">帽子・ライン</div><div class="sw" id="swCap">${CAPS.map(c=>`<button data-cap="${c.k}" aria-pressed="${t.cap===c.k}"><span class="dot" style="background:${c.c}"></span>${c.l}</button>`).join('')}</div></div>
+    <div><div class="lbl">ユニフォーム</div><div class="sw" id="swBody">${BODIES.map(c=>`<button data-body="${c.k}" aria-pressed="${t.body===c.k}"><span class="dot" style="background:${c.c}"></span>${c.l}</button>`).join('')}</div></div>
+    <div><div class="lbl">選手（13人）</div><div class="roster">${t.players.map((p,i)=>`<div class="prow"><span class="num">${p.num}</span><input type="text" id="pn${i}" data-p="${i}" maxlength="8" value="${esc(p.name)}" aria-label="背番号${p.num}の名前"><div class="gseg" data-g="${i}"><button data-v="0" aria-pressed="${!p.girl}">男の子</button><button data-v="1" aria-pressed="${!!p.girl}">女の子</button></div></div>`).join('')}</div></div>
+    <p class="note">変更は次の試合から反映されます。先発の9人・守備位置・打順は、出場の少ない子から公平にランダムで決まります。</p>`;
+  }else{
+    const ts=DB.teams.map(x=>({x,s:DB.st.t[x.id]||{g:0,w:0,l:0,d:0,rf:0,ra:0,vs:{}}}));
+    const s=(DB.st.t[t.id]||{vs:{}});
+    const rows=t.players.map(p=>({p,s:DB.st.p[p.id]||{}}));
+    const pit=rows.filter(r=>r.s.pg);
+    shBody.innerHTML=`<div><h3>チーム成績</h3><div class="tbl"><table><tr><th>チーム</th><th>試合</th><th>勝</th><th>敗</th><th>分</th><th>勝率</th><th>得点</th><th>失点</th></tr>
+      ${ts.map(({x,s})=>`<tr><td class="l"><span class="dot" style="display:inline-block;vertical-align:-1px;margin-right:5px;background:${capOf(x)}"></span>${esc(x.name)}</td><td>${s.g}</td><td>${s.w}</td><td>${s.l}</td><td>${s.d}</td><td>${s.w+s.l?avg(s.w,s.w+s.l):'-'}</td><td>${s.rf}</td><td>${s.ra}</td></tr>`).join('')}</table></div></div>
+    ${teamPick()}
+    <div><h3>対戦相手別</h3><div class="tbl"><table><tr><th>相手</th><th>勝</th><th>敗</th><th>分</th></tr>${Object.entries(s.vs||{}).map(([n,v])=>`<tr><td class="l">${esc(n)}</td><td>${v.w}</td><td>${v.l}</td><td>${v.d}</td></tr>`).join('')||'<tr><td class="l" colspan="4">まだ試合がありません</td></tr>'}</table></div></div>
+    <div><h3>打撃成績</h3><div class="tbl"><table><tr><th>選手</th><th>試合</th><th>打席</th><th>打数</th><th>安打</th><th>本塁打</th><th>打点</th><th>四球</th><th>三振</th><th>打率</th></tr>
+      ${rows.map(({p,s})=>`<tr><td class="l">${p.num} ${esc(p.name)}</td><td>${s.g||0}</td><td>${s.pa||0}</td><td>${s.ab||0}</td><td>${s.h||0}</td><td>${s.hr||0}</td><td>${s.rbi||0}</td><td>${s.bb||0}</td><td>${s.so||0}</td><td>${avg(s.h||0,s.ab||0)}</td></tr>`).join('')}</table></div></div>
+    <div><h3>投手成績</h3><div class="tbl"><table><tr><th>選手</th><th>登板</th><th>投球回</th><th>奪三振</th><th>失点</th><th>勝</th><th>敗</th></tr>
+      ${pit.map(({p,s})=>`<tr><td class="l">${p.num} ${esc(p.name)}</td><td>${s.pg||0}</td><td>${ip(s.po)}</td><td>${s.pk||0}</td><td>${s.pr||0}</td><td>${s.w||0}</td><td>${s.l||0}</td></tr>`).join('')||'<tr><td class="l" colspan="7">まだ登板がありません</td></tr>'}</table></div></div>
+    <div><h3>最近の試合</h3><ul class="log">${DB.log.slice(0,12).map(g=>{const d=new Date(g.t);return`<li>${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}　${esc(g.a)} ${g.sa} - ${g.sh} ${esc(g.h)}${g.c?'（コールド）':''}</li>`}).join('')||'<li>まだ試合がありません</li>'}</ul></div>
+    ${window.KawaApp?'<p class="note">成績は壁紙で行われた試合で記録されます。</p>':''}
+    <button class="danger" id="resetSt">${shConfirm?'本当に消す（もう一度押す）':'成績をすべてリセット'}</button>`;
+  }
+}
+$('#bTeams').addEventListener('click',()=>{panel.hidden=true;gear.setAttribute('aria-expanded','false');sheet.hidden=false;shConfirm=false;renderSheet()});
+$('#shClose').addEventListener('click',()=>{sheet.hidden=true});
+$('#shTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;shTab=b.dataset.t;shConfirm=false;renderSheet()});
+shBody.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.team!=null){shTeam=+b.dataset.team;renderSheet();return}
+  if(b.dataset.cap){editD(d=>{d.teams[shTeam].cap=b.dataset.cap});renderSheet();return}
+  if(b.dataset.body){editD(d=>{d.teams[shTeam].body=b.dataset.body});renderSheet();return}
+  const g=b.closest('.gseg');if(g){editD(d=>{d.teams[shTeam].players[+g.dataset.g].girl=b.dataset.v==='1'});g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));return}
+  if(b.id==='resetSt'){if(!shConfirm){shConfirm=true;renderSheet();return}editD(d=>{d.st={p:{},t:{}};d.log=[]});shConfirm=false;renderSheet()}
+});
+shBody.addEventListener('input',e=>{const el=e.target;
+  if(el.id==='tName')editD(d=>{d.teams[shTeam].name=el.value.trim()});
+  else if(el.dataset.p!=null)editD(d=>{d.teams[shTeam].players[+el.dataset.p].name=el.value.trim()});
+});
+shBody.addEventListener('change',e=>{if(e.target.id==='tName')renderSheet()});
+
 window.addEventListener('resize',layout);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadS();syncUI();checkUpdate()}});
-addEventListener('storage',e=>{if(e.key==='kawajiki.v1'){loadS();syncUI()}});
+addEventListener('storage',e=>{if(e.key==='kawajiki.v1'){loadS();syncUI()}if(e.key===DKEY){DB=loadD();if(!sheet.hidden&&shTab==='stats')renderSheet()}});
 if(window.KawaApp){$('#appBox').hidden=false;$('#bWp').onclick=()=>{try{KawaApp.setWallpaper()}catch(e){}}}
 let updBusy=false;
 function checkUpdate(){if(updBusy||!/^https?:/.test(location.protocol)||BUILD.startsWith('__'))return;updBusy=true;
@@ -1106,7 +1336,7 @@ function checkUpdate(){if(updBusy||!/^https?:/.test(location.protocol)||BUILD.st
     if(!v||!v.build||v.build===BUILD)return;
     let tried=null;try{tried=JSON.parse(localStorage.getItem('kawajikiUpd')||'null')}catch(e){}
     if(tried&&tried.b===v.build&&Date.now()-tried.t<600000)return;
-    if(!WALL&&!panel.hidden)return;
+    if(!WALL&&(!panel.hidden||!sheet.hidden))return;
     try{localStorage.setItem('kawajikiUpd',JSON.stringify({b:v.build,t:Date.now()}))}catch(e){}
     const q=new URLSearchParams(location.search);q.set('v',v.build);location.replace(location.pathname+'?'+q.toString());
   }).catch(()=>{updBusy=false})}

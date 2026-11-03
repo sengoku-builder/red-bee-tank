@@ -59,6 +59,12 @@ body.trialing .dock,body.trialing .panel{display:none}
 .debug[hidden]{display:none}
 #whud{display:none;position:fixed;top:calc(14px + env(safe-area-inset-top));right:14px;padding:7px 11px;border-radius:12px;background:rgba(255,255,255,.42);color:#26313b;font-size:12px;line-height:1.6;text-align:right;pointer-events:none;font-variant-numeric:tabular-nums;max-width:62%}
 body.wall.showhud #whud{display:block}
+body.hudedit #whud{display:block;pointer-events:auto;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none;outline:2px dashed rgba(62,111,142,.55);outline-offset:3px}
+#whud.lift{transform:scale(1.07);background:rgba(255,255,255,.78);box-shadow:0 10px 28px rgba(40,60,80,.28);outline-style:solid;transition:transform .12s}
+body.hudedit #ui>*:not(#hudBar){display:none!important}
+#hudBar{display:none;position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));padding:12px;border-radius:16px;font-size:13px;line-height:1.6}
+body.hudedit #hudBar{display:block}
+#hudBar .row{display:flex;gap:8px;margin-top:8px}#hudBar .row button{flex:1}
 .fam{border-top:1px solid rgba(60,80,100,.12);padding:10px 0;font-size:13px;line-height:1.7}
 .fam b{color:#3e6f8e}
 .thumb.emo{display:flex;align-items:center;justify-content:center;font-size:28px}
@@ -91,8 +97,9 @@ body.trialing #bShot,body.paneling #bShot{display:none}
  <section class="panel glass" id="pAlbum"><h2>アルバム</h2><p id="albumMsg"></p><div class="album" id="albumList"></div></section>
  <section class="panel glass" id="pNote"><h2>知識ノート</h2><p>出来事が起きると、カードが1枚ずつ増えていきます。</p><div id="noteList"></div></section>
  <section class="panel glass" id="pLog"><h2>記録</h2><div class="log" id="logList"></div>
-  <div class="sec">壁紙</div><div id="wpBox"></div><label style="display:block;font-size:13px;margin:4px 0"><input type="checkbox" id="hudChk"> 壁紙の右上に状態（Gや子育ての様子）を表示する</label>
+  <div class="sec">壁紙</div><div id="wpBox"></div><label style="display:block;font-size:13px;margin:4px 0"><input type="checkbox" id="hudChk"> 壁紙に状態（Gや子育ての様子）を表示する</label><button class="glass" id="bHudMove" style="margin-top:4px">壁紙の表示を動かす</button>
   <div class="sec">やり直し</div><button class="glass" id="bReset">最初からやり直す</button></section>
+ <div class="glass" id="hudBar">壁紙に出る表示です。<b>長押し</b>すると持ち上がるので、そのまま指で好きな場所へ動かしてください。<div class="row"><button class="glass" id="hudReset">元の位置に戻す</button><button class="main" id="hudDone">完了</button></div></div>
  <div class="trial glass" id="trial"><span id="trialMsg"></span><button class="main" id="trialBuy">買う</button><button class="glass" id="trialEnd">やめる</button></div>
  <div class="modal glass" id="mLot"><div class="tag">今日のくじ</div><h2 id="lotTitle">今日の単価を決めよう</h2><div class="big" id="lotBig">？</div><p class="body" id="lotMsg" style="text-align:center"></p><button class="main" id="bDraw">くじを引く</button></div>
  <div class="modal glass" id="mNote"><div class="tag">知識カード</div><h2 id="mnTitle"></h2><div class="body" id="mnBody"></div><button class="main" id="bNoteOk">わかった</button></div>
@@ -416,7 +423,7 @@ function stageText(){const L=life(),lv=level();
  }}
 function render(){tick();camUI();const r=S.rates[dkey(now())];
  $('hud').innerHTML='<div><b>'+G(S.g)+'</b><div class="muted">今日 '+(r?r+'G/分':'1G/分（くじ未）')+'</div></div><div class="stage">'+stageText()+'</div>';
- $('whud').innerHTML=G(S.g)+'<br>'+stageText();
+ $('whud').innerHTML=G(S.g)+'<br>'+stageText();placeHud();
  document.body.classList.toggle('showhud',S.hud!==false&&!qs.has('nohud'));
  if($('pShop').classList.contains('open'))renderShop(true)}
 let shopSig='';
@@ -480,6 +487,28 @@ $('bLog').onclick=()=>toggle('pLog',()=>{$('logList').innerHTML=S.log.slice(0,40
 (function(){const b=$('wpBox');if(window.ShimaApp){b.innerHTML='<button class="main" id="bWp">この森を壁紙にする</button><p>ホーム画面の壁紙が、この森の動く写真になります。遊んだ内容はそのまま壁紙に反映されます。</p>';$('bWp').onclick=()=>{try{ShimaApp.setWallpaper()}catch(e){}}}
  else b.innerHTML='<p>スマホの「シマエナガの森」アプリで開くと、この森をそのまま壁紙にできます。</p>'})();
 $('hudChk').onchange=e=>{S.hud=e.target.checked;save();render()};
+/* ----- 壁紙の表示を長押しで好きな場所へ（位置は画面に対する割合で覚える） ----- */
+const WH=$('whud');let hudDrag=null;
+function placeHud(){if(hudDrag)return;const p=S.hudPos;
+ if(!p){WH.style.left='';WH.style.top='';WH.style.right='';return}
+ const w=WH.offsetWidth||140,h=WH.offsetHeight||44,x=Math.max(6,Math.min(innerWidth-w-6,p.x*innerWidth)),y=Math.max(6,Math.min(innerHeight-h-6,p.y*innerHeight));
+ WH.style.right='auto';WH.style.left=x+'px';WH.style.top=y+'px'}
+addEventListener('resize',placeHud);
+$('bHudMove').onclick=()=>{closePanels();document.body.classList.add('hudedit');render()};
+$('hudDone').onclick=()=>{document.body.classList.remove('hudedit');toast('壁紙の表示の位置を覚えました')};
+$('hudReset').onclick=()=>{delete S.hudPos;save();placeHud();toast('元の位置（右上）に戻しました')};
+WH.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('hudedit'))return;e.preventDefault();
+ const r=WH.getBoundingClientRect();hudDrag={id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:e.clientX-r.left,oy:e.clientY-r.top,live:false,
+  timer:setTimeout(()=>{if(hudDrag){hudDrag.live=true;WH.classList.add('lift');try{navigator.vibrate&&navigator.vibrate(15)}catch(_){}}},380)};
+ try{WH.setPointerCapture(e.pointerId)}catch(_){}});
+WH.addEventListener('pointermove',e=>{if(!hudDrag||e.pointerId!==hudDrag.id)return;
+ if(!hudDrag.live){if(Math.hypot(e.clientX-hudDrag.sx,e.clientY-hudDrag.sy)>10){clearTimeout(hudDrag.timer);hudDrag=null}return}
+ const w=WH.offsetWidth,h=WH.offsetHeight,x=Math.max(6,Math.min(innerWidth-w-6,e.clientX-hudDrag.ox)),y=Math.max(6,Math.min(innerHeight-h-6,e.clientY-hudDrag.oy));
+ WH.style.right='auto';WH.style.left=x+'px';WH.style.top=y+'px'});
+function hudUp(e){if(!hudDrag||e.pointerId!==hudDrag.id)return;clearTimeout(hudDrag.timer);
+ WH.classList.remove('lift');
+ if(hudDrag.live){const r=WH.getBoundingClientRect();S.hudPos={x:r.left/innerWidth,y:r.top/innerHeight};save()}hudDrag=null;placeHud()}
+WH.addEventListener('pointerup',hudUp);WH.addEventListener('pointercancel',hudUp);
 cv.addEventListener('click',closePanels);
 $('bReset').onclick=()=>{if(confirm('森を最初からやり直しますか？（G・道具・家族・カードがすべて消えます）')){try{localStorage.removeItem(KEY)}catch(e){}location.reload()}};
 if(DEBUG){$('debug').hidden=false;document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{S.offset=(S.offset||0)+ +b.dataset.skip;tick();checkLife();save();render();scheduleNext();pump()});
@@ -509,7 +538,7 @@ function checkUpdate(){if(updBusy||!/^https?:/.test(location.protocol))return;up
   // 同じ版への読み込み直しは10分に1回まで（公開直後の行き違いで繰り返さないように）
   let tried=null;try{tried=JSON.parse(localStorage.getItem('shimaUpd')||'null')}catch(e){}
   if(tried&&tried.b===v.build&&Date.now()-tried.t<10*MIN)return;
-  if(!WALL&&(anyModal()||trial||document.querySelector('.panel.open')))return; // 遊んでいる途中は待つ
+  if(!WALL&&(anyModal()||trial||document.querySelector('.panel.open')||document.body.classList.contains('hudedit')))return; // 遊んでいる途中は待つ
   try{localStorage.setItem('shimaUpd',JSON.stringify({b:v.build,t:Date.now()}))}catch(e){}
   save();const q=new URLSearchParams(location.search);q.set('v',v.build);location.replace(location.pathname+'?'+q.toString())
  }).catch(()=>{updBusy=false})}

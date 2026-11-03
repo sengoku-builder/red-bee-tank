@@ -1,15 +1,8 @@
-package io.github.sengokubuilder.shimaenaga;
+package io.github.sengokubuilder.kawajiki;
 
 import android.app.Activity;
 import android.app.WallpaperManager;
 import android.content.ComponentName;
-import android.content.ContentResolver;
-import android.content.ContentValues;
-import android.net.Uri;
-import android.os.Environment;
-import android.provider.MediaStore;
-import android.util.Base64;
-import java.io.OutputStream;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -22,8 +15,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 /**
- * シマエナガの森で遊ぶ画面。
- * 壁紙と同じアプリの中で開くので、ここで遊んだ内容（G・道具・家族）がそのまま壁紙に映る。
+ * 河川敷の少年野球を眺める画面。右上のボタンから吹き出しの量などを設定でき、
+ * 同じアプリの壁紙にそのまま反映される。「この野球場を壁紙にする」で壁紙に設定できる。
  */
 public class MainActivity extends Activity {
 
@@ -44,46 +37,23 @@ public class MainActivity extends Activity {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
-        web.setBackgroundColor(Color.rgb(223, 229, 234));
+        web.setBackgroundColor(Color.rgb(156, 199, 230));
         web.setWebViewClient(new WebViewClient());
-        web.setWebChromeClient(new WebChromeClient()); // 「最初からやり直す」の確認ダイアログ用
-        web.addJavascriptInterface(new Bridge(), "ShimaApp");
+        web.setWebChromeClient(new WebChromeClient());
+        web.addJavascriptInterface(new Bridge(), "KawaApp");
         setContentView(web);
-        web.loadUrl(ForestWallpaperService.GAME_URL);
+        web.loadUrl(BallparkWallpaperService.PAGE_URL);
     }
 
     /** ページから呼ばれる窓口 */
     class Bridge {
-        /** アルバムの写真を、スマホの「Pictures/シマエナガの森」に保存する */
-        @JavascriptInterface
-        public boolean savePhoto(String dataUrl, String name) {
-            try {
-                String b64 = dataUrl.substring(dataUrl.indexOf(',') + 1);
-                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
-                ContentValues v = new ContentValues();
-                v.put(MediaStore.Images.Media.DISPLAY_NAME, name);
-                v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-                v.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/シマエナガの森");
-                ContentResolver r = getContentResolver();
-                Uri uri = r.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
-                if (uri == null) return false;
-                try (OutputStream os = r.openOutputStream(uri)) {
-                    if (os == null) return false;
-                    os.write(bytes);
-                }
-                return true;
-            } catch (Throwable e) {
-                return false;
-            }
-        }
-
-        /** ページの「この森を壁紙にする」ボタンから呼ばれる */
+        /** ページの「この野球場を壁紙にする」ボタンから呼ばれる */
         @JavascriptInterface
         public void setWallpaper() {
             runOnUiThread(() -> {
                 Intent i = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
                 i.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                        new ComponentName(MainActivity.this, ForestWallpaperService.class));
+                        new ComponentName(MainActivity.this, BallparkWallpaperService.class));
                 try {
                     startActivity(i);
                 } catch (Exception e) {
@@ -101,7 +71,6 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
-        // 遊んだ内容をすぐ保存させてから止める（ページ側は1秒ごとに保存している）
         if (web != null) web.onPause();
         super.onPause();
     }

@@ -1,7 +1,7 @@
-name: シマエナガの森 壁紙アプリを組み立てる
+name: 河川敷の少年野球 壁紙アプリを組み立てる
 on:
   push:
-    branches: [android-shimaenaga]
+    branches: [android-kawajiki]
   workflow_dispatch:
 permissions:
   contents: write
@@ -20,13 +20,13 @@ jobs:
       - name: APKを組み立てる
         run: gradle -p android assembleDebug --no-daemon --stacktrace
       - name: ファイル名を整える
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk ShimaenagaForest.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk KawajikiBaseball.apk
       - name: リリースに置く
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: shimaenaga-latest
-          target_commitish: android-shimaenaga
-          name: シマエナガの森 壁紙アプリ（最新版）
-          body: スマホでこのページを開き、下の ShimaenagaForest.apk を押してダウンロード・インストールしてください。
-          files: ShimaenagaForest.apk
+          tag_name: kawajiki-latest
+          target_commitish: android-kawajiki
+          name: 河川敷の少年野球 壁紙アプリ（最新版）
+          body: スマホでこのページを開き、下の KawajikiBaseball.apk を押してダウンロード・インストールしてください。
+          files: KawajikiBaseball.apk
           make_latest: false

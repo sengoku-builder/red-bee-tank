@@ -16,6 +16,13 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
 #hud{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none}
 .board{background:rgba(32,58,44,.82);color:#f4f1e4;border-radius:10px;padding:6px 10px 7px;font-size:13px;line-height:1.35;min-width:132px;box-shadow:0 1px 0 rgba(0,0,0,.15)}
 .board .row{display:flex;justify-content:space-between;gap:14px}
+.ls{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12.5px;color:#f4f1e4}
+.ls td,.ls th{color:inherit;font-family:var(--font)}
+.ls th{font-weight:500;font-size:10.5px;opacity:.7;padding:0 0 2px;text-align:center;min-width:15px}
+.ls td{text-align:center;padding:1px 0;min-width:15px}
+.ls td.tn{text-align:left;padding-right:8px;max-width:5.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ls .tot{font-weight:700;padding-left:6px;min-width:20px}
+.ls td.now{color:#f6d23a}
 .board .sc{font-variant-numeric:tabular-nums;font-weight:700}
 .board .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:3px;padding-top:3px;border-top:1px solid rgba(244,241,228,.25);font-size:12px}
 .bso{display:flex;flex-direction:column;gap:3px;margin-top:4px}
@@ -77,8 +84,9 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
   <canvas id="cv" aria-label="堤防の上から河川敷の少年野球を眺める動く壁紙"></canvas>
   <div id="hud">
     <div class="board" id="board" hidden>
-      <div class="row"><span id="tA">ひばり</span><span class="sc" id="sA">0</span></div>
-      <div class="row"><span id="tH">かもめ</span><span class="sc" id="sH">0</span></div>
+      <table class="ls" id="ls"><thead><tr><th></th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th class="tot">計</th></tr></thead>
+        <tbody><tr id="lsA"><td class="tn"></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="tot"></td></tr>
+        <tr id="lsH"><td class="tn"></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="tot"></td></tr></tbody></table>
       <div class="meta"><span id="inn">1回オモテ</span></div>
       <div class="bso" id="bso">
         <div class="lr"><b>B</b><i class="lp g"></i><i class="lp g"></i><i class="lp g"></i></div>
@@ -305,7 +313,7 @@ function dist(a,x,z){return Math.hypot(a.x-x,a.z-z)}
 function faceTo(a,b){const dx=b.x-a.x,dz=b.z-a.z;return Math.abs(dx)>Math.abs(dz)*.7?(dx>0?'r':'l'):(dz>0?'b':'f')}
 
 /* ---------- box score ---------- */
-function bx(k){if(!k||!k.pid)return null;return G.box[k.pid]||(G.box[k.pid]={g:0,pa:0,ab:0,h:0,hr:0,rbi:0,bb:0,so:0,pg:0,po:0,pk:0,pr:0,w:0,l:0})}
+function bx(k){if(!k||!k.pid)return null;return G.box[k.pid]||(G.box[k.pid]={g:0,pa:0,ab:0,h:0,hr:0,rbi:0,bb:0,so:0,sh:0,pg:0,po:0,pk:0,pr:0,w:0,l:0})}
 function st(k,key,n=1){const b=bx(k);if(b)b[key]+=n}
 function appear(k,pitch=false){const b=bx(k);if(!b)return;b.g=1;if(pitch)b.pg=1}
 function bv(k,key){const b=bx(k);return b?b[key]:0}
@@ -329,8 +337,9 @@ function updateHUD(){
   const board=$('#board'),ph=$('#phase');
   if(phaseName==='game'&&G.home){
     board.hidden=false;ph.hidden=true;
-    $('#tA').textContent=G.away.def.name;$('#tH').textContent=G.home.def.name;
-    $('#sA').textContent=G.score[1];$('#sH').textContent=G.score[0];
+    [['#lsA',1,G.away],['#lsH',0,G.home]].forEach(([id,ti,t])=>{const tds=document.querySelectorAll(id+' td');tds[0].textContent=t.def.name;
+      for(let i=0;i<6;i++){const v=(G.line&&G.line[ti][i]);tds[i+1].textContent=v==null?'':v;tds[i+1].classList.toggle('now',!G.pre&&!G.over&&G.inning===i+1&&(ti===1)===G.top)}
+      tds[7].textContent=G.score[ti]});
     $('#inn').textContent=G.pre?'まもなく試合':G.over?(G.cold?'コールドゲーム':'試合終了'):`${G.inning}回${G.top?'オモテ':'ウラ'}`;
     $('#bso').hidden=!!(G.pre||G.over);
     const rows=document.querySelectorAll('#bso .lr');[G.balls||0,G.strikes||0,Math.min(2,G.outs||0)].forEach((n,r)=>rows[r].querySelectorAll('.lp').forEach((l,i)=>l.classList.toggle('on',i<n)));
@@ -351,18 +360,24 @@ async function throwTo(from,to,spd=15,ball=G.ball,wild=null){
 }
 
 /* ---------- running ---------- */
-async function runBases(k,from,to){
+async function runBases(k,from,to,how){
+  if(from===0&&how==='through'){
+    await k.goto(16.6,16.3,k.spd);k.spd0=k.spd;await k.goto(21.5,21.2,k.spd);
+    if(to===1){await sleep(.3);await k.goto(16.7,16.1,2.2)}
+    k.idlePose='stand';k.idleFace='f';return;
+  }
   for(let b=from+1;b<=to;b++){
     const [x,z]=BASES[b%4];
     await k.goto(x+(b===1?.3:0),z,k.spd);
     if(b===4){scoreRun(k);return}
   }
+  if(from===0&&to===1&&how==='over'){await k.goto(13.4,19.4,k.spd*.85);await sleep(.4);await k.goto(16.6,16.3,2.4)}
   k.idlePose='stand';k.idleFace='f';
 }
-function advanceAll(adv,batter,batterTo){
+function advanceAll(adv,batter,batterTo,how){
   const ps=[],nb=[null,null,null];
   for(let i=2;i>=0;i--){const k=G.bases[i];if(!k)continue;const to=Math.min(i+1+adv,4);if(to<4)nb[to-1]=k;ps.push(runBases(k,i+1,to))}
-  if(batter&&batterTo>0){if(batterTo<4)nb[batterTo-1]=batter;ps.push(runBases(batter,0,batterTo))}
+  if(batter&&batterTo>0){if(batterTo<4)nb[batterTo-1]=batter;ps.push(runBases(batter,0,batterTo,how))}
   G.bases=nb;return Promise.all(ps);
 }
 function walkBatter(batter){
@@ -371,7 +386,7 @@ function walkBatter(batter){
   ps.push(runBases(batter,0,1));G.bases=nb;return Promise.all(ps);
 }
 function scoreRun(k){
-  const ti=G.bat===G.home?0:1;G.score[ti]++;G.runsThis++;G.playRuns++;st(fielder('P'),'pr');updateHUD();
+  const ti=G.bat===G.home?0:1;G.score[ti]++;if(G.line)G.line[ti][G.inning-1]=(G.line[ti][G.inning-1]||0)+1;G.runsThis++;G.playRuns++;st(fielder('P'),'pr');updateHUD();
   k.role=null;k.helmet=false;
   const t=G.bat;sendToBench(t,k);
   if(chance(.4))call(G.ump,'safe',0);
@@ -402,17 +417,27 @@ async function playGrounder(tx,tz,d,batter){
   const r=Math.random();
   let ev=r<.1?'trip':r<.22?'tunnel':r<.31?'through':r<.39?'wild':'out';
   if(f===fb&&ev==='wild')ev='out';
+  const lat=dist(f,tx,tz);if(lat>3.5&&lat<9&&f!==fb&&f.role!=='P'&&chance(.4))ev='dive';
   const ftime=dist(f,tx,tz)/5;
-  const bdur=Math.max(d/15,ftime+.25);
+  const bdur=ev==='dive'?Math.max(.9,d/17):Math.max(d/15,ftime+.25);
   if(f!==fb)fb.walkTo(16.0,16.8,5);
   const ext=[tx*1.65,tz*1.65];
   let runs;
-  if(ev==='out'){runs=G.outs+1<3?advanceAll(1,null,0):Promise.resolve()}
+  if(ev==='out'||ev==='dive'){runs=G.outs+1<3?advanceAll(1,null,0):Promise.resolve()}
   else if(ev==='wild')runs=advanceAll(2,batter,2);
-  else runs=advanceAll(1,batter,1);
-  const batterRun=ev==='out'?runBases(batter,0,1):null;
+  else runs=advanceAll(1,batter,1,ev==='through'?'over':'through');
+  const batterRun=(ev==='out'||ev==='dive')?runBases(batter,0,1,'through'):null;
   f.walkTo(tx,tz,5);
   const bp=b.flyTo(tx,tz,bdur,.35,.9,.1,true);
+  if(ev==='dive'){
+    const dir=tx>f.x?1:-1;
+    await sleep(Math.max(.1,bdur-.45));f.x+=(tx-dir*.7-f.x)*.75;f.z+=(tz-f.z)*.75;f.tx=f.x;f.tz=f.z;f.fall(1.0,dir,false);say(f,'えいっ!',1);
+    await bp;b.holder=f;await sleep(1.0);f.walkTo(f.x,f.z);
+    await throwTo(f,fb,17);call(G.umps[1],'out');addOut();
+    say(pick(G.field.parents),'ナイスプレー!',1);await sleep(.4);say(pick(G.field.kids),'ナイスー!',0);
+    await batterRun;sendToBench(G.bat,batter);await runs;
+    return'O';
+  }
   if(ev==='trip'){
     await sleep(Math.min(.5,ftime*.6));f.fall(1.5,f.x<tx?1:-1);say(f,'うわっ!',2);
     await bp;
@@ -462,7 +487,7 @@ async function playFly(tx,tz,d,batter){
   const bp=b.flyTo(tx,tz,hang,arc,.9,.15);
   let runs,adv=1;
   if(ev==='catch'){runs=(async()=>{await batter.goto(7,7.5,batter.spd);batter.idlePose='stand'})()}
-  else{adv=ev==='collide'?2:(ev==='drop'&&d>40)?2:1;runs=advanceAll(adv,batter,adv)}
+  else{adv=ev==='collide'?2:(ev==='drop'&&d>44)?2:1;runs=advanceAll(adv,batter,adv,'over')}
   if(ev==='collide'){
     say(f1,'オーライ!',2);f1.walkTo(tx-.4,tz,4.6);await sleep(.5);
     say(f2,'オーライ!',2);f2.walkTo(tx+.4,tz,4.6);
@@ -503,11 +528,22 @@ async function playFly(tx,tz,d,batter){
 
 async function playLine(tx,tz,d,batter){
   const b=G.ball;
-  const adv=d>43?2:1;
-  const runs=advanceAll(adv,batter,adv);
+  const adv=d>46&&chance(.7)?2:1;
   const mx=tx*.45,mz=tz*.45;
   const near=nearest(mx,mz,['C','LF','CF','RF']);
-  const dive=dist(near,mx,mz)<5&&chance(.5);
+  const dn=dist(near,mx,mz);
+  if(dn>1.8&&dn<6.5&&chance(.22)){
+    near.distracted=false;const dir=mx>near.x?1:-1;
+    const bp=G.ball.flyTo(mx,mz,.55,.4,.9,.5);near.walkTo(mx-dir*.6,mz,7);
+    const bt=(async()=>{await batter.goto(9,9.4,batter.spd);})();
+    await sleep(.3);near.x+=(mx-dir*.6-near.x)*.6;near.z+=(mz-near.z)*.6;near.fall(1.1,dir,false);
+    await bp;G.ball.holder=near;say(near,'とった!',1);call(nearestUmp(mx,mz),'out');addOut();
+    await sleep(.6);say(pick(benchKids(G.field).concat(G.field.parents)),'ナイスプレー!',1);
+    await bt;sendToBench(G.bat,batter);await sleep(.5);
+    return'O';
+  }
+  const runs=advanceAll(adv,batter,adv,'over');
+  const dive=dn<5&&chance(.5);
   if(dive){near.distracted=false;near.walkTo(mx,mz,5)}
   const of=nearest(tx,tz,['C','P','1B','2B','3B','SS']);of.distracted=false;
   of.walkTo(tx,tz,4.6);
@@ -582,7 +618,11 @@ async function pitchingChange(fld){
   if(!(loaded||G.runsThis>=4)||!chance(.35))return;
   G.pchg=key;
   const old=fielder('P'),co=fld.coach,home=[co.x,co.z];
-  say(co,'タイム!',1);G.ump.setPose('safe',1);await sleep(.8);
+  await co.goto(fld.side*7.4,1.6,2.2);co.idleFace=fld.side<0?'r':'l';
+  say(co,'タイムお願いします!',2);await sleep(1.4);
+  G.ump.setPose('timeCall',1.6);say(G.ump,'タイム!',2);await sleep(.7);
+  for(const u of G.umps.slice(1)){u.setPose('timeCall',1.4);say(u,'タイム!',1);await sleep(.25)}
+  await sleep(.8);
   await co.goto(1.4,14.2,2.4);co.idleFace='l';
   fld.kids.filter(k=>['C','1B','2B','3B','SS'].includes(k.role)).forEach(k=>k.walkTo(rnd(-1.6,1.6),rnd(13.5,17),3));
   await sleep(1.6);say(co,'ピッチャー交代!',2);await sleep(1.4);
@@ -606,6 +646,69 @@ async function pitchingChange(fld){
   fld.kids.forEach(k=>k.setPose('cheer',.8));say(pick(fld.kids),'しまっていこー!',1);await sleep(1);
 }
 
+async function buntPitch(batter,plan,p,c){
+  resetFielders();G.ball.holder=p;
+  await sleep(rnd(1,1.8));
+  p.setPose('windup',.7,'f');await sleep(.5);
+  const r3=plan==='squeeze'?G.bases[2]:null;
+  if(r3)r3.walkTo(-9,9,r3.spd);
+  if(plan==='bunt'&&chance(.4)){const t3=fielder('3B'),t1=fielder('1B');t3.walkTo(-10,12,4);t1.walkTo(10,12,4)}
+  await sleep(.2);batter.idlePose='bunt';batter.setPose('bunt',2,'r');
+  const roll=Math.random();
+  const res=roll<.12?'ball':roll<.3?'foul':roll<.42?'pop':roll<.5&&plan==='squeeze'?'miss':'good';
+  const bp=G.ball.flyTo(.05,-.95,.75,.3,1.6,.7);
+  if(res==='ball'||res==='miss'){
+    if(res==='ball')batter.setPose('stand',.6,'r');
+    await bp;G.ball.holder=c;c.setPose('catchUp',.3,'b');
+    if(res==='ball'){say(G.ump,'ボール!',0);if(r3){r3.walkTo(-16.3,16.3,4)}batter.idlePose='bunt';return'ball'}
+    say(G.ump,'ストライク!',0);say(pick(benchKids(G.bat)),'あっ…!',1);
+    const t3=fielder('3B');t3.walkTo(-15.8,16.6,4);await sleep(.4);r3.walkTo(-15.9,15.9,3.6);
+    await throwTo(c,t3,15);r3.stunUntil=0;await sleep(.2);call(G.umps[3],'out');
+    G.bases[2]=null;sendToBench(G.bat,r3);addOut();
+    G.strikes=Math.min(2,(G.strikes||0)+1);updateHUD();
+    await sleep(.4);await throwTo(t3,p,11);batter.idlePose='bat';
+    return G.outs>=3?'done':'cancel';
+  }
+  await sleep(.66);
+  if(res==='foul'){
+    say(G.ump,'ファール!',1);await G.ball.flyTo(chance(.5)?6:-6,-2,.8,1.2,.7,.1);
+    if(r3)r3.walkTo(-16.3,16.3,4);
+    G.ball.vis=false;await sleep(.6);G.ball.vis=true;G.ball.x=.5;G.ball.z=-2.6;G.ball.holder=G.ump;await sleep(.3);await throwTo(G.ump,p,10);
+    batter.idlePose='bunt';return'foul';
+  }
+  G.inPlay=true;G.balls=G.strikes=0;updateHUD();
+  batter.role='R';batter.idlePose='stand';batter.idleFace='f';G.playRuns=0;
+  if(res==='pop'){
+    const tx=rnd(-3,3),tz=rnd(2,6);
+    const f=nearest(tx,tz,['1B','2B','SS','LF','CF','RF']);
+    G.ball.flyTo(tx,tz,1.4,4,.9,.9);f.walkTo(tx,tz,4.5);say(f,'オーライ!',1);
+    const bt=batter.goto(6,6,batter.spd);
+    await sleep(1.4);G.ball.holder=f;call(G.ump,'out');addOut();
+    if(r3)r3.walkTo(-16.3,16.3,4.4);
+    say(pick(benchKids(G.bat)),'あ〜…',0);
+    await bt;sendToBench(G.bat,batter);st(batter,'pa');st(batter,'ab');
+    G.inPlay=false;await relayToPitcher();return'done';
+  }
+  // good bunt
+  const tx=rnd(-5,5),tz=rnd(5,9);
+  const f=nearest(tx,tz,['C','2B','SS','LF','CF','RF'])||p;
+  say(batter,'えいっ!',0);
+  const ps=[];
+  for(let i=2;i>=0;i--){const k=G.bases[i];if(!k)continue;ps.push(runBases(k,i+1,Math.min(i+2,4)))}
+  const nb=[null,G.bases[0],G.bases[1]];G.bases=nb;
+  const bp2=G.ball.flyTo(tx,tz,1.3,.15,.2,.05,true);
+  const fb=fielder('1B');if(f!==fb)fb.walkTo(16.1,16.6,5);else fielder('2B').walkTo(16.1,16.8,5);
+  const cover=f===fb?fielder('2B'):fb;
+  const bRun=runBases(batter,0,1,'through');
+  f.walkTo(tx,tz,5);await bp2;await f.goto(tx,tz,5);G.ball.holder=f;await sleep(.2);
+  await throwTo(f,cover,15);call(G.umps[1],'out');addOut();
+  await bRun;sendToBench(G.bat,batter);await Promise.all(ps);
+  st(batter,'pa');st(batter,'sh');if(G.playRuns)st(batter,'rbi',G.playRuns);
+  say(pick(benchKids(G.bat)),plan==='squeeze'?'スクイズ成功!':'ナイスバント!',1);
+  G.inPlay=false;await relayToPitcher();
+  return'done';
+}
+
 async function atBat(){
   const bat=G.bat,fld=G.field,p=fielder('P'),c=fielder('C');
   let batter=nextBatter(bat);
@@ -615,7 +718,18 @@ async function atBat(){
   G.playRuns=0;
   if(chance(.7))say(pick(benchKids(bat)),pick([`かっとばせー!${batter.name}!`,`${batter.name}、打てるぞー!`,'ボールよく見てー!']),0);
   let balls=0,strikes=0;G.balls=G.strikes=0;updateHUD();
+  let plan=null;
+  if(G.outs<2&&G.bases[2]&&chance(.16))plan='squeeze';
+  else if(G.outs<2&&(G.bases[0]||G.bases[1])&&!G.bases[2]&&chance(.2))plan='bunt';
+  if(plan){bat.coach.setPose('sign',1.6,bat.side<0?'r':'l');await sleep(.6);bat.coach.setPose('sign',1.2,bat.side<0?'r':'l');await sleep(1.4);batter.setPose('stand',.6,'l');await sleep(.6)}
   while(true){
+    if(plan&&strikes<2){const r=await buntPitch(batter,plan,p,c);
+      if(r==='done')return;
+      if(r==='foul'){strikes++;G.strikes=strikes;updateHUD();continue}
+      if(r==='ball'){balls++;G.balls=Math.min(3,balls);updateHUD();if(balls>=4){say(G.ump,'フォアボール!',2);G.balls=G.strikes=0;updateHUD();batter.role='R';batter.idlePose='stand';batter.idleFace='f';G.playRuns=0;await walkBatter(batter);st(batter,'pa');st(batter,'bb');st(batter,'rbi',G.playRuns);await sleep(.3);await throwTo(c,p,10);return}continue}
+      if(r==='cancel'){plan=null;continue}
+    }
+    if(plan&&strikes>=2){plan=null;batter.idlePose='bat'}
     if(!G.ball.holder||G.ball.holder!==p){G.ball.holder=p}
     resetFielders();
     await sleep(rnd(1.1,2.2));
@@ -651,7 +765,7 @@ async function atBat(){
       await sleep(.3);await throwTo(c,p,10);return;
     }
     if(strikes>=3){
-      G.ump.setPose('outCall',1.4);say(G.ump,'バッターアウト!',2);G.balls=G.strikes=0;
+      if(out==='look'){G.ump.setPose('strike3',1.8);say(G.ump,'ストライクスリー!',2)}else{G.ump.setPose('outCall',1.4);say(G.ump,'バッターアウト!',2)}G.balls=G.strikes=0;
       st(batter,'pa');st(batter,'ab');st(batter,'so');st(p,'pk');addOut();
       await sleep(.6);say(batter,pick(['くやしい〜','うぅ…','あ〜あ']),1);
       sendToBench(bat,batter);await sleep(.4);await throwTo(c,p,10);
@@ -664,7 +778,8 @@ async function atBat(){
 
 async function halfInning(bat,fld){
   umpsToPosts();
-  G.bat=bat;G.field=fld;G.outs=0;G.balls=G.strikes=0;G.bases=[null,null,null];G.runsThis=0;updateHUD();
+  G.bat=bat;G.field=fld;G.outs=0;G.balls=G.strikes=0;G.bases=[null,null,null];G.runsThis=0;
+  {const ti=bat===G.home?0:1;if(G.line[ti][G.inning-1]==null)G.line[ti][G.inning-1]=0}updateHUD();
   fld.kids.forEach((k,i)=>{setRole(fld,k,i);const[x,z]=POS[k.role];k.walkTo(x,z,4.3)});
   fld.all.filter(k=>!fld.kids.includes(k)).forEach(k=>{const[x,z]=benchPos(fld,k);benchIdle(fld,k);k.walkTo(x,z,3.6)});
   bat.all.forEach(k=>{const[x,z]=benchPos(bat,k);benchIdle(bat,k);k.walkTo(x,z,3.6)});
@@ -710,8 +825,8 @@ async function playGame(){
   for(G.inning=1;;G.inning++){
     const m=COLD[G.inning];
     G.top=true;await halfInning(G.away,G.home);
-    if(G.inning>=LAST&&G.score[0]>G.score[1])break;
-    if(m&&G.score[0]-G.score[1]>=m){G.cold=true;break}
+    if(G.inning>=LAST&&G.score[0]>G.score[1]){G.line[0][G.inning-1]='x';updateHUD();break}
+    if(m&&G.score[0]-G.score[1]>=m){G.cold=true;G.line[0][G.inning-1]='x';updateHUD();break}
     G.top=false;await halfInning(G.home,G.away);
     if(G.walkoff==='sayonara'){say(pick(benchKids(G.home)),'サヨナラだー!',2);await sleep(3);break}
     if(G.walkoff==='cold'){G.cold=true;break}
@@ -748,7 +863,7 @@ function pickMatch(){
 function setupGame(){
   ents=ents.filter(e=>!e.gameEnt);
   const {home,away:aw}=pickMatch();
-  Object.assign(G,{home,away:aw,score:[0,0],inning:1,top:true,outs:0,balls:0,strikes:0,bases:[null,null,null],over:false,walkoff:false,cold:false,inPlay:false,pre:true,box:{},pchg:null,playRuns:0});
+  Object.assign(G,{home,away:aw,score:[0,0],inning:1,top:true,outs:0,balls:0,strikes:0,bases:[null,null,null],over:false,walkoff:false,cold:false,inPlay:false,pre:true,box:{},pchg:null,playRuns:0,line:[[],[]]});
   [home,aw].forEach(t=>{
     t.all.forEach(k=>{const[x,z]=benchPos(t,k);k.place(x,z);benchIdle(t,k);k.gameEnt=true;ents.push(k)});
     t.kids.forEach(k=>appear(k));appear(t.kids[0],true);
@@ -952,8 +1067,8 @@ function renderBG(h){
 
 /* ---------- drawing: people ---------- */
 const HANDS_F={stand:[[-.2,-.26],[.2,-.26]],ready:[[-.13,-.21],[.13,-.21]],squat:[[-.12,-.13],[.12,-.13]],catchUp:[[-.16,-.96],[.21,-.3]],throw:[[-.22,-.45],[.25,-.86]],
-  windup:[[-.05,-.9],[.05,-.9]],cheer:[[-.24,-.98],[.24,-.98]],bow:[[-.13,-.24],[.13,-.24]],sit:[[-.12,-.25],[.12,-.25]],bat:[[.05,-.5],[.13,-.52]],swing:[[.2,-.4],[.24,-.42]],rake:[[-.1,-.36],[.1,-.36]],fall:[[-.22,-.3],[.22,-.3]]};
-const HANDS_S={stand:[[-.05,-.27],[.06,-.27]],ready:[[.13,-.21],[.19,-.21]],squat:[[.15,-.1],[.2,-.12]],catchUp:[[.14,-.97],[.04,-.3]],throw:[[-.3,-.84],[.25,-.5]],
+  windup:[[-.05,-.9],[.05,-.9]],cheer:[[-.24,-.98],[.24,-.98]],bow:[[-.13,-.24],[.13,-.24]],sit:[[-.12,-.25],[.12,-.25]],bunt:[[.1,-.48],[.2,-.5]],bat:[[.05,-.5],[.13,-.52]],swing:[[.2,-.4],[.24,-.42]],rake:[[-.1,-.36],[.1,-.36]],fall:[[-.22,-.3],[.22,-.3]]};
+const HANDS_S={stand:[[-.05,-.27],[.06,-.27]],bunt:[[.12,-.5],[.3,-.52]],ready:[[.13,-.21],[.19,-.21]],squat:[[.15,-.1],[.2,-.12]],catchUp:[[.14,-.97],[.04,-.3]],throw:[[-.3,-.84],[.25,-.5]],
   windup:[[-.04,-.9],[.04,-.9]],cheer:[[-.05,-.98],[.12,-.98]],bow:[[.08,-.2],[.13,-.2]],sit:[[.13,-.23],[.17,-.23]],bat:[[-.02,-.53],[.06,-.5]],swing:[[.2,-.38],[.26,-.4]],rake:[[.16,-.34],[.24,-.3]],fall:[[-.1,-.3],[.12,-.3]]};
 function rr(c,x,y,w,h,r){c.beginPath();c.roundRect(x,y,w,h,r);c.fill()}
 function limb(c,x0,y0,x1,y1,w,col){c.strokeStyle=col;c.lineWidth=w;c.lineCap='round';c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.stroke()}
@@ -1006,6 +1121,7 @@ function drawKid(c,e){
   hands.forEach(([x,y],i)=>{c.fillStyle=e.skin;c.beginPath();c.arc(x*U,(y+sq*.6)*U,.04*U,0,7);c.fill()});
   if(hasGlove||(e.glove)){const gi=(side&&pose==='throw')?1:(face==='b'&&!side?1:0);const [x,y]=hands[gi];c.fillStyle='#9a5b2c';c.beginPath();c.arc(x*U,(y+sq*.6)*U,.068*U,0,7);c.fill();c.fillStyle='#b97440';c.beginPath();c.arc(x*U-.015*U,(y+sq*.6)*U-.015*U,.035*U,0,7);c.fill()}
   // bat
+  if(e.role==='B'&&pose==='bunt'){const [x0,y0]=hands[0],[x1,y1]=hands[1];limb(c,(x0-.12)*U,y0*U,(x1+.42)*U,(y1-.06)*U,.06*U,'#c99456');limb(c,(x1+.2)*U,(y1-.04)*U,(x1+.42)*U,(y1-.06)*U,.085*U,'#d6a466')}
   if(e.role==='B'&&(pose==='bat'||pose==='swing')){const [x,y]=hands[1];const hx0=x*U,hy0=(y)*U;const end=pose==='swing'?[.85*U,-.42*U]:[-.32*U,-1.0*U];limb(c,hx0,hy0,end[0],end[1],.06*U,'#c99456');limb(c,(hx0*.6+end[0]*.4),(hy0*.6+end[1]*.4),end[0],end[1],.085*U,'#d6a466')}
   // rake
   if(e.carry==='rake'){const [x,y]=hands[1];const ex=side?.7*U:.05*U,ey=side?-.02*U:.05*U;limb(c,x*U,y*U,ex,ey,.035*U,'#b48a55');if(side)limb(c,ex,ey-.14*U,ex,ey+.05*U,.05*U,'#8a6a40');else limb(c,ex-.28*U,ey,ex+.28*U,ey,.05*U,'#8a6a40')}
@@ -1070,6 +1186,9 @@ function drawAdult(c,e){
   if(e.role==='ump'&&!side&&face!=='b'){c.fillStyle='#3b4558';rr(c,-.09*U,by0+.04*U,.18*U,.2*U,.04*U)}
   let hands=pose==='cheer'?[[-.18,-1.02],[.18,-1.02]]:sit?[[-.1,-.5],[.1,-.5]]:[[-.16,-.45],[.16,-.45]];
   if(e.moving&&!sit){const sw=Math.sin(e.phase)*.1;hands=side?[[-.04-sw,-.47],[.04+sw,-.47]]:[[-.16,-.47+sw*.3],[.16,-.47-sw*.3]]}
+  if(pose==='strike3'){const u=clamp((e.poseUntil-simT)/1.8,0,1),a=u>.75?(1-u)/.25:1;c.rotate((side?.25:.18)*a*(face==='b'?-1:1));hands=side?[[.06,-.55],[-.15-.45*a,-.75-.1*a]]:[[-.14,-.55],[.2+.42*a,-.7-.18*a]]}
+  if(pose==='timeCall')hands=[[-.2,-1.04],[.2,-1.04]];
+  if(pose==='sign')hands=side?[[.1,-.95],[.04,-.48]]:[[-.13,-.47],[.15,-.95]];
   if(pose==='outCall')hands=side?[[.04,-.48],[.1,-1.05]]:[[-.15,-.46],[.13,-1.05]];
   if(pose==='safe')hands=side?[[-.3,-.74],[.34,-.74]]:[[-.44,-.74],[.44,-.74]];
   if(pose==='bow'&&!sit)c.translate(0,U*.03);
@@ -1336,8 +1455,8 @@ function renderSheet(){
       ${ts.map(({x,s})=>`<tr><td class="l"><span class="dot" style="display:inline-block;vertical-align:-1px;margin-right:5px;background:${capOf(x)}"></span>${esc(x.name)}</td><td>${s.g}</td><td>${s.w}</td><td>${s.l}</td><td>${s.d}</td><td>${s.w+s.l?avg(s.w,s.w+s.l):'-'}</td><td>${s.rf}</td><td>${s.ra}</td></tr>`).join('')}</table></div></div>
     ${teamPick()}
     <div><h3>対戦相手別</h3><div class="tbl"><table><tr><th>相手</th><th>勝</th><th>敗</th><th>分</th></tr>${Object.entries(s.vs||{}).map(([n,v])=>`<tr><td class="l">${esc(n)}</td><td>${v.w}</td><td>${v.l}</td><td>${v.d}</td></tr>`).join('')||'<tr><td class="l" colspan="4">まだ試合がありません</td></tr>'}</table></div></div>
-    <div><h3>打撃成績</h3><div class="tbl"><table><tr><th>選手</th><th>試合</th><th>打席</th><th>打数</th><th>安打</th><th>本塁打</th><th>打点</th><th>四球</th><th>三振</th><th>打率</th></tr>
-      ${rows.map(({p,s})=>`<tr><td class="l">${p.num} ${esc(p.name)}</td><td>${s.g||0}</td><td>${s.pa||0}</td><td>${s.ab||0}</td><td>${s.h||0}</td><td>${s.hr||0}</td><td>${s.rbi||0}</td><td>${s.bb||0}</td><td>${s.so||0}</td><td>${avg(s.h||0,s.ab||0)}</td></tr>`).join('')}</table></div></div>
+    <div><h3>打撃成績</h3><div class="tbl"><table><tr><th>選手</th><th>試合</th><th>打席</th><th>打数</th><th>安打</th><th>本塁打</th><th>打点</th><th>四球</th><th>三振</th><th>犠打</th><th>打率</th></tr>
+      ${rows.map(({p,s})=>`<tr><td class="l">${p.num} ${esc(p.name)}</td><td>${s.g||0}</td><td>${s.pa||0}</td><td>${s.ab||0}</td><td>${s.h||0}</td><td>${s.hr||0}</td><td>${s.rbi||0}</td><td>${s.bb||0}</td><td>${s.so||0}</td><td>${s.sh||0}</td><td>${avg(s.h||0,s.ab||0)}</td></tr>`).join('')}</table></div></div>
     <div><h3>投手成績</h3><div class="tbl"><table><tr><th>選手</th><th>登板</th><th>投球回</th><th>奪三振</th><th>失点</th><th>勝</th><th>敗</th></tr>
       ${pit.map(({p,s})=>`<tr><td class="l">${p.num} ${esc(p.name)}</td><td>${s.pg||0}</td><td>${ip(s.po)}</td><td>${s.pk||0}</td><td>${s.pr||0}</td><td>${s.w||0}</td><td>${s.l||0}</td></tr>`).join('')||'<tr><td class="l" colspan="7">まだ登板がありません</td></tr>'}</table></div></div>
     <div><h3>最近の試合</h3><ul class="log">${DB.log.slice(0,12).map(g=>{const d=new Date(g.t);return`<li>${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}　${esc(g.a)} ${g.sa} - ${g.sh} ${esc(g.h)}${g.c?'（コールド）':''}</li>`}).join('')||'<li>まだ試合がありません</li>'}</ul></div>

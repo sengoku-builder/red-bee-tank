@@ -128,7 +128,10 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
       <div class="lbl">時間帯</div>
       <div class="chips" id="timeChips">
         <button data-h="now">いまの時刻</button><button data-h="6.3">夜明け</button><button data-h="7.6">朝練</button>
-        <button data-h="11">試合</button><button data-h="15.8">グラウンド整備</button><button data-h="20">夜</button>
+        <button data-h="11">試合</button><button data-h="17.2">グラウンド整備</button><button data-h="20">夜</button>
+      </div>
+      <div class="seg" id="optSeg" style="grid-template-columns:1fr 1fr;margin-top:8px">
+        <button id="tNight">ナイター：オフ</button><button id="tZoom">見せ場のアップ：オン</button>
       </div>
       <div class="trow" style="margin-top:8px">
         <input type="range" id="hourR" min="0" max="23.75" step="0.25" aria-label="時刻を指定">
@@ -137,7 +140,7 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
     </div>
     <button class="appbtn" id="bTeams" style="background:#2f6b4a">チーム・成績</button>
     <div id="appBox" hidden><button class="appbtn" id="bWp">この野球場を壁紙にする</button></div>
-    <p class="note">朝練7:00〜、試合8:30〜15:30、整備〜16:30、夕方以降は誰もいないグラウンドになります。スマホでは指で左右に見回せます。</p>
+    <p class="note">朝練7:00〜、試合8:30〜17:00、整備〜17:40、夕方以降は誰もいないグラウンドになります。スマホでは指で左右に見回せます。</p>
   </div>
 </div>
 
@@ -159,14 +162,14 @@ function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.rando
 function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
 /* ---------- settings ---------- */
-const S={talk:2, hour:null, names:2};
-try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;}catch(e){}
-function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names}))}catch(e){}}
+const S={talk:2, hour:null, names:2, night:false, zoom:true};
+try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;}catch(e){}
+function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom}))}catch(e){}}
 const BUILD='__BUILD__';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 if(WALL)document.body.classList.add('wp');
-function loadS(){try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}');if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names}catch(e){}}
+function loadS(){try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}');if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom}catch(e){}}
 
 /* ---------- world projection ---------- */
 const CX=600, HZ=210, F=1075, D=35, CH=14;
@@ -257,6 +260,7 @@ class Ball{
 class Fly{constructor(x,z){this.kind='fly';this.x=x;this.z=z;this.h=1.2;this.leave=false;this.t=Math.random()*9}
   update(dt){this.t+=dt;if(this.leave){this.h+=dt*1.2;this.x+=dt*1.5;if(this.h>9)this.dead=true}else{this.x+=Math.sin(this.t*1.3)*dt*1.2;this.z+=Math.cos(this.t*.9)*dt*0.9;this.h=1.1+Math.sin(this.t*2.1)*.35}}}
 const NET={kind:'net',z:-6,update(){}};
+const LIGHTS=[[-33,27],[33,27],[-30,68],[30,68]];
 
 /* ---------- speech bubbles ---------- */
 let bubbles=[];
@@ -459,7 +463,7 @@ function scoreRun(k){
   const bk=benchKids(t);bk.forEach(b=>b.setPose('cheer',2.2));
   say(pick(bk)||k,pick(['ナイスラン!','ホームイン!','やったー!']),1);
   t.parents.forEach(p=>p.setPose('cheer',2));
-  if(!G.top){const lead=G.score[0]-G.score[1];if(G.inning>=LAST&&lead>0)G.walkoff='sayonara';else if(COLD[G.inning]&&lead>=COLD[G.inning])G.walkoff='cold'}
+  if(!G.top){const lead=G.score[0]-G.score[1];if(G.inning>=LAST&&lead>0){G.walkoff='sayonara';spot([0,0],3)}else if(COLD[G.inning]&&lead>=COLD[G.inning])G.walkoff='cold'}
 }
 
 /* ---------- plays ---------- */
@@ -485,17 +489,18 @@ function prepRelay(tx,tz){
   if(G.relay)return;
   const b0=G.b0||[];let tgt=2,word='バックセカン!';
   if(b0[1]||b0[2]){tgt=0;word='バックホーム!'}else if(b0[0]){tgt=3;word='バックサード!'}
-  const c=fielder('C');c.idlePose='stand';c.idleFace='b';c.walkTo(0,1.2,3);say(c,word,1);
+  const c=fielder('C');c.idlePose='stand';c.idleFace='b';c.walkTo(0,1.2,3);
   const cut=tx<0?fielder('SS'):fielder('2B');
   const [bx,bz]=tgt===0?[0,.8]:BASES[tgt];
   const er=knows(cut,'relay')?.5:(1-sk(cut,'iq')/100)*6;
   const ox=rnd(-er,er),oz=rnd(-er,er);
   cut.walkTo(bx+(tx-bx)*.55+ox,bz+(tz-bz)*.55+oz,4.5);
   if(Math.hypot(ox,oz)>2.4)(async()=>{await sleep(1.4);mistake(cut,'relay')})();else didRight(cut,'relay');
-  G.relay={tgt,cut};
+  G.relay={tgt,cut,word,said:false};
 }
 async function relayOrThrow(of){
   const r=G.relay;
+  if(r&&!r.said){r.said=true;say(fielder('C'),r.word,1);await sleep(.35)}
   if(!r||of.z<33||of===r.cut){await throwTo(of,cutoffFor(of.x),14);return}
   await throwTo(of,r.cut,13);await sleep(.25);
   const recv=r.tgt===0?fielder('C'):r.tgt===3?fielder('3B'):(r.cut===fielder('SS')?fielder('2B'):fielder('SS'));
@@ -533,7 +538,7 @@ async function afterCatch(plans,f){
   for(const pl of plans){const k=pl.k,i=pl.i;
     if(G.outs>=3)break;
     if(pl.mode==='tag'&&!pl.err){
-      coachSay(3,i===3?'ゴー!':'行けー!','wave',2);didRight(k,'fly');
+      coachSay(3,i===3?'ゴー!':'行けー!','wave',2);didRight(k,'fly');if(i===3)spot([0,0],3,1.6);
       const out=chance(clamp(.12+.3*sk(f,'thr')/100-.18*sk(k,'run')/100,.03,.4));
       const rcv=i===3?fielder('C'):fielder('3B');
       G.bases[i-1]=null;if(!out&&i<3)G.bases[i]=k;
@@ -543,10 +548,58 @@ async function afterCatch(plans,f){
       coachSay(3,'戻れー!',null,2);mistake(k,'fly');
       const out=chance(pl.err==='far'?.65:.5);const rcv=baseFielder(i);const[x,z]=BASES[i];
       if(!thrown){thrown=true;ps.push((async()=>{await sleep(.2);if(G.ball.holder===f)await throwTo(f,rcv,16)})())}
+      if(out&&chance(.45)&&G.outs<3){ps.push((async()=>{await sleep(.6);G.bases[i-1]=null;const rd=await rundown(k,i);placeAfterRundown(k,rd,i)})());continue}
       ps.push((async()=>{await k.goto(x,z,k.spd);k.idlePose='stand';k.idleFace='f';if(out&&G.outs<3){call(nearestUmp(x,z),'out');addOut();G.bases[i-1]=null;sendToBench(G.bat,k)}})());
     }else{const[x,z]=BASES[i];didRight(k,'fly');ps.push(k.goto(x,z,k.spd).then(()=>{k.idlePose='stand';k.idleFace='f'}))}
   }
   await Promise.all(ps);return sf;
+}
+function bpos(i){return i===4||i===0?[0,0]:BASES[i]}
+function baseMan(i){return i===4?fielder('C'):i===1?fielder('1B'):i===3?fielder('3B'):fielder(G.ball.x<0?'2B':'SS')}
+async function rundown(k,a){
+  const bA=a,bB=a+1;let fa=baseMan(bA),fb=baseMan(bB);
+  if(fa===fb)fb=fielder('SS')===fa?fielder('2B'):fielder('SS');
+  const helpers=[fielder('P'),fielder('SS'),fielder('2B'),fielder('3B'),fielder('1B')].filter(h=>h!==fa&&h!==fb&&h.role!=='C');
+  const [ax,az]=bpos(bA),[bx,bz]=bpos(bB);
+  fa.walkTo(ax,az,4.6);fb.walkTo(bx,bz,4.6);
+  let holder=G.ball.holder;
+  if(holder!==fa&&holder!==fb){const tgt=dist(fa,G.ball.x,G.ball.z)<dist(fb,G.ball.x,G.ball.z)?fa:fb;if(holder&&holder.kind==='kid')await throwTo(holder,tgt,15);else G.ball.holder=tgt;holder=tgt}
+  const q=clamp((sk(fa,'iq')+sk(fb,'iq')+sk(fa,'thr')+sk(fb,'thr'))/400+(knows(fa,'rundown')||knows(fb,'rundown')?.3:0),0,1);
+  say(pick(benchKids(G.bat))||G.bat.coach,'戻れ戻れー!',1);
+  const nThrows=q>.7?1+(chance(.5)?1:0):2+Math.floor(rnd(0,3));
+  const near=()=>dist(k,ax,az)<dist(k,bx,bz)?bA:bB;
+  let other=holder===fa?fa===holder?fb:fa:fa;
+  for(let n=0;n<nThrows;n++){
+    other=holder===fa?fb:fa;
+    const [ox,oz]=other===fa?[ax,az]:[bx,bz];
+    k.walkTo(k.x+(ox-k.x)*.55,k.z+(oz-k.z)*.55,k.spd*.85);
+    holder.walkTo(k.x,k.z,4.2);say(other,'こっち!',0);
+    await sleep(.85);
+    if(chance((1-q)*.35)){
+      say(holder,'あっ!',1);mistake(holder,'rundown');
+      await throwTo(holder,other,14,G.ball,[other.x+rnd(-3,3),other.z+rnd(-3,3)]);
+      const tb=near();const[tx2,tz2]=bpos(tb);await k.goto(tx2,tz2,k.spd);
+      other.walkTo(G.ball.x,G.ball.z,4);await sleep(.8);G.ball.holder=other;
+      return{res:'safe',base:tb};
+    }
+    say(G.field.coach,n===0?'投げろ!':'追いこめ!',0);
+    await throwTo(holder,other,14);
+    const prev=holder,[px,pz]=other===fa?[ax,az]:[bx,bz];
+    prev.walkTo(px+(px<0?-.9:.9),pz+(pz<16?-.6:.6),3.8);
+    const vac=other===fa?[bx,bz]:[ax,az];
+    if(helpers.length&&chance(.35+.6*q)){const h=helpers.shift();h.walkTo(vac[0],vac[1],4.6);if(other===fa)fb=h;else fa=h}
+    else{mistake(prev,'rundown',true);if(chance(.55)){const vb=other===fa?bB:bA;const[vx,vz]=bpos(vb);say(G.field.coach,'カバー!',1);await k.goto(vx,vz,k.spd);return{res:'safe',base:vb}}}
+    holder=other;
+  }
+  holder.walkTo(k.x,k.z,4.8);await sleep(.55);spot(k,1.6,.25);await sleep(.25);
+  if(chance(.25+.7*q)){call(nearestUmp(k.x,k.z),'out');addOut();sendToBench(G.bat,k);didRight(holder,'rundown');say(pick(G.field.kids),'ナイスタッチ!',0);return{res:'out'}}
+  say(holder,'あっ…',1);mistake(holder,'rundown');const tb=near();const[tx2,tz2]=bpos(tb);await k.goto(tx2,tz2,k.spd);return{res:'safe',base:tb};
+}
+function placeAfterRundown(k,rd,fallback){
+  if(rd.res==='out')return;
+  if(rd.base===4){scoreRun(k);return}
+  if(!G.bases[rd.base-1])G.bases[rd.base-1]=k;else if(!G.bases[fallback-1])G.bases[fallback-1]=k;
+  k.idlePose='stand';k.idleFace='f';
 }
 function fakeRun(k,from){const [x,z]=BASES[(from+1)%4];return k.goto(x,z,k.spd)}
 function runnersOnOut(){
@@ -554,8 +607,11 @@ function runnersOnOut(){
   const [a,b,c]=G.bases,ps=[];
   if(G.outs>=2){[a,b,c].forEach((k,i)=>{if(k)ps.push(fakeRun(k,i+1))});return Promise.all(ps)}
   const nb=[...G.bases];
+  const forcedSet=new Set();
   if(a){const forced=[[a,1]];if(b){forced.push([b,2]);if(c)forced.push([c,3])}
-    for(const [k,i] of forced.reverse()){nb[i-1]=null;if(i+1<4)nb[i]=k;ps.push(maybeForget(k,()=>runBases(k,i,i+1)))}}
+    for(const [k,i] of forced.reverse()){forcedSet.add(k);nb[i-1]=null;if(i+1<4)nb[i]=k;ps.push(maybeForget(k,()=>runBases(k,i,i+1)))}}
+  G.stray=null;
+  [b,c].forEach((k,j)=>{const i=j+2;if(!k||forcedSet.has(k)||G.stray||i===3)return;if(chance(.22*(1-sk(k,'iq')/100))){G.stray={k,i};const[x,z]=lerpBase(i,.5);k.walkTo(x,z,k.spd)}});
   G.bases=nb;return Promise.all(ps);
 }
 function cutoffFor(x){return fielder(x<0?'SS':'2B')}
@@ -564,7 +620,30 @@ function outChorus(){
   const c=fielder('C');c.setPose('finger',1.4);say(c,t,1);
   (async()=>{await sleep(.6);const o=shuffle(G.field.kids.filter(k=>k!==c));o.slice(0,4).forEach(k=>k.setPose('finger',1.3));o.slice(0,2).forEach(k=>say(k,t,0))})();
 }
-function playCall(){G.ump.setPose('point',1.3,'b');say(G.ump,'プレイ!',2)}
+function spot(t,dur=2,slowAt=null){if(!S.zoom)return;G.spot={t,until:simT+dur,slowAt:slowAt!=null?simT+slowAt:null}}
+function playCall(){G.needPlay=true}
+function doPlayCall(){G.ump.setPose('point',1.3,'b');say(G.ump,'プレイ!',2);G.needPlay=false}
+async function readyForPlay(){
+  await fieldersReady();
+  for(let i=0;i<40;i++){const co=[G.home.coach,G.away.coach];if(co.every(k=>!k.moving)&&!G.ump.moving)break;await sleep(.2)}
+}
+function changeChatter(bat,fld){
+  const bi=bat===G.home?0:1,fi=1-bi,diff=G.score[bi]-G.score[fi];
+  const lines=[];
+  const lead=peekNext(bat);if(lead)lines.push([lead,lead.girl?'次はわたしからだ!':pick(['次はおれからだ!','塁に出るぞー!'])]);
+  const bk=bat.all.filter(k=>k!==lead);
+  const err=bk.find(k=>G.errKids&&G.errKids.has(k));if(err)lines.push([err,'ごめん、打って取り返す!']);
+  const last=G.inning>=LAST&&!G.top||G.inning>=LAST&&G.top&&bat===G.away;
+  const zeros=G.inning>=3&&[G.line[bi][G.inning-2],G.line[bi][G.inning-3]].every(v=>v===0);
+  lines.push([pick(bk),last?pick(['最後の攻撃だ!','あきらめないぞー!']):diff<0?pick(['逆転するぞー!','まだまだいけるー!']):diff>0?'もっと点とろうぜ!':zeros?'そろそろ打とうよー':'打っていこー!']);
+  lines.push([bat.coach,pick(['よし、攻撃だ!','ナイス守備!','声出していけー!'])]);
+  const fk=fld.kids,pch=fk[0];
+  const conceded=(G.conceded||[0,0])[fi];
+  lines.push([pick(fk.slice(1)),conceded>=3?'切りかえていこー!':diff>0?'これ以上点やらないぞ!':diff<0&&G.inning>=4?'守りきるぞー!':'三人で終わらせよう!']);
+  lines.push([pch,pick(['まかせとけ!','がんばるぞー'])]);
+  if(G.errKids)G.errKids.clear();
+  (async()=>{for(const [k,t] of shuffle(lines)){if(k){say(k,t,0)}await sleep(rnd(.7,1.3))}})();
+}
 async function shimatte(fld){
   say(fielder('C'),'しまってこー!',2);await sleep(.7);
   const all=fld.all.filter(k=>k.role!=='C');
@@ -587,9 +666,11 @@ const LEARN={
   call:{sk:'iq',name:'声のかけあい',yell:()=>'声をかけあえ!',praise:n=>`${n}、いい声だ!`},
   focus:{sk:'iq',name:'試合に集中',yell:n=>`${n}ー!前見ろー!`,praise:n=>`${n}、集中してるな!`},
   fly:{sk:'iq',name:'フライの走塁',yell:n=>`${n}、フライは戻れる位置まで!`,praise:n=>`${n}、いい判断だ!`},
+  rundown:{sk:'iq',name:'挟殺プレー',yell:n=>`${n}、投げたら走れ!`,praise:n=>`${n}、いい挟殺だ!`},
   relay:{sk:'iq',name:'中継の位置',yell:n=>`${n}、もっと線の上!`,praise:n=>`${n}、いい中継だ!`}};
 function teamOf(k){return[G.home,G.away].find(t=>t&&t.all.includes(k))}
 function knows(k,type){return!!(k&&k.learned&&k.learned[type])}
+function markErr(k){if(!k)return;(G.errKids=G.errKids||new Set()).add(k)}
 function mistake(k,type,quiet){if(!k)return;const t=teamOf(k);if(!quiet&&t)say(t.coach,LEARN[type].yell(k.name),2);const b=bx(k);if(b){b.mis=b.mis||{};b.mis[type]=(b.mis[type]||0)+1}}
 function didRight(k,type){if(!k||!k.praise||!k.praise.includes(type))return;k.praise=k.praise.filter(x=>x!==type);const t=teamOf(k);if(t)say(t.coach,LEARN[type].praise(k.name),2);const b=bx(k);if(b)b.praised=(b.praised||[]).concat(type)}
 function setRole(t,k,i){k.role=POSN[i];k.helmet=k.role==='C';k.carry=null;k.idlePose=k.role==='C'?'squat':'ready';k.idleFace=k.role==='C'?'b':'f'}
@@ -611,13 +692,26 @@ async function thirdOutBall(){
     await rcv.goto(mound[0],mound[1],3);b.holder=null;b.x=mound[0];b.z=mound[1];b.h=.05;rcv.setPose('squat',.4);await sleep(.4);sendToBench(fld,rcv);
   }
 }
+async function catcherReturn(c,p){await sleep(.7);c.setPose('stand',.9,'b');await sleep(.5);await throwTo(c,p,9)}
 async function relayToPitcher(){
   if(G.outs>=3)return thirdOutBall();
   const b=G.ball,h=b.holder,p=fielder('P');
+  if(h&&h!==p)p.walkTo(0,15.6,2.4);
   if(!h||h===p)return;
   const cut=cutoffFor(h.x);
   if(h.z>34&&h!==cut){await throwTo(h,cut,14);await sleep(.4)}
-  if(b.holder&&b.holder!==p){await sleep(.3);await throwTo(b.holder,p,11)}
+  if(b.holder&&b.holder!==p){await softToss(b.holder,p)}
+}
+async function softToss(h,p){
+  const mx=0,mz=15.6;p.walkTo(mx,mz,2.4);
+  const dx=p.x-h.x,dz=p.z-h.z,dd=Math.hypot(dx,dz)||1;
+  if(dd>6){h.walkTo(h.x+dx/dd*2.2,h.z+dz/dd*2.2,1.6);await sleep(.9)}else await sleep(.3);
+  const pd=Math.hypot(mx-p.x,mz-p.z)||1,lead=Math.min(pd,2.2);
+  const tx=p.x+(mx-p.x)/pd*lead,tz=p.z+(mz-p.z)/pd*lead;
+  h.setPose('throw',.5,faceTo(h,p));await sleep(.25);
+  const d=Math.hypot(tx-h.x,tz-h.z);
+  await G.ball.flyTo(tx,tz,Math.max(.5,d/8),.3+d*.06,1.45*h.size,1.0);
+  G.ball.holder=p;
 }
 
 async function playGrounder(tx,tz,d,batter){
@@ -641,7 +735,7 @@ async function playGrounder(tx,tz,d,batter){
   f.walkTo(tx,tz,5);
   const bp=b.flyTo(tx,tz,bdur,.35,.9,.1,true);
   if(ev==='dive'){
-    const dir=tx>f.x?1:-1;
+    const dir=tx>f.x?1:-1;spot(f,bdur+1.4,Math.max(.1,bdur-.4));
     await sleep(Math.max(.1,bdur-.45));f.x+=(tx-dir*.7-f.x)*.75;f.z+=(tz-f.z)*.75;f.tx=f.x;f.tz=f.z;f.fall(1.0,dir,false);say(f,'えいっ!',1);
     await bp;b.holder=f;await sleep(1.0);f.walkTo(f.x,f.z);
     await throwTo(f,fb,17);call(G.umps[1],'out');addOut();
@@ -659,6 +753,7 @@ async function playGrounder(tx,tz,d,batter){
   }
   if(ev==='trip'||ev==='tunnel'||ev==='through'){
     if(ev==='tunnel'){f.setPose('squat',.8);say(f,'あっ…!',2);mistake(f,'tunnel',true)}
+    if(ev!=='through')markErr(f);
     const of=nearest(ext[0],ext[1],['C','P','1B','2B','3B','SS']);of.distracted=false;
     of.walkTo(ext[0],ext[1],4.6);prepRelay(ext[0],ext[1]);
     await b.flyTo(ext[0],ext[1],1.8,.2,.15,.05,true);
@@ -673,7 +768,7 @@ async function playGrounder(tx,tz,d,batter){
   b.holder=f;f.setPose('ready',.3);if(ev==='out')didRight(f,'tunnel');await sleep(.25);
   if(ev==='wild'){
     await throwTo(f,fb,16,b,[fb.x+3.5,fb.z-4]);
-    say(fb,'あ〜っ!',2);fb.walkTo(fb.x+3.5,fb.z-4,4.5);
+    say(fb,'あ〜っ!',2);markErr(f);fb.walkTo(fb.x+3.5,fb.z-4,4.5);
     await sleep(1.2);b.holder=fb;
     await runs;call(G.umps[2],'safe',1);await sleep(.8);say(G.field.coach,'落ちついていけー!',1);
     return'E';
@@ -682,6 +777,7 @@ async function playGrounder(tx,tz,d,batter){
   call(G.umps[1],'out');addOut();
   await batterRun;benchFrom1B(G.bat,batter);
   await runs;
+  if(G.stray&&G.outs<3){const {k,i}=G.stray;G.stray=null;if(G.bases[i-1]===k){G.bases[i-1]=null;mistake(k,'fly',true);coachSay(3,'戻れー!',null,2);const rd=await rundown(k,i);placeAfterRundown(k,rd,i)}}
   return'O';
 }
 
@@ -692,28 +788,58 @@ async function playFly(tx,tz,d,batter){
   if(dist(fielder('P'),tx,tz)<dist(c[0],tx,tz))say(fielder('P'),'まかせた!',0);
   const f1=c[0],f2=c[1];f1.distracted=f2.distracted=false;
   const t1=dist(f1,tx,tz)/4.6,t2=dist(f2,tx,tz)/4.6;
+  const q=(sk(f1,'iq')+sk(f2,'iq'))/200,kn=knows(f1,'call')||knows(f2,'call');
   let ev;
-  if(t1<hang-.2&&t2<hang&&chance((.03+.55*(1-chem(G.field))*(1-(sk(f1,'iq')+sk(f2,'iq'))/200))*(knows(f1,'call')||knows(f2,'call')?.3:1)))ev='collide';
+  if(t1<hang-.2&&t2<hang-.1&&chance(.1+.45*(1-chem(G.field))*(1-q)*(kn?.4:1))){
+    const wc=(1-q)*(kn?.3:1),wo=(1-q)*(kn?.3:1)*.8,wn=.45+q,tot=wc+wo+wn,r=Math.random()*tot;
+    ev=r<wc?'collide':r<wc+wo?'omiai':'nearCatch';
+  }
   else if(t1>hang-.1)ev='drop';
   else ev=chance(.5+.46*sk(f1,'fld')/100)?'catch':'muff';
+  const caught=ev==='catch'||ev==='nearCatch';
   const bp=b.flyTo(tx,tz,hang,arc,.9,.15);
-  if(ev!=='catch'&&tz>32)prepRelay(tx,tz);
+  if(!caught&&tz>32)prepRelay(tx,tz);
   const flyPlan=(G.outs<2&&G.bases.some(Boolean))?planFly(tx,tz):null;
   let runs,adv=1;
-  if(ev==='catch'){const two=G.outs>=2;runs=(async()=>{const ps=[batter.goto(7,7.5,batter.spd)];if(two)G.bases.forEach((k,i)=>{if(k)ps.push(fakeRun(k,i+1))});await Promise.all(ps);batter.idlePose='stand'})()}
-  else{adv=ev==='collide'?2:(ev==='drop'&&d>44)?2:1;if(tz<32)adv=1;runs=flyPlan?(async()=>{batter.walkTo(16.6,16.3,batter.spd);await bp;return advanceAll(adv,batter,adv,'over')})():advanceAll(adv,batter,adv,'over')}
-  if(ev==='collide'){
-    say(f1,'オーライ!',2);f1.walkTo(tx-.4,tz,4.6);await sleep(.5);
-    say(f2,'オーライ!',2);f2.walkTo(tx+.4,tz,4.6);
-    await bp;
-    f1.fall(1.7,-1);f2.fall(1.7,1);
-    await b.flyTo(tx+rnd(-3,3),tz-rnd(1.5,3.5),.9,.6,.3,.05,true);
-    await sleep(.7);say(f1,'いてて…',1);await sleep(.6);say(f2,'ごめーん',1);
-    await f1.goto(b.x,b.z,4);b.holder=f1;await sleep(.2);
-    await relayOrThrow(f1);
-    await runs;
-    mistake(f1,'call');mistake(f2,'call',true);
-    return'E';
+  if(caught){const two=G.outs>=2;runs=(async()=>{const ps=[batter.goto(7,7.5,batter.spd)];if(two)G.bases.forEach((k,i)=>{if(k)ps.push(fakeRun(k,i+1))});await Promise.all(ps);batter.idlePose='stand'})()}
+  else{adv=ev==='collide'?2:(ev==='drop'||ev==='omiai')&&d>44?2:1;if(tz<32)adv=1;runs=flyPlan?(async()=>{batter.walkTo(16.6,16.3,batter.spd);await bp;return advanceAll(adv,batter,adv,'over')})():advanceAll(adv,batter,adv,'over')}
+  if(ev==='collide'||ev==='omiai'||ev==='nearCatch'){
+    const L=f1.x<f2.x?f1:f2,Rk=L===f1?f2:f1,off=ev==='omiai'?.85:.42;
+    const tArr=Math.max(.6,hang-(ev==='omiai'?.5:.1));
+    [[L,-off],[Rk,off]].forEach(([k,o])=>{k.lookUp=true;k.walkTo(tx+o,tz,clamp(dist(k,tx+o,tz)/tArr,1.2,6.5))});
+    if(ev!=='omiai')spot([tx,tz],hang+1.4,hang-.35);
+    say(f1,'オーライ!',2);await sleep(.45);say(f2,'オーライ!',2);
+    if(ev==='omiai'){
+      await sleep(Math.max(0,tArr-.45));
+      [L,Rk].forEach(k=>{k.lookUp=false;k.walkTo(k.x,k.z);k.setPose('stand',2.2,faceTo(k,k===L?Rk:L))});
+      await bp;
+      await b.flyTo(tx+rnd(-.6,.6),tz-.8,.5,.3,.2,.05,true);
+      await sleep(.4);say(L,'……あ',1);await sleep(.4);say(Rk,'……あ',0);
+      say(pick(benchKids(G.field)),'あ〜!',1);await sleep(.6);mistake(f1,'call');mistake(f2,'call',true);markErr(f1);
+      await f1.goto(b.x,b.z,4);b.holder=f1;await sleep(.2);
+      await relayOrThrow(f1);await runs;
+      return'E';
+    }
+    if(ev==='nearCatch'&&chance(.5)){await sleep(Math.max(0,hang-.85));Rk===f2?f2.walkTo(f2.x+(f2.x<tx?-1.3:1.3),f2.z-1,3.5):f2.walkTo(f2.x+(f2.x<tx?-1.3:1.3),f2.z-1,3.5);f2.lookUp=false;say(f2,'うわっ',0);await bp}
+    else await bp;
+    f1.lookUp=f2.lookUp=false;
+    if(ev==='collide'){
+      f1.fall(1.7,-1);f2.fall(1.7,1);
+      await b.flyTo(tx+rnd(-3,3),tz-rnd(1.5,3.5),.9,.6,.3,.05,true);
+      await sleep(.7);say(f1,'いてて…',1);await sleep(.6);say(f2,'ごめーん',1);markErr(f1);
+      await f1.goto(b.x,b.z,4);b.holder=f1;await sleep(.2);
+      await relayOrThrow(f1);
+      await runs;
+      mistake(f1,'call');mistake(f2,'call',true);
+      return'E';
+    }
+    // nearCatch
+    if(dist(f2,tx,tz)<1.2)f2.fall(.7,f2.x<tx?-1:1,false);
+    b.holder=f1;f1.setPose('catchUp',1,'f');say(f1,'とった!',2);call(nearestUmp(tx,tz),'out');addOut();
+    await sleep(.5);say(pick(G.field.parents),'ナイスキャッチ!',1);
+    let sf=false;if(flyPlan)sf=await afterCatch(flyPlan,f1);
+    await runs;sendToBench(G.bat,batter);
+    return sf?'SF':'O';
   }
   say(f1,'オーライ!',1);f1.walkTo(tx,tz,4.6);if(f2&&dist(f2,tx,tz)<12)didRight(f1,'call');
   if(ev==='drop'){
@@ -733,7 +859,7 @@ async function playFly(tx,tz,d,batter){
     await runs;sendToBench(G.bat,batter);
     return sf?'SF':'O';
   }
-  say(f1,'あっ!',2);
+  say(f1,'あっ!',2);markErr(f1);
   await b.flyTo(tx+rnd(-1.5,1.5),tz-1,.5,.5,.4,.05,true);
   await f1.goto(b.x,b.z,4);b.holder=f1;
   await relayOrThrow(f1);
@@ -748,7 +874,7 @@ async function playLine(tx,tz,d,batter,advO){
   const near=nearest(mx,mz,['C','P','LF','CF','RF']);
   const dn=dist(near,mx,mz);
   if(!advO&&dn>1.8&&dn<6.5&&chance(.06+.28*sk(near,'fld')/100)){
-    near.distracted=false;const dir=mx>near.x?1:-1;
+    near.distracted=false;const dir=mx>near.x?1:-1;spot(near,1.9,.35);
     const bp=G.ball.flyTo(mx,mz,.55,.4,.9,.5);near.walkTo(mx-dir*.6,mz,7);
     const bt=(async()=>{await batter.goto(9,9.4,batter.spd);})();
     await sleep(.3);near.x+=(mx-dir*.6-near.x)*.6;near.z+=(mz-near.z)*.6;near.fall(1.1,dir,false);
@@ -757,6 +883,8 @@ async function playLine(tx,tz,d,batter,advO){
     await bt;sendToBench(G.bat,batter);await sleep(.5);
     return'O';
   }
+  let over=null;
+  {const lead=[2,1,0].map(i=>[G.bases[i],i+1]).find(([k])=>k);if(lead&&G.outs<2){const [k,i]=lead,to=i+adv;if(to<=2&&chance(.18*(1-sk(k,'iq')/100)+.02))over={k,base:to}}}
   const runs=advanceAll(adv,batter,adv,'over');prepRelay(tx,tz);
   const dive=dn<5&&chance(.5);
   if(dive){near.distracted=false;near.walkTo(mx,mz,5)}
@@ -766,8 +894,11 @@ async function playLine(tx,tz,d,batter,advO){
   if(dive){await sleep(.35);near.fall(1.0,mx>near.x?1:-1,false);say(near,'えいっ!',1)}
   await bp;await of.goto(tx,tz,4.6);b.holder=of;
   if(adv>1)coachSay(3,'まわれまわれー!','wave',1);else say(pick(benchKids(G.bat)),'ナイスバッティング!',1);
-  await sleep(.2);await relayOrThrow(of);
+  await sleep(.2);
+  if(over){(async()=>{await sleep(.4);if(G.bases[over.base-1]===over.k){const[x,z]=lerpBase(over.base,.45);over.k.walkTo(x,z,over.k.spd);coachSay(3,'戻れー!',null,2)}})()}
+  await relayOrThrow(of);
   await runs;
+  if(over&&G.bases[over.base-1]===over.k&&G.outs<3){G.bases[over.base-1]=null;mistake(over.k,'fly',true);const rd=await rundown(over.k,over.base);placeAfterRundown(over.k,rd,over.base)}
   return adv>2?'3B':adv>1?'2B':'1B';
 }
 
@@ -775,6 +906,7 @@ async function playHomer(tx,tz,batter){
   const b=G.ball,u2=G.umps[2],bat=G.bat;
   const bk=benchKids(bat);
   const ang=Math.atan2(tx,tz),fx=Math.sin(ang)*60.5,fz=Math.cos(ang)*60.5;
+  spot(batter,1.1,.05);
   const bp=b.flyTo(tx,tz,4.6,22,.9,.1);
   const outs=G.field.kids.filter(k=>['LF','CF','RF'].includes(k.role));
   outs.forEach(k=>{k.distracted=false;k.walkTo(k.x+(fx-k.x)*.85,k.z+(fz-k.z)*.85,4.6)});
@@ -784,6 +916,7 @@ async function playHomer(tx,tz,batter){
   const old=new Ball();old.x=tx;old.z=tz;old.h=.05;old.gameEnt=true;ents.push(old);b.vis=false;b.holder=null;b.path=null;
   outs.forEach(k=>k.setPose('stand',1.5,'b'));
   u2.idleFace='f';
+  u2.walkTo(u2.x,u2.z);await sleep(.5);
   for(let i=0;i<2;i++){u2.setPose('hrCall',1.3,'f');say(u2,'ホームラン!',2);await sleep(1.5)}
   batter.joy=true;const sp0=batter.spd;batter.spd=Math.min(sp0,3.2);
   G.bases.forEach(k=>{if(k){k.joy=true;k.spd=Math.min(k.spd,3.4)}});
@@ -799,14 +932,14 @@ async function playHomer(tx,tz,batter){
   await sleep(1.2);say(batter,'入ったー!',1);
   const party=benchKids(bat).slice(0,5);
   party.forEach((k,i)=>{k.walkTo(bat.side*(1.6+i*.75),-1.9,3);k.idleFace=bat.side<0?'r':'l'});
-  await runs;
+  await runs;spot([bat.side*1.6,-1.2],2.4);
   party.forEach(k=>k.setPose('cheer',1.6));batter.setPose('cheer',1.6,bat.side<0?'l':'r');say(pick(party),'ナイスー!',1);
   await sleep(1.8);
   batter.joy=false;batter.spd=sp0;bat.all.forEach(k=>{k.joy=false});
   party.forEach(k=>{if(!k.role)sendToBench(bat,k)});
   const um=G.ump;await um.goto(.15,1.0,1.6);um.idleFace='f';um.setPose('brush',2.6,'f');await sleep(2.6);
   b.vis=true;b.x=um.x;b.z=um.z;b.holder=um;await sleep(.3);await throwTo(um,fielder('P'),8);
-  um.idleFace='b';await um.goto(UMP_POS[0][0],UMP_POS[0][1],1.6);playCall();await sleep(.6);
+  um.idleFace='b';await um.goto(UMP_POS[0][0],UMP_POS[0][1],1.6);playCall();
   return'HR';
 }
 
@@ -824,6 +957,7 @@ async function playRunningHR(tx,tz,batter){
   if(chance(.5)){say(of,'あっ…!',1);await b.flyTo(fx+rnd(-2,2),fz-1.5,.6,.2,.1,.05,true);await of.goto(b.x,b.z,3)}
   b.holder=of;
   for(let i=0;i<120;i++){if(Math.hypot(batter.x,batter.z)<13||!batter.role)break;await sleep(.2)}
+  spot([0,0],3.2,2.0);
   await relayOrThrow(of);
   await runs;batter.spd=sp;
   call(G.ump,'safe',2);
@@ -875,7 +1009,7 @@ async function pinchHit(bat,batter){
   await co.goto(co.x-bat.side*1.3,co.z+.5,1.4);co.idleFace=faceTo(co,G.ump);
   await callTime(co);
   say(co,`代打、${sub.name}!`,2);await sleep(1.2);co.walkTo(h[0],h[1],1.4);co.idleFace=f0;
-  (async()=>{await sleep(3.5);playCall()})();
+  playCall();
   const i=bat.kids.indexOf(batter),o=bat.order.indexOf(batter);
   if(i>=0)bat.kids[i]=sub;if(o>=0)bat.order[o]=sub;
   batter.out=true;sendToBench(bat,batter);
@@ -938,6 +1072,7 @@ async function foulFly(batter,c){
 }
 async function buntPitch(batter,plan,p,c){
   resetFielders();G.ball.holder=p;await fieldersReady();
+  if(G.needPlay){await readyForPlay();await sleep(.4);doPlayCall();await sleep(.9)}
   await sleep(rnd(1,1.8));
   p.setPose('windup',.7,'f');G.ump.setPose('crouch',6,'b');await sleep(.5);
   const r3=plan==='squeeze'?G.bases[2]:null;
@@ -949,12 +1084,11 @@ async function buntPitch(batter,plan,p,c){
   const bp=G.ball.flyTo(.05,-.95,.75,.3,1.6,.7);
   if(res==='ball'||res==='miss'){
     if(res==='ball')batter.setPose('stand',.6,batter.idleFace);
-    await bp;G.ball.holder=c;c.setPose('catchUp',.3,'b');
+    await bp;G.ball.holder=c;c.setPose('squat',1.1,'b');
     if(res==='ball'){say(G.ump,'ボール!',2);G.ump.setPose('crouch',.7,'b');if(r3){r3.walkTo(-16.3,16.3,4)}batter.idlePose='bunt';return'ball'}
     G.ump.poseO=null;await sleep(.3);say(G.ump,'ストライク!',2);say(pick(benchKids(G.bat)),'あっ…!',1);
-    const t3=fielder('3B');t3.walkTo(-15.8,16.6,4);await sleep(.4);r3.walkTo(-15.9,15.9,3.6);
-    await throwTo(c,t3,15);r3.stunUntil=0;await sleep(.2);call(G.umps[3],'out');
-    G.bases[2]=null;sendToBench(G.bat,r3);addOut();
+    G.bases[2]=null;r3.walkTo(r3.x,r3.z);
+    const rd=await rundown(r3,3);placeAfterRundown(r3,rd,3);
     G.strikes=Math.min(2,(G.strikes||0)+1);updateHUD();
     await sleep(.4);if(G.outs>=3)await thirdOutBall();else await throwTo(t3,p,11);batter.idlePose='bat';
     return G.outs>=3?'done':'cancel';
@@ -968,6 +1102,7 @@ async function buntPitch(batter,plan,p,c){
   }
   G.inPlay=true;G.balls=G.strikes=0;updateHUD();
   batter.role='R';batter.idlePose='stand';batter.idleFace='f';G.playRuns=0;
+  if(r3)r3.walkTo(-3,3,r3.spd);
   if(res==='pop'){
     const tx=rnd(-3,3),tz=rnd(2,6);
     const f=nearest(tx,tz,['1B','2B','SS','LF','CF','RF']);
@@ -978,6 +1113,23 @@ async function buntPitch(batter,plan,p,c){
     say(pick(benchKids(G.bat)),'あ〜…',0);
     await bt;sendToBench(G.bat,batter);st(batter,'pa');st(batter,'ab');
     G.inPlay=false;await relayToPitcher();return'done';
+  }
+  // squeeze: rolled hard right back to the pitcher
+  if(plan==='squeeze'&&G.bases[2]&&chance(.08+.22*(1-sk(batter,'bat')/100))){
+    say(batter,'あっ…',0);const r3k=G.bases[2];const c0=fielder('C');
+    const bp3=G.ball.flyTo(.4,11.5,.7,.1,.2,.05,true);p.walkTo(.4,11.8,4);
+    const bRun=runBases(batter,0,1,'through');
+    await bp3;G.ball.holder=p;await sleep(.15);c0.walkTo(.2,.5,3);
+    const rr=r3k.goto(0,0,r3k.spd);
+    spot([0,0],2.2);
+    await throwTo(p,c0,16);await sleep(.15);
+    call(G.ump,'out');addOut();sendToBench(G.bat,r3k);
+    const a=G.bases[0],b2=G.bases[1];
+    const ps=[];if(a){ps.push(runBases(a,1,2))}
+    G.bases=[batter,a||b2||null,a&&b2?b2:null];if(a&&b2)ps.push(runBases(b2,2,3));
+    say(pick(benchKids(G.bat)),'あ〜…',1);await sleep(.6);say(G.bat.coach,`${batter.name}、もっと勢いを殺せ!`,2);
+    await bRun;batter.role='R';await Promise.all(ps);
+    st(batter,'pa');st(batter,'ab');G.inPlay=false;await relayToPitcher();return'done';
   }
   // good bunt
   const tx=rnd(-5,5),tz=rnd(5,9);
@@ -999,11 +1151,11 @@ async function buntPitch(batter,plan,p,c){
   return'done';
 }
 
-async function atBat(){
+async function atBat(res){
   const bat=G.bat,fld=G.field,p=fielder('P'),c=fielder('C');
   resetFielders();
-  let batter=nextBatter(bat);
-  batter=await pinchHit(bat,batter);
+  let batter=res&&bat.all[res.batter];
+  if(!batter){batter=nextBatter(bat);batter=await pinchHit(bat,batter)}
   const bs=batter.lefty?1:-1,bface=batter.lefty?'l':'r';
   G.ump.walkTo(bs*.55,-2.6,1.6);
   batter.helmet=true;batter.role='B';batter.idlePose='bat';batter.idleFace=bface;
@@ -1011,12 +1163,13 @@ async function atBat(){
   await walkToBox(batter,bs*.95,bat.side);
   G.playRuns=0;
   if(chance(.7))say(pick(benchKids(bat)),pick([`かっとばせー!${batter.name}!`,`${batter.name}、打てるぞー!`,'ボールよく見てー!']),0);
-  let balls=0,strikes=0;G.balls=G.strikes=0;updateHUD();
+  let balls=res?res.balls||0:0,strikes=res?res.strikes||0:0;G.balls=balls;G.strikes=strikes;updateHUD();
   let plan=null;
-  if(G.outs<2&&G.bases[2]&&chance(.16))plan='squeeze';
+  if(res){}else if(G.outs<2&&G.bases[2]&&chance(.16))plan='squeeze';
   else if(G.outs<2&&(G.bases[0]||G.bases[1])&&!G.bases[2]&&chance(.2))plan='bunt';
   if(plan){bat.coach.setPose('sign',1.6,bat.side<0?'r':'l');await sleep(.6);bat.coach.setPose('sign',1.2,bat.side<0?'r':'l');await sleep(1.4);batter.setPose('stand',.6,'l');await sleep(.6)}
   while(true){
+    saveResume(batter,balls,strikes);
     if(plan&&strikes<2){const r=await buntPitch(batter,plan,p,c);
       if(r==='done')return;
       if(r==='foul'){strikes++;G.strikes=strikes;updateHUD();continue}
@@ -1027,6 +1180,7 @@ async function atBat(){
     if(!G.ball.holder||G.ball.holder!==p){G.ball.holder=p}
     resetFielders();
     await fieldersReady();
+    if(G.needPlay){await readyForPlay();await sleep(.4);doPlayCall();await sleep(.9)}
     await sleep(rnd(1.1,2.2));
     if(chance(.5))say(pick(fld.kids.filter(k=>k.role!=='P')),chance(.55)?'バッチこーい!':pick(['打たせていこー!','ピッチャーがんばれー!','声出していこー!']),0);
     p.setPose('windup',.7,'f');G.ump.setPose('crouch',6,'b');await sleep(.7);
@@ -1074,7 +1228,7 @@ async function atBat(){
       await sleep(.4);await throwTo(G.ump,p,10);playCall();
       continue;
     }
-    await bp;G.ball.holder=c;c.setPose('catchUp',.3,'b');
+    await bp;G.ball.holder=c;c.setPose('squat',1.1,'b');
     if(out==='ball'){balls++;G.balls=Math.min(3,balls);updateHUD();say(G.ump,'ボール!',2);G.ump.setPose('crouch',.7,'b');if(chance(.5))say(pick(benchKids(bat)),pick(['ナイスセン!','見えてるよー!']),0)}
     else{G.ump.poseO=null;await sleep(.35);strikes++;G.strikes=Math.min(2,strikes);updateHUD();if(strikes<3)say(G.ump,'ストライク!',2);if(out==='miss'&&chance(.5))say(pick(benchKids(bat)),'ドンマイ!',0)}
     if(balls>=4){
@@ -1090,27 +1244,32 @@ async function atBat(){
       outChorus();
       return;
     }
-    await sleep(.3);await throwTo(c,p,9);
+    await catcherReturn(c,p);
   }
 }
 
-async function halfInning(bat,fld){
-  umpsToPosts();
-  G.bat=bat;G.field=fld;G.outs=0;G.balls=G.strikes=0;G.bases=[null,null,null];G.runsThis=0;
+async function halfInning(bat,fld,res){
+  G.bat=bat;G.field=fld;G.balls=G.strikes=0;
+  if(res){G.outs=res.outs;G.runsThis=res.runsThis||0;G.bases=res.bases.map(i=>i>=0?bat.all[i]:null);G.umps.forEach((u,i)=>{u.idleFace=i===0?'b':'f';u.place(UMP_POS[i][0],UMP_POS[i][1])})}
+  else{umpsToPosts();G.outs=0;G.bases=[null,null,null];G.runsThis=0}
   {const ti=bat===G.home?0:1;if(G.line[ti][G.inning-1]==null)G.line[ti][G.inning-1]=0}updateHUD();
-  fld.kids.forEach((k,i)=>{setRole(fld,k,i);const[x,z]=POS[k.role];k.walkTo(x,z,4.6)});
-  fld.all.filter(k=>!fld.kids.includes(k)).forEach(k=>{const[x,z]=benchPos(fld,k);benchIdle(fld,k);k.walkTo(x,z,3.6)});
-  bat.all.forEach(k=>{const[x,z]=benchPos(bat,k);benchIdle(bat,k);k.walkTo(x,z,3.6)});
+  const mv=(k,x,z,sp)=>res?k.place(x,z):k.walkTo(x,z,sp);
+  fld.kids.forEach((k,i)=>{setRole(fld,k,i);const[x,z]=POS[k.role];mv(k,x,z,4.6)});
+  fld.all.filter(k=>!fld.kids.includes(k)).forEach(k=>{const[x,z]=benchPos(fld,k);benchIdle(fld,k);mv(k,x,z,3.6)});
+  bat.all.forEach(k=>{const[x,z]=benchPos(bat,k);benchIdle(bat,k);mv(k,x,z,3.6)});
+  if(res)G.bases.forEach((k,i)=>{if(!k)return;k.role='R';k.helmet=true;k.idlePose='stand';k.idleFace='f';const[x,z]=BASES[i+1];k.place(x,z)});
   placeCoaches(bat);
-  await sleep(7);
-  {const p0=fielder('P');if(G.ball.holder===G.ump){await throwTo(G.ump,p0,9)}else{G.ball.vis=true;G.ball.holder=p0}}
-  await shimatte(fld);
-  await sleep(.4);playCall();await sleep(.8);
+  if(res){[bat,fld].forEach(t=>{if(t.bcoach)Object.values(t.bcoach).forEach(k=>{k.place(k.tx,k.tz)})});updateHUD();await sleep(2.5)}
+  else{changeChatter(bat,fld);await sleep(7)}
+  {const p0=fielder('P');if(G.ball.holder===G.ump&&!res){await throwTo(G.ump,p0,9)}else{G.ball.vis=true;G.ball.holder=p0}}
+  if(!res)await shimatte(fld);
+  playCall();
   while(G.outs<3){
-    await pitchingChange(fld);
-    await atBat();
+    if(!res)await pitchingChange(fld);
+    await atBat(res);res=null;
     if(G.walkoff)return;
   }
+  G.conceded=G.conceded||[0,0];G.conceded[fld===G.home?0:1]=G.runsThis;
   await sleep(.6);G.balls=G.strikes=0;updateHUD();say(G.ump,'チェンジ!',2);
   fld.kids.forEach(k=>k.setPose('cheer',.8));
   await sleep(1.0);
@@ -1142,7 +1301,9 @@ async function lineUp(mode){
 }
 
 async function playGame(){
-  setupGame();
+  let first=loadResume();
+  try{setupGame(first)}catch(e){console.error(e);clearResume();first=null;setupGame(null)}
+  if(!first){
   G.pre=true;updateHUD();
   await sleep(6);
   await lineUp('start');
@@ -1152,13 +1313,17 @@ async function playGame(){
   G.away.all.forEach(k=>{const[x,z]=benchPos(G.away,k);benchIdle(G.away,k);k.walkTo(x,z,3.4)});
   G.umps.forEach((u,i)=>{u.idleFace=i===0?'b':'f';u.walkTo(UMP_POS[i][0],UMP_POS[i][1],3.6)});
   say(pick(G.home.kids),'いくぞー!',1);await sleep(.5);say(pick(G.home.kids),'おー!',0);
+  if(lightsOn())say(pick(benchKids(G.away))||G.away.coach,pick(['ナイターだー!','暗くなってきたね']),1);
   say(G.ump,'プレイボール!',2);
-  for(G.inning=1;;G.inning++){
+  }
+  for(;;G.inning++){
     const m=COLD[G.inning];
-    G.top=true;await halfInning(G.away,G.home);
+    if(!(first&&!first.top)){
+    G.top=true;await halfInning(G.away,G.home,first);first=null;
     if(G.inning>=LAST&&G.score[0]>G.score[1]){G.line[0][G.inning-1]='x';updateHUD();break}
     if(m&&G.score[0]-G.score[1]>=m){G.cold=true;G.line[0][G.inning-1]='x';updateHUD();break}
-    G.top=false;await halfInning(G.home,G.away);
+    }
+    G.top=false;await halfInning(G.home,G.away,first);first=null;
     if(G.walkoff==='sayonara'){say(pick(benchKids(G.home)),'サヨナラだー!',2);await sleep(3);break}
     if(G.walkoff==='cold'){G.cold=true;break}
     if(m&&Math.abs(G.score[0]-G.score[1])>=m){G.cold=true;break}
@@ -1167,7 +1332,7 @@ async function playGame(){
   }
   if(G.cold){const w=G.score[0]>G.score[1]?G.home:G.away;say(pick(benchKids(w).length?benchKids(w):w.all),'コールドだー!',2);await sleep(1.5)}
   G.over=true;updateHUD();
-  commitGame();
+  commitGame();clearResume();
   await sleep(1.5);
   await lineUp('end');
   [G.home,G.away].forEach(t=>t.all.forEach(k=>sendToBench(t,k)));
@@ -1190,13 +1355,30 @@ function pickMatch(){
   return homeFirst?{home:me,away:other}:{home:other,away:me};
 }
 
-function setupGame(){
+const RKEY='kawajiki.resume.'+(WALL?'wp':window.KawaApp?'app':'web');
+const KF=['sk','learned','praise','spd','name','girl','num','pid','lefty','size','skin','hair','out'];
+function teamSnap(t){const ix=k=>t.all.indexOf(k);
+  return{def:t.def,side:t.side,mine:t.mine,tid:t.tid,chem:t.chem,bi:t.bi,co:{skin:t.coach.skin,hair:t.coach.hair},
+    all:t.all.map(k=>{const o={};KF.forEach(f=>{if(k[f]!==undefined)o[f]=k[f]});return o}),
+    kids:t.kids.map(ix),subs:t.subs.map(ix),order:t.order.map(ix),pitchers:t.pitchers.map(ix)}}
+function teamFrom(s){const def=s.def,all=s.all.map(o=>new Ent({...o,team:def})),g=i=>all[i];
+  return{def,side:s.side,kids:s.kids.map(g),subs:s.subs.map(g),all,order:s.order.map(g),bi:s.bi,coach:new Ent({kind:'adult',role:'coach',team:def,size:1,...s.co}),parents:[],mine:s.mine,tid:s.tid,pitchers:s.pitchers.map(g),chem:s.chem}}
+function saveResume(batter,balls,strikes){
+  if(!G.home||G.over||G.pre||!G.bat)return;
+  try{localStorage.setItem(RKEY,JSON.stringify({v:1,t:Date.now(),home:teamSnap(G.home),away:teamSnap(G.away),score:G.score,line:G.line,inning:G.inning,top:G.top,outs:G.outs,
+    bases:G.bases.map(k=>k?G.bat.all.indexOf(k):-1),runsThis:G.runsThis,box:G.box,pchg:G.pchg,conceded:G.conceded,batter:G.bat.all.indexOf(batter),balls,strikes}))}catch(e){}
+}
+function clearResume(){try{localStorage.removeItem(RKEY)}catch(e){}}
+function loadResume(){try{const r=JSON.parse(localStorage.getItem(RKEY)||'null');if(r&&r.v===1&&r.home&&r.away&&r.batter>=0&&r.home.kids.length===9&&r.away.kids.length===9)return r}catch(e){}return null}
+
+function setupGame(res){
   ents=ents.filter(e=>!e.gameEnt);
-  const {home,away:aw}=pickMatch();
-  Object.assign(G,{home,away:aw,score:[0,0],inning:1,top:true,outs:0,balls:0,strikes:0,bases:[null,null,null],over:false,walkoff:false,cold:false,inPlay:false,pre:true,box:{},pchg:null,playRuns:0,line:[[],[]]});
+  const {home,away:aw}=res?{home:teamFrom(res.home),away:teamFrom(res.away)}:pickMatch();
+  Object.assign(G,{home,away:aw,score:[0,0],inning:1,top:true,outs:0,balls:0,strikes:0,bases:[null,null,null],over:false,walkoff:false,cold:false,inPlay:false,pre:true,box:{},pchg:null,playRuns:0,line:[[],[]],conceded:[0,0],errKids:new Set(),runsThis:0});
+  if(res)Object.assign(G,{score:res.score,line:res.line,inning:res.inning,top:res.top,box:res.box||{},pchg:res.pchg,conceded:res.conceded||[0,0],pre:false});
   [home,aw].forEach(t=>{
     t.all.forEach(k=>{const[x,z]=benchPos(t,k);k.place(x,z);benchIdle(t,k);k.gameEnt=true;ents.push(k)});
-    t.kids.forEach(k=>appear(k));appear(t.kids[0],true);
+    if(!res){t.kids.forEach(k=>appear(k));appear(t.kids[0],true)}
     t.coach.place(t.side*9.4,-2.4);t.coach.idleFace=t.side<0?'r':'l';t.coach.gameEnt=true;ents.push(t.coach);
     for(let i=0;i<4;i++){const pa=new Ent({kind:'adult',role:'parent',size:rnd(.92,1.04),idlePose:'sit',idleFace:t.side<0?'r':'l',shirt:pick(['#e7a24a','#7aa7d6','#e88b8b','#9c8bd1','#6fbf9b','#f2f2ee']),hat:chance(.5)});
       pa.place(t.side*(18.5+(i%2)*1.6),4.6+(i>>1)*1.8);pa.gameEnt=true;t.parents.push(pa);ents.push(pa)}
@@ -1321,7 +1503,8 @@ function skyAt(h){
   return{top:mix(hx(A[1]),hx(B[1]),u),bot:mix(hx(A[2]),hx(B[2]),u),tint:mix(A[3],B[3],u),star:A[4]+(B[4]-A[4])*u};
 }
 function hourNow(){if(S.hour!=null)return S.hour;const d=new Date();return d.getHours()+d.getMinutes()/60+d.getSeconds()/3600}
-function phaseAt(h){if(h<5.5||h>=17.6)return'night';if(h<7)return'dawn';if(h<8.5)return'warmup';if(h<15.5)return'game';if(h<16.5)return'maint';return'dusk'}
+function phaseAt(h){if(S.night&&(h>=17||h<7))return'game';if(h<5.5||h>=18.3)return'night';if(h<7)return'dawn';if(h<8.5)return'warmup';if(h<17)return'game';if(h<17.7)return'maint';return'dusk'}
+function lightsOn(){return S.night&&phaseName==='game'&&skyAt(hourNow()).tint[3]>.12}
 
 /* ---------- background (static, regenerated per time) ---------- */
 const bg=document.createElement('canvas');const bgc=bg.getContext('2d');
@@ -1454,6 +1637,7 @@ function drawKid(c,e){
   if(pose==='finger')hands=side?[[-.05,-.3],[.12,-1.0]]:[[-.2,-.3],[.2,-1.0]];
   if(pose==='wave'){const a=simT*11;hands=side?[[-.05,-.3],[.1+Math.cos(a)*.14,-.95+Math.sin(a)*.1]]:[[-.2,-.3],[.22+Math.cos(a)*.14,-.95+Math.sin(a)*.1]]}
   if(pose==='stop')hands=side?[[.3,-.6],[.34,-.66]]:[[-.24,-.66],[.24,-.66]];
+  if(e.lookUp&&(pose==='run'||pose==='walk'))hands=side?[[.14,-.97],[.04,-.3]]:[[-.16,-.96],[.2,-.3]];
   if(e.joy&&(pose==='run'||pose==='walk'))hands=side?[[-.06,-.3],[.1,-.98]]:[[-.2,-.3],[.22,-.98]];
   if(face==='b'&&!side)hands=hands.map(([x,y])=>[-x,y]);
   const sh=side?[[-.02,-.42],[.03,-.42]]:[[-.13,-.42],[.13,-.42]];
@@ -1516,14 +1700,14 @@ function drawAdult(c,e){
   c.save();c.translate(g.x,g.y);const side=face==='l'||face==='r';if(face==='l')c.scale(-1,1);
   let shirt=e.shirt||'#e7a24a',pants='#4b5160',cap=null;
   if(e.role==='ump'){shirt='#232a3a';pants='#6b7282';cap='#1b2030'}
-  if(e.role==='coach'){shirt=e.team.capD;pants='#2f3442';cap=e.team.cap}
+  if(e.role==='coach'){shirt=e.team.body;pants=e.team.pants;cap=e.team.cap}
   if(e.role==='jogger'){pants='#2c3140'}
   const sit=pose==='sit';const sq=sit?.28:pose==='crouch'?.27:0;let lift=0;
   if(pose==='cheer')lift=Math.abs(Math.sin(simT*7+e.seed))*U*.04;
   c.translate(0,-lift);
   const hipY=(-.44+sq)*U;
   if(sit){c.fillStyle=pants;if(side)rr(c,-.04*U,hipY,.26*U,.09*U,.04*U);else{rr(c,-.11*U,hipY,.1*U,.12*U,.04*U);rr(c,.01*U,hipY,.1*U,.12*U,.04*U)}}
-  else{const a=e.moving?Math.sin(e.phase)*(e.speed>2?.5:.3):0;[[-1,a],[1,-a]].forEach(([s,ang])=>{c.save();c.translate(side?0:s*.05*U,hipY);c.rotate(side?ang:0);c.fillStyle=pants;rr(c,-.045*U,0,.09*U,-hipY*.95,.04*U);c.fillStyle='#2b2b30';c.beginPath();c.ellipse(side?.02*U:0,-hipY,.06*U,.03*U,0,0,7);c.fill();c.restore()})}
+  else{const a=e.moving?Math.sin(e.phase)*(e.speed>2?.5:.3):0,lw=e.role==='coach'?.14:.09,lx=e.role==='coach'?.08:.05;[[-1,a],[1,-a]].forEach(([s,ang])=>{c.save();c.translate(side?0:s*lx*U,hipY);c.rotate(side?ang:0);c.fillStyle=pants;rr(c,-lw/2*U,0,lw*U,-hipY*.95,.05*U);if(e.role==='coach'){c.fillStyle=e.team.sock;c.fillRect(-lw/2*U,-hipY*.55,lw*U,-hipY*.32)}c.fillStyle='#2b2b30';c.beginPath();c.ellipse(side?.02*U:0,-hipY,.06*U,.03*U,0,0,7);c.fill();c.restore()})}
   const fat=e.role==='coach';
   const by0=(-.8+sq)*U,by1=hipY+.02*U,bw=fat?(side?.3:.4):(side?.2:.26);
   c.fillStyle=shirt;rr(c,-bw/2*U,by0,bw*U,by1-by0,fat?.14*U:.07*U);
@@ -1543,7 +1727,8 @@ function drawAdult(c,e){
   if(pose==='bow'&&!sit)c.translate(0,U*.03);
   if(e.role==='coach'&&e.talkUntil>simT&&!e.moving)hands=side?[[.18,-.86],[.04,-.48]]:[[-.16,-.45],[.12,-.88]];
   const sh=side?[[0,-.76],[0,-.76]]:[[-.11,-.76],[.11,-.76]];
-  hands.forEach(([x,y],i)=>limb(c,sh[i][0]*U,(sh[i][1]+sq)*U,x*U,(y+sq)*U,.06*U,shirt));
+  hands.forEach(([x,y],i)=>limb(c,sh[i][0]*U*(fat?1.3:1),(sh[i][1]+sq)*U,x*U*(fat?1.15:1),(y+sq)*U,(fat?.085:.06)*U,shirt));
+  if(fat&&!side){c.fillStyle=e.team.trim;c.fillRect(-bw/2*U,by0+.04*U,.03*U,.14*U);c.fillRect(bw/2*U-.03*U,by0+.04*U,.03*U,.14*U)}
   hands.forEach(([x,y])=>{c.fillStyle=e.skin;c.beginPath();c.arc(x*U,(y+sq)*U,.03*U,0,7);c.fill()});
   if(pose==='brush'){const [x,y]=hands[1];c.fillStyle='#6b4a2b';c.fillRect(x*U-.05*U,(y+sq)*U,.1*U,.04*U);c.fillStyle='#d9c79a';c.fillRect(x*U-.05*U,(y+sq)*U+.04*U,.1*U,.03*U)}
   const hr=.12*U,hy=(-.9+sq)*U;
@@ -1607,7 +1792,9 @@ function drawTrain(c,tr,lights){
 let W=0,Hh=0,dpr=1,scale=1,base=1,Z=1,vw=1200,vh=800,portrait=false,stL=0,stT=0;
 const cam={x:600,y:430};let manual=null,manualY=null,manualUntil=0,drag=null,pinch=null;
 function zMin(){return Math.max(W/(1200*base),Hh/(1800*base),portrait?0:1)}
-function applyScale(){Z=clamp(Z,zMin(),3);scale=base*Z;vw=W/scale;vh=Hh/scale}
+let spotZ=1;
+function applyScale(){Z=clamp(Z,zMin(),3);scale=base*Z*spotZ;vw=W/scale;vh=Hh/scale}
+function spotPos(){const t=G.spot.t;if(Array.isArray(t)){const p=P(t[0],t[1],.6);return[p.x,p.y]}const p=P(t.x,t.z,.9);return[p.x,p.y]}
 function layout(){
   const r=$('#stage').getBoundingClientRect();W=r.width;Hh=r.height;stL=r.left;stT=r.top;dpr=Math.min(window.devicePixelRatio||1,2);
   cv.width=Math.round(W*dpr);cv.height=Math.round(Hh*dpr);
@@ -1625,6 +1812,7 @@ window.wallpaperPan=(t,v)=>{const lo=vw/2,hi=Math.max(lo,1200-vw/2);
   else if(t==='up'){panStart=null}};
 function defY(){return portrait?440:430}
 function camTarget(){
+  if(G.spot&&simT<G.spot.until&&S.zoom)return spotPos();
   let fx=baseX,fy=defY();
   if(G.inPlay&&G.ball&&phaseName==='game'){const p=P(G.ball.x,G.ball.z);fx=p.x;if(Z>1.15)fy=p.y}
   if(manual!=null&&simT<manualUntil){fx=manual;if(manualY!=null)fy=manualY}else{manual=null;manualY=null}
@@ -1654,6 +1842,8 @@ function draw(){
   clouds.forEach(cl=>drawCloud(cx,cl));
   planes.forEach(p=>{cx.fillStyle='#f4f6f8';cx.beginPath();cx.ellipse(p.x,p.y,9,2.2,0,0,7);cx.fill();cx.fillRect(p.x-2,p.y-6,3,12);cx.strokeStyle='rgba(255,255,255,.6)';cx.lineWidth=1.5;cx.beginPath();cx.moveTo(p.x-p.d*10,p.y);cx.lineTo(p.x-p.d*120,p.y);cx.stroke()});
   trains.forEach(tr=>drawTrain(cx,tr,false));
+  const LON=lightsOn();
+  if(LON)LIGHTS.forEach(([x,z])=>{const a=P(x,z),b=P(x,z,15);cx.strokeStyle='#5c6470';cx.lineWidth=Math.max(2,a.k*.25);cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke();cx.fillStyle='#3d4450';cx.fillRect(b.x-a.k*1.2,b.y-a.k*.7,a.k*2.4,a.k*.9)});
   drawBridge(cx);
   sparkles.forEach(sp=>{const a=(Math.sin(simT*1.3+sp.p)+1)/2;cx.strokeStyle=`rgba(235,248,255,${a*.55})`;cx.lineWidth=1.2;const x=(sp.x+simT*4)%1200;cx.beginPath();cx.moveTo(x,sp.y);cx.lineTo(x+sp.w,sp.y);cx.stroke()});
   const list=ents.filter(e=>!e.dead).concat([NET]).sort((a,b)=>b.z-a.z);
@@ -1662,7 +1852,12 @@ function draw(){
     else if(e.kind==='net')drawNet(cx);else if(e.kind==='dog')drawDog(cx,e);else if(e.kind==='fly')drawFly(cx,e);
   }
   const sk=skyAt(hourNow());
-  if(sk.tint[3]>0){cx.fillStyle=`rgba(${sk.tint[0]|0},${sk.tint[1]|0},${sk.tint[2]|0},${sk.tint[3]})`;cx.fillRect(L-2,T-2,vw+4,vh+4)}
+  if(sk.tint[3]>0){const tc=`rgba(${sk.tint[0]|0},${sk.tint[1]|0},${sk.tint[2]|0},`;
+    if(LON){const gy=P(0,66).y;cx.fillStyle=tc+sk.tint[3]+')';cx.fillRect(L-2,T-2,vw+4,gy-T+2);cx.fillStyle=tc+(sk.tint[3]*.22)+')';cx.fillRect(L-2,gy,vw+4,T+vh-gy+2)}
+    else{cx.fillStyle=tc+sk.tint[3]+')';cx.fillRect(L-2,T-2,vw+4,vh+4)}}
+  if(LON){LIGHTS.forEach(([x,z],n)=>{const b=P(x,z,15);for(let i=0;i<4;i++){cx.fillStyle='rgba(255,250,215,.95)';cx.beginPath();cx.arc(b.x-b.k*.8+i*b.k*.53,b.y-b.k*.25,Math.max(1.5,b.k*.18),0,7);cx.fill()}
+    cx.fillStyle='rgba(255,245,200,.18)';cx.beginPath();cx.arc(b.x,b.y-b.k*.25,b.k*2.6,0,7);cx.fill();
+    for(let m=0;m<5;m++){const t=simT*2+m*1.7+n;cx.fillStyle='rgba(255,255,230,.8)';cx.fillRect(b.x+Math.cos(t*1.3)*b.k*1.8,b.y+Math.sin(t*1.7)*b.k*1.1,1.6,1.6)}})}
   if(sk.star>.05){
     stars.forEach(st=>{const a=sk.star*(.5+.5*Math.sin(simT*1.7+st.p));cx.fillStyle=`rgba(255,255,240,${a})`;cx.fillRect(st.x,st.y,st.s,st.s)});
     cx.fillStyle=`rgba(255,250,225,${sk.star})`;cx.beginPath();cx.arc(930,150,15,0,7);cx.fill();
@@ -1736,7 +1931,7 @@ function startPhase(ph){
   epoch++;waiters=[];bubbles=[];ents=[];G.home=null;G.field=null;G.inPlay=false;trains=[];
   phaseName=ph;const ep=epoch;updateHUD();
   commonAmbient(ep);
-  if(ph==='game'){ambientGame(ep);(async()=>{while(ep===epoch&&phaseAt(hourNow())==='game')await playGame();if(ep===epoch)startPhase(phaseAt(hourNow()))})()}
+  if(ph==='game'){ambientGame(ep);(async()=>{while(ep===epoch&&phaseAt(hourNow())==='game')await playGame().catch(e=>{console.error(e);clearResume()});if(ep===epoch)startPhase(phaseAt(hourNow()))})()}
   else if(ph==='warmup')warmup(ep);
   else if(ph==='maint')maintenance(ep);
   else quiet(ep);
@@ -1747,7 +1942,11 @@ function startPhase(ph){
 let last=performance.now();
 function frame(ts){
   if(WALL&&ts-last<30){requestAnimationFrame(frame);return}
-  const dt=Math.min(.1,(ts-last)/1000)*SPEED*.85;last=ts;simT+=dt;
+  let dt=Math.min(.1,(ts-last)/1000)*SPEED*.85;last=ts;
+  const sp=G.spot&&S.zoom&&simT<G.spot.until?G.spot:null;
+  if(sp&&sp.slowAt&&simT>sp.slowAt-.15&&simT<sp.slowAt+.55)dt*=.38;
+  simT+=dt;
+  {const zt=sp?2.1:1;if(Math.abs(spotZ-zt)>.002){spotZ+=(zt-spotZ)*Math.min(1,dt*(sp?2.2:1.1));applyScale()}else if(spotZ!==zt){spotZ=zt;applyScale()}}
   if(waiters.length){const due=[],rest=[];for(const w of waiters)(w.t<=simT?due:rest).push(w);waiters=rest;due.forEach(w=>w.res())}
   for(const e of ents)e.update(dt);
   if(phaseName==='game'&&G.home)updateDia();
@@ -1755,7 +1954,7 @@ function frame(ts){
   clouds.forEach(cl=>{cl.x+=cl.v*dt;if(cl.x>1300)cl.x=-140});
   trains.forEach(tr=>tr.x+=tr.d*tr.sp*dt);trains=trains.filter(tr=>tr.x>-900&&tr.x<2100);
   planes.forEach(p=>p.x+=p.d*14*dt);planes=planes.filter(p=>p.x>-200&&p.x<1400);
-  const [tx,ty]=camTarget();if(!drag&&!pinch){const k=Math.min(1,dt*1.4);cam.x+=(tx-cam.x)*k;cam.y+=(ty-cam.y)*k}
+  const [tx,ty]=camTarget();if(!drag&&!pinch){const k=Math.min(1,dt*(sp?3:1.4));cam.x+=(tx-cam.x)*k;cam.y+=(ty-cam.y)*k}
   clampCam();
   const h=hourNow();if(Math.abs(h-bgHour)>.05&&Math.abs(h-bgHour)<23.9||bgHour<0)renderBG(h);
   draw();
@@ -1772,11 +1971,15 @@ document.addEventListener('pointerdown',e=>{if(!panel.hidden&&!panel.contains(e.
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!sheet.hidden)sheet.hidden=true;else setPanel(false)}});
 function fmtH(h){const m=Math.round(h*60);return`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`}
 function syncUI(){
+  syncOpt();
   document.querySelectorAll('#nameSeg button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===S.names)));
   document.querySelectorAll('#talkSeg button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===S.talk)));
   document.querySelectorAll('#timeChips button').forEach(b=>{const v=b.dataset.h;b.setAttribute('aria-pressed',String(v==='now'?S.hour==null:S.hour!=null&&Math.abs(+v-S.hour)<.01))});
   $('#hourR').value=hourNow();$('#hourV').textContent=fmtH(hourNow());
 }
+function syncOpt(){$('#tNight').textContent='ナイター：'+(S.night?'オン':'オフ');$('#tNight').setAttribute('aria-pressed',String(S.night));$('#tZoom').textContent='見せ場のアップ：'+(S.zoom?'オン':'オフ');$('#tZoom').setAttribute('aria-pressed',String(S.zoom))}
+$('#tNight').addEventListener('click',()=>{S.night=!S.night;saveS();syncOpt();const ph=phaseAt(hourNow());if(ph!==phaseName&&!(phaseName==='game'&&ph!=='game'))startPhase(ph)});
+$('#tZoom').addEventListener('click',()=>{S.zoom=!S.zoom;saveS();syncOpt()});
 $('#nameSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.names=+b.dataset.v;saveS();syncUI()});
 $('#talkSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.talk=+b.dataset.v;saveS();if(S.talk===0)bubbles=[];syncUI()});
 function setHour(h){const before=phaseAt(hourNow());S.hour=h;renderBG(hourNow());const after=phaseAt(hourNow());if(after!==phaseName||before!==after)startPhase(after);syncUI()}

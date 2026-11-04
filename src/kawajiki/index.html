@@ -101,7 +101,7 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
     </button>
   </div>
   <div id="panel" hidden>
-    <h2>設定</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between"><h2>設定</h2><button class="xbtn" id="panelClose" aria-label="設定を閉じる" style="margin:0">×</button></div>
     <div>
       <div class="lbl">吹き出しの量</div>
       <div class="seg" id="talkSeg">
@@ -1666,7 +1666,12 @@ function frame(ts){
 
 /* ---------- settings UI ---------- */
 const panel=$('#panel'),gear=$('#gear');
-gear.addEventListener('click',()=>{panel.hidden=!panel.hidden;gear.setAttribute('aria-expanded',String(!panel.hidden))});
+function setPanel(open){panel.hidden=!open;gear.setAttribute('aria-expanded',String(open));
+  if(open){const r=gear.getBoundingClientRect(),st=$('#stage').getBoundingClientRect();panel.style.top=(r.bottom-st.top+8)+'px';panel.style.maxHeight=`calc(100% - ${r.bottom-st.top+18}px)`;panel.style.overflowY='auto'}}
+gear.addEventListener('click',e=>{e.stopPropagation();setPanel(panel.hidden)});
+$('#panelClose').addEventListener('click',()=>setPanel(false));
+document.addEventListener('pointerdown',e=>{if(!panel.hidden&&!panel.contains(e.target)&&!gear.contains(e.target))setPanel(false)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!sheet.hidden)sheet.hidden=true;else setPanel(false)}});
 function fmtH(h){const m=Math.round(h*60);return`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`}
 function syncUI(){
   document.querySelectorAll('#nameSeg button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===S.names)));
@@ -1745,7 +1750,7 @@ function renderSheet(){
     <button class="danger" id="resetSt">${shConfirm?'本当に消す（もう一度押す）':'成績をすべてリセット'}</button>`;
   }
 }
-$('#bTeams').addEventListener('click',()=>{panel.hidden=true;gear.setAttribute('aria-expanded','false');sheet.hidden=false;shConfirm=false;renderSheet()});
+$('#bTeams').addEventListener('click',()=>{setPanel(false);sheet.hidden=false;shConfirm=false;renderSheet()});
 $('#shClose').addEventListener('click',()=>{sheet.hidden=true});
 $('#shTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;shTab=b.dataset.t;shNote=null;shConfirm=false;renderSheet()});
 shBody.addEventListener('click',e=>{

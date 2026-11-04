@@ -103,6 +103,12 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
       </div>
     </div>
     <div>
+      <div class="lbl">選手の名前</div>
+      <div class="seg" id="nameSeg" style="grid-template-columns:repeat(3,1fr)">
+        <button data-v="2">全員</button><button data-v="1">打者・走者・投手</button><button data-v="0">なし</button>
+      </div>
+    </div>
+    <div>
       <div class="lbl">時間帯</div>
       <div class="chips" id="timeChips">
         <button data-h="now">いまの時刻</button><button data-h="6.3">夜明け</button><button data-h="7.6">朝練</button>
@@ -137,14 +143,14 @@ function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.rando
 function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
 /* ---------- settings ---------- */
-const S={talk:2, hour:null};
-try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;}catch(e){}
-function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk}))}catch(e){}}
-const BUILD='20261104084313';
+const S={talk:2, hour:null, names:2};
+try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;}catch(e){}
+function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names}))}catch(e){}}
+const BUILD='20261104092041';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 if(WALL)document.body.classList.add('wp');
-function loadS(){try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}');if(v.talk!=null)S.talk=v.talk}catch(e){}}
+function loadS(){try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}');if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names}catch(e){}}
 
 /* ---------- world projection ---------- */
 const CX=600, HZ=210, F=1075, D=35, CH=14;
@@ -1198,8 +1204,36 @@ function draw(){
     trains.forEach(tr=>{cx.globalAlpha=sk.star;drawTrain(cx,tr,true);cx.globalAlpha=1});
   }
   cx.setTransform(1,0,0,1,0,0);
+  drawNameTags(L,T);
   if(snap){const a=1-(simT-snapT)/1.4;if(a<=0)snap=null;else{cx.globalAlpha=a;cx.drawImage(snap,0,0);cx.globalAlpha=1}}
   drawBubbles(L,T);
+}
+function drawNameTags(L,T){
+  if(!S.names||phaseName!=='game'||!G.home||G.pre)return;
+  const fs=clamp(Math.min(W,Hh)/40,10,13)*dpr;
+  cx.font=`700 ${fs}px 'Zen Maru Gothic','Hiragino Maru Gothic ProN',sans-serif`;cx.textBaseline='middle';cx.textAlign='center';
+  const tags=[];
+  for(const e of ents){
+    if(e.kind!=='kid'||e.dead||!e.role)continue;
+    if(S.names===1&&!['P','B','R'].includes(e.role))continue;
+    const p=P(e.x,e.z);const sx=(p.x-L)*scale*dpr,sy=(p.y-T)*scale*dpr+3*dpr;
+    if(sx<-40||sx>W*dpr+40||sy<-20||sy>Hh*dpr+20)continue;
+    tags.push({e,sx,sy,z:e.z});
+  }
+  tags.sort((a,b)=>b.z-a.z);
+  for(const t of tags){
+    const w=cx.measureText(t.e.name).width+fs*.9,h=fs*1.45;
+    cx.globalAlpha=.88;cx.fillStyle=t.e.team.capD||'#2a3142';
+    cx.beginPath();cx.roundRect(t.sx-w/2,t.sy,w,h,h/2);cx.fill();
+    cx.globalAlpha=1;cx.fillStyle='#fff';cx.fillText(t.e.name,t.sx,t.sy+h/2+.5);
+  }
+}
+function speaker(e){
+  if(e.kind==='kid')return{n:e.name,c:(e.team&&e.team.capD)||'#2a3142'};
+  if(e.role==='coach')return{n:`${e.team.name} 監督`,c:e.team.capD};
+  if(e.role==='ump')return{n:e===G.ump?'球審':'塁審',c:'#3b4558'};
+  if(e.role==='parent')return{n:'おうちの人',c:'#8a6a40'};
+  return null;
 }
 function drawBubbles(L,T){
   const fs=clamp(Math.min(W,Hh)/27,13,18)*dpr;
@@ -1210,19 +1244,22 @@ function drawBubbles(L,T){
     const e=b.e;const top=e.kind==='adult'?2.2*e.size:1.95*e.size;
     const p=P(e.x,e.z,e.stunUntil>simT?.5:top);
     let sx=(p.x-L)*scale*dpr,sy=(p.y-T)*scale*dpr-6*dpr;
-    const w=cx.measureText(b.text).width+fs*1.1,h=fs*1.7;
+    const sp=phaseName==='game'?speaker(e):null,nfs=fs*.62;
+    const tw=cx.measureText(b.text).width;cx.font=`700 ${nfs}px 'Zen Maru Gothic','Hiragino Maru Gothic ProN',sans-serif`;const nw=sp?cx.measureText(sp.n).width:0;cx.font=`700 ${fs}px 'Zen Maru Gothic','Hiragino Maru Gothic ProN',sans-serif`;
+    const w=Math.max(tw,nw)+fs*1.1,h=fs*1.7+(sp?nfs*1.15:0);
     let bx=clamp(sx-w/2,6*dpr,W*dpr-w-6*dpr),by=sy-h-fs*.55;
     for(let k=0;k<4;k++){const hit=placed.find(r=>bx<r.x+r.w&&bx+w>r.x&&by<r.y+r.h&&by+h>r.y);if(!hit)break;by=hit.y-h-4*dpr}
     placed.push({x:bx,y:by,w,h});
     const age=simT-b.born,a=Math.min(1,age/.15,(b.ttl-age)/.3);
     cx.globalAlpha=Math.max(0,a);
     cx.fillStyle='rgba(255,255,255,.96)';cx.strokeStyle='rgba(50,60,80,.55)';cx.lineWidth=1.4*dpr;
-    cx.beginPath();cx.roundRect(bx,by,w,h,h/2);cx.fill();cx.stroke();
+    cx.beginPath();cx.roundRect(bx,by,w,h,Math.min(h/2,fs*.85));cx.fill();cx.stroke();
     const tx=clamp(sx,bx+h*.5,bx+w-h*.5);
     cx.beginPath();cx.moveTo(tx-fs*.3,by+h-1);cx.lineTo(sx,sy);cx.lineTo(tx+fs*.3,by+h-1);cx.closePath();cx.fill();
     cx.beginPath();cx.moveTo(tx-fs*.3,by+h);cx.lineTo(sx,sy);cx.lineTo(tx+fs*.3,by+h);cx.stroke();
     cx.fillStyle='rgba(255,255,255,.96)';cx.fillRect(tx-fs*.3+1,by+h-2*dpr,fs*.6-2,3*dpr);
-    cx.fillStyle='#2a3142';cx.fillText(b.text,bx+w/2,by+h/2+1);
+    if(sp){cx.font=`700 ${nfs}px 'Zen Maru Gothic','Hiragino Maru Gothic ProN',sans-serif`;cx.fillStyle=sp.c;cx.fillText(sp.n,bx+w/2,by+fs*.42+nfs*.5);cx.font=`700 ${fs}px 'Zen Maru Gothic','Hiragino Maru Gothic ProN',sans-serif`}
+    cx.fillStyle='#2a3142';cx.fillText(b.text,bx+w/2,by+h-fs*.85+1);
     cx.globalAlpha=1;
   }
 }
@@ -1263,10 +1300,12 @@ const panel=$('#panel'),gear=$('#gear');
 gear.addEventListener('click',()=>{panel.hidden=!panel.hidden;gear.setAttribute('aria-expanded',String(!panel.hidden))});
 function fmtH(h){const m=Math.round(h*60);return`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`}
 function syncUI(){
+  document.querySelectorAll('#nameSeg button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===S.names)));
   document.querySelectorAll('#talkSeg button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===S.talk)));
   document.querySelectorAll('#timeChips button').forEach(b=>{const v=b.dataset.h;b.setAttribute('aria-pressed',String(v==='now'?S.hour==null:S.hour!=null&&Math.abs(+v-S.hour)<.01))});
   $('#hourR').value=hourNow();$('#hourV').textContent=fmtH(hourNow());
 }
+$('#nameSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.names=+b.dataset.v;saveS();syncUI()});
 $('#talkSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.talk=+b.dataset.v;saveS();if(S.talk===0)bubbles=[];syncUI()});
 function setHour(h){const before=phaseAt(hourNow());S.hour=h;renderBG(hourNow());const after=phaseAt(hourNow());if(after!==phaseName||before!==after)startPhase(after);syncUI()}
 $('#timeChips').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;setHour(b.dataset.h==='now'?null:+b.dataset.h)});

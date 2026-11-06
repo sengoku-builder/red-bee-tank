@@ -2770,20 +2770,21 @@ shBody.addEventListener('input',e=>{const el=e.target;
 shBody.addEventListener('change',e=>{if(e.target.id==='tName')renderSheet()});
 
 window.addEventListener('resize',layout);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadS();syncUI();checkUpdate();DB=loadD();applyLive();checkRestart()}});
+document.addEventListener('visibilitychange',()=>{if(WALL||!document.hidden){loadS();syncUI();checkUpdate();DB=loadD();applyLive();checkRestart()}});
 addEventListener('storage',e=>{if(e.key==='kawajiki.v1'){loadS();syncUI()}if(e.key===DKEY){DB=loadD();applyLive();if(!sheet.hidden&&shTab==='stats')renderSheet()}if(e.key===RSKEY)checkRestart()});
 if(window.KawaApp){$('#appBox').hidden=false;$('#bWp').onclick=()=>{try{KawaApp.setWallpaper()}catch(e){}}}
 let updBusy=false;
+const UPDKEY='kawajikiUpd.'+(WALL?'wp':window.KawaApp?'app':'web');
 function checkUpdate(){if(updBusy||!/^https?:/.test(location.protocol)||BUILD.startsWith('__'))return;updBusy=true;
   fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(v=>{updBusy=false;
     if(!v||!v.build||v.build===BUILD)return;
-    let tried=null;try{tried=JSON.parse(localStorage.getItem('kawajikiUpd')||'null')}catch(e){}
+    let tried=null;try{tried=JSON.parse(localStorage.getItem(UPDKEY)||'null')}catch(e){}
     if(tried&&tried.b===v.build&&Date.now()-tried.t<600000)return;
     if(!WALL&&(!panel.hidden||!sheet.hidden))return;
-    try{localStorage.setItem('kawajikiUpd',JSON.stringify({b:v.build,t:Date.now()}))}catch(e){}
+    try{localStorage.setItem(UPDKEY,JSON.stringify({b:v.build,t:Date.now()}))}catch(e){}
     const q=new URLSearchParams(location.search);q.set('v',v.build);location.replace(location.pathname+'?'+q.toString());
   }).catch(()=>{updBusy=false})}
-setTimeout(checkUpdate,4000);setInterval(()=>{if(!document.hidden)checkUpdate()},30*60*1000);
+setTimeout(checkUpdate,4000);setInterval(()=>{if(WALL||!document.hidden)checkUpdate()},(WALL?10:30)*60*1000);
 layout();syncUI();
 if(document.fonts)document.fonts.load("700 16px 'Zen Maru Gothic'").catch(()=>{});
 startPhase(phaseAt(hourNow()));

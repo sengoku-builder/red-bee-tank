@@ -169,7 +169,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261106231852';
+const BUILD='20261107045817';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 if(WALL)document.body.classList.add('wp');
@@ -2773,20 +2773,21 @@ shBody.addEventListener('input',e=>{const el=e.target;
 shBody.addEventListener('change',e=>{if(e.target.id==='tName')renderSheet()});
 
 window.addEventListener('resize',layout);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadS();syncUI();checkUpdate();DB=loadD();applyLive();checkRestart()}});
+document.addEventListener('visibilitychange',()=>{if(WALL||!document.hidden){loadS();syncUI();checkUpdate();DB=loadD();applyLive();checkRestart()}});
 addEventListener('storage',e=>{if(e.key==='kawajiki.v1'){loadS();syncUI()}if(e.key===DKEY){DB=loadD();applyLive();if(!sheet.hidden&&shTab==='stats')renderSheet()}if(e.key===RSKEY)checkRestart()});
 if(window.KawaApp){$('#appBox').hidden=false;$('#bWp').onclick=()=>{try{KawaApp.setWallpaper()}catch(e){}}}
 let updBusy=false;
+const UPDKEY='kawajikiUpd.'+(WALL?'wp':window.KawaApp?'app':'web');
 function checkUpdate(){if(updBusy||!/^https?:/.test(location.protocol)||BUILD.startsWith('__'))return;updBusy=true;
   fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(v=>{updBusy=false;
     if(!v||!v.build||v.build===BUILD)return;
-    let tried=null;try{tried=JSON.parse(localStorage.getItem('kawajikiUpd')||'null')}catch(e){}
+    let tried=null;try{tried=JSON.parse(localStorage.getItem(UPDKEY)||'null')}catch(e){}
     if(tried&&tried.b===v.build&&Date.now()-tried.t<600000)return;
     if(!WALL&&(!panel.hidden||!sheet.hidden))return;
-    try{localStorage.setItem('kawajikiUpd',JSON.stringify({b:v.build,t:Date.now()}))}catch(e){}
+    try{localStorage.setItem(UPDKEY,JSON.stringify({b:v.build,t:Date.now()}))}catch(e){}
     const q=new URLSearchParams(location.search);q.set('v',v.build);location.replace(location.pathname+'?'+q.toString());
   }).catch(()=>{updBusy=false})}
-setTimeout(checkUpdate,4000);setInterval(()=>{if(!document.hidden)checkUpdate()},30*60*1000);
+setTimeout(checkUpdate,4000);setInterval(()=>{if(WALL||!document.hidden)checkUpdate()},(WALL?10:30)*60*1000);
 layout();syncUI();
 if(document.fonts)document.fonts.load("700 16px 'Zen Maru Gothic'").catch(()=>{});
 startPhase(phaseAt(hourNow()));

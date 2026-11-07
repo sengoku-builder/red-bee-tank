@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>一球速報 - 河川敷の少年野球</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#2a3142;--paper:#fffcf3;--line:#ddd4bd;--chip:#f1ead7;--navy:#24418a;--muted:#6b7286;--board:#203a2c;--gold:#f6d23a;
+  --font:'Zen Maru Gothic','Hiragino Maru Gothic ProN','BIZ UDPGothic','Yu Gothic',sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0;background:#efe8d6;color:var(--ink);font-family:var(--font);-webkit-tap-highlight-color:transparent}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button{font-family:var(--font);color:inherit;cursor:pointer}
+input,select,textarea{font-family:var(--font);font-size:16px;color:var(--ink)}
+[hidden]{display:none!important}
+.wrap{max-width:560px;margin:0 auto;padding:0 10px 90px}
+header.top{position:sticky;top:0;z-index:5;background:#efe8d6;padding:8px 10px 6px;display:flex;align-items:center;gap:8px;max-width:560px;margin:0 auto}
+header.top h1{font-size:16px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:7px 11px;font-size:14px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-width:560px;margin:0 auto;padding:0 10px 8px;position:sticky;top:46px;z-index:5;background:#efe8d6}
+.tabs button{border:1px solid var(--line);background:var(--chip);border-radius:9px;padding:8px 0;font-size:14px;font-weight:700}
+.tabs button[aria-pressed=true]{background:var(--navy);color:#fff;border-color:var(--navy)}
+.card{background:var(--paper);border-radius:14px;padding:12px;margin-bottom:10px;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+.card h2{font-size:14px;margin:0 0 8px}
+.muted{color:var(--muted);font-size:12.5px}
+/* scoreboard */
+.sb{background:var(--board);color:#f4f1e4;border-radius:14px;padding:10px 10px 8px;margin-bottom:10px}
+.ls{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px}
+.ls th{font-weight:500;font-size:11px;opacity:.7;padding:0 0 3px;text-align:center}
+.ls td{text-align:center;padding:2px 0}
+.ls td.tn{text-align:left;max-width:6.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:6px}
+.ls .tot{font-weight:700;color:var(--gold)}
+.ls td.now{color:var(--gold);font-weight:700}
+.sit{display:flex;align-items:center;gap:12px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(244,241,228,.2)}
+.inn{font-size:17px;font-weight:700;min-width:5.2em}
+.bso{display:flex;flex-direction:column;gap:3px;font-size:11px}
+.lr{display:flex;align-items:center;gap:4px}.lr b{width:11px}
+.lp{width:11px;height:11px;border-radius:50%;background:rgba(244,241,228,.16);display:inline-block}
+.lp.g.on{background:#3fd172}.lp.y.on{background:#f6d23a}.lp.r.on{background:#f04b3e}
+.dia{margin-left:auto}
+.dia rect{fill:rgba(244,241,228,.16);stroke:rgba(244,241,228,.4)}
+.dia rect.on{fill:var(--gold);stroke:var(--gold)}
+.dia text{fill:#f4f1e4;font-size:7px;font-family:var(--font)}
+/* matchup */
+.mu{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center}
+.mu .who{font-size:12px;color:var(--muted)}
+.mu .nm{font-size:17px;font-weight:700;line-height:1.25;word-break:break-all}
+.mu .vs{font-size:12px;color:var(--muted)}
+.mu .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.pl{list-style:none;margin:8px 0 0;padding:0;border-top:1px solid var(--line)}
+.pl li{display:grid;grid-template-columns:2.2em 1fr auto;gap:6px;padding:5px 2px;border-bottom:1px dashed var(--line);font-size:14px;font-variant-numeric:tabular-nums}
+.pl .no{color:var(--muted)}
+.pl .ct{color:var(--muted);font-size:12px}
+.k-B{color:#1f8a4c}.k-S,.k-W{color:#b88a00}.k-F{color:#7a6a4a}.k-X{color:#c0392b;font-weight:700}.k-H{color:#c0392b}
+/* input buttons */
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.pad button{border:0;border-radius:12px;padding:16px 0;font-size:16px;font-weight:700;color:#fff;box-shadow:0 2px 0 rgba(0,0,0,.15)}
+.bB{background:#2f9a5a}.bS{background:#d6a514}.bW{background:#e0821f}.bF{background:#8a7a5a}
+.bigx{width:100%;border:0;border-radius:12px;padding:15px 0;font-size:17px;font-weight:700;color:#fff;background:#c0392b;box-shadow:0 2px 0 rgba(0,0,0,.15);margin-bottom:6px}
+.row4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.row4 button{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:10px 0;font-size:13px}
+.feed{list-style:none;margin:0;padding:0}
+.feed li{padding:6px 2px;border-bottom:1px dashed var(--line);font-size:14px;line-height:1.45}
+.feed li.hd{border:0;padding-top:12px;font-weight:700;color:var(--navy)}
+.feed .pt{font-size:12px;color:var(--muted)}
+.feed .rs{color:#c0392b;font-weight:700}
+/* sheet */
+.ov{position:fixed;inset:0;background:rgba(20,25,35,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--paper);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px calc(18px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0 0 10px;font-size:16px}
+.lbl{font-size:12px;color:var(--muted);margin:12px 0 5px;letter-spacing:.04em}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chips button{border:1px solid var(--line);background:var(--chip);border-radius:9px;padding:8px 11px;font-size:14px}
+.chips button[aria-pressed=true]{background:var(--navy);border-color:var(--navy);color:#fff}
+.chips button:disabled{opacity:.35}
+.grp{font-size:11px;color:var(--muted);width:100%;margin-top:4px}
+.fld{width:100%;display:block;background:#dfe9d3;border-radius:12px;touch-action:manipulation}
+.rrow{display:grid;grid-template-columns:5.5em 1fr;gap:6px;align-items:center;margin-bottom:6px}
+.rrow .rn{font-size:13px;line-height:1.25;word-break:break-all}
+.seg5{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
+.seg5 button{border:1px solid var(--line);background:var(--chip);border-radius:7px;padding:8px 0;font-size:13px}
+.seg5 button[aria-pressed=true]{background:var(--navy);color:#fff;border-color:var(--navy)}
+.seg5 button.out[aria-pressed=true]{background:#c0392b;border-color:#c0392b}
+.seg5 button:disabled{opacity:.25}
+.acts{display:flex;gap:8px;margin-top:14px}
+.acts button{flex:1;border-radius:12px;padding:13px 0;font-size:16px;font-weight:700;border:1px solid var(--line);background:var(--chip)}
+.acts .ok{background:var(--navy);color:#fff;border-color:var(--navy)}
+.acts .ok:disabled{opacity:.4}
+.warn{color:#c0392b;font-size:13px;margin-top:8px}
+.sum{font-size:13px;margin-top:8px;color:var(--muted)}
+/* forms */
+.frm{display:grid;gap:8px}
+.frm label{font-size:12px;color:var(--muted)}
+.frm input[type=text],.frm input[type=date],.frm select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.lu{display:grid;grid-template-columns:2em 1fr 4.6em 3.2em;gap:5px;align-items:center;margin-bottom:5px}
+.lu .n{font-weight:700;text-align:center;background:var(--chip);border-radius:6px;padding:7px 0;font-size:13px}
+.lu input,.lu select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;min-width:0}
+.lu button{border:1px solid var(--line);background:var(--chip);border-radius:8px;padding:7px 0;font-size:12px}
+.lu button[aria-pressed=true]{background:#e0679a;border-color:#e0679a;color:#fff}
+.caps{display:flex;flex-wrap:wrap;gap:6px}
+.caps button{width:30px;height:30px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.caps button[aria-pressed=true]{box-shadow:0 0 0 3px var(--navy)}
+.gl{display:flex;flex-direction:column;gap:8px}
+.gi{background:var(--paper);border-radius:14px;padding:12px}
+.gi .t{font-weight:700;font-size:15px}
+.gi .sc{font-variant-numeric:tabular-nums;font-size:20px;font-weight:700;margin:2px 0}
+.gi .bt{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.gi .bt button{border:1px solid var(--line);background:var(--chip);border-radius:9px;padding:8px 12px;font-size:13px}
+.gi .bt .pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+.gi .bt .rp{background:#2f6b4a;color:#fff;border-color:#2f6b4a}
+.danger{color:#a5372f!important;border-color:#d9a4a0!important;background:#fff!important}
+.newb{width:100%;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:700;background:var(--navy);color:#fff;margin-bottom:10px}
+.tbl{overflow-x:auto}
+.tbl table{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;width:100%}
+.tbl th,.tbl td{padding:5px 5px;border-bottom:1px solid var(--line);text-align:right}
+.tbl th{color:var(--muted);font-size:11.5px}
+.tbl td:first-child,.tbl th:first-child{text-align:left}
+.over{background:#2f6b4a;color:#fff;border-radius:12px;padding:12px;text-align:center;font-weight:700;margin-bottom:10px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#2a3142;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:40;max-width:90vw}
+textarea{width:100%;min-height:140px;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px}
+a.back{color:var(--navy)}
+</style></head>
+<body>
+<header class="top"><button class="ib" id="hBack" aria-label="戻る">←</button><h1 id="hTitle">一球速報</h1><a class="ib" id="hField" href="./" style="text-decoration:none;color:inherit">野球場</a></header>
+<nav class="tabs" id="tabs" hidden>
+  <button data-a="tab" data-v="live">速報</button><button data-a="tab" data-v="feed">打席</button><button data-a="tab" data-v="stats">成績</button><button data-a="tab" data-v="setup">試合設定</button>
+</nav>
+<main class="wrap" id="main"></main>
+<div id="modal"></div>
+<div id="toast" class="toast" hidden></div>
+<script>
+'use strict';
+const RKEY='kawajiki.records.v1',QKEY='kawajiki.replayReq',RSKEY='kawajiki.restartAt';
+const POSJ=['投','捕','一','二','三','遊','左','中','右'];
+const POSF=['ピッチャー','キャッチャー','ファースト','セカンド','サード','ショート','レフト','センター','ライト'];
+const POSOPT=['投','捕','一','二','三','遊','左','中','右','DH',''];
+const CAPS=[{k:'navy',c:'#25408a'},{k:'red',c:'#c9443b'},{k:'green',c:'#2f8a58'},{k:'orange',c:'#d9822b'},{k:'sky',c:'#3b93d4'},{k:'purple',c:'#7a4fb3'},{k:'black',c:'#2b2f3a'},{k:'yellow',c:'#e0b021'},{k:'pink',c:'#e0679a'},{k:'brown',c:'#8a5a34'}];
+// 壁紙と同じ座標（ホーム(0,0)、二塁(0,32.6)、外野フェンス約63）
+const BASES=[[0,0],[16.3,16.3],[0,32.6],[-16.3,16.3]];
+const FPOS=[[0,15.6],[0,-1.25],[14.6,19.5],[6.8,28.5],[-14.6,19.5],[-6.8,28.5],[-23,45],[0,52],[23,45]];
+const RES={
+ '1B':{l:'ヒット',g:'安打',ab:1,h:1,ty:'L'},'2B':{l:'2ベース',g:'安打',ab:1,h:1,ty:'L'},'3B':{l:'3ベース',g:'安打',ab:1,h:1,ty:'L'},'HR':{l:'ホームラン',g:'安打',ab:1,h:1,ty:'F'},
+ 'GO':{l:'ゴロ',g:'アウト',ab:1,ty:'G'},'FO':{l:'フライ',g:'アウト',ab:1,ty:'F'},'LO':{l:'ライナー',g:'アウト',ab:1,ty:'L'},'DP':{l:'併殺',g:'アウト',ab:1,ty:'G',norbi:1},
+ 'SH':{l:'送りバント',g:'アウト',ab:0,ty:'B'},'SF':{l:'犠牲フライ',g:'アウト',ab:0,ty:'F'},
+ 'E':{l:'エラー',g:'出塁',ab:1,ty:'G',norbi:1},'FC':{l:'野選',g:'出塁',ab:1,ty:'G'},
+ 'HBP':{l:'死球',g:'その他',ab:0,bb:1},'IBB':{l:'申告敬遠',g:'その他',ab:0,bb:1},'KWP':{l:'振り逃げ',g:'その他',ab:1,k:1,norbi:1},
+ 'BB':{l:'四球',ab:0,bb:1},'K':{l:'空振り三振',ab:1,k:1},'KL':{l:'見逃し三振',ab:1,k:1},'CONT':{l:'（攻撃終了）'}
+};
+const INPLAY=['1B','2B','3B','HR','GO','FO','LO','DP','SH','SF','E','FC'];
+const PITCH={B:'ボール',S:'見逃しストライク',W:'空振りストライク',F:'ファウル',X:'打った',H:'死球'};
+const TY={G:'ゴロ',F:'フライ',L:'ライナー',B:'バント'};
+const WHY=['盗塁','盗塁死','暴投','捕逸','ボーク','牽制死','走塁死','エラー','その他'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad2=n=>String(n).padStart(2,'0');
+
+/* ---------- 保存 ---------- */
+let recs=[];
+function load(){try{recs=JSON.parse(localStorage.getItem(RKEY)||'[]')}catch(e){recs=[]}if(!Array.isArray(recs))recs=[]}
+function save(){try{localStorage.setItem(RKEY,JSON.stringify(recs))}catch(e){toast('保存できませんでした')}}
+function mkTeam(n,c){return{name:n,cap:c,lineup:['中','二','遊','一','三','左','右','捕','投'].map(p=>({name:'',pos:p,girl:false}))}}
+function newRec(){const d=new Date();return{id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),v:1,date:`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`,place:'',innings:6,teams:[mkTeam('先攻チーム','red'),mkTeam('後攻チーム','navy')],events:[],created:Date.now(),updated:Date.now()}}
+const R=()=>recs.find(r=>r.id===ui.id);
+function touch(){const r=R();if(r)r.updated=Date.now();save()}
+
+/* ---------- 試合の進行（記録から毎回組み立てる） ---------- */
+function pname(lu,slot){const p=lu[slot];return(p&&p.name)||`${slot+1}番打者`}
+function pitcherOf(t){const p=t.lineup.find(x=>x.pos==='投');return p&&p.name?p.name:'ピッチャー'}
+function defMoves(res,bases){
+  const o=bases.map(Boolean),r=[null,null,null];
+  const stay=()=>{for(let i=0;i<3;i++)if(o[i])r[i]=i+1};
+  const adv=n=>{for(let i=0;i<3;i++)if(o[i])r[i]=Math.min(4,i+1+n)};
+  const forced=()=>{stay();if(o[0]){r[0]=2;if(o[1]){r[1]=3;if(o[2])r[2]=4}}};
+  let b=0;
+  switch(res){
+    case'1B':adv(1);b=1;break;case'2B':adv(2);b=2;break;case'3B':adv(3);b=3;break;case'HR':adv(4);b=4;break;
+    case'GO':case'FO':case'LO':case'K':case'KL':stay();break;
+    case'DP':stay();if(o[0])r[0]=0;break;
+    case'SH':adv(1);break;
+    case'SF':stay();if(o[2])r[2]=4;break;
+    default:forced();b=1;
+  }
+  return{b,r};
+}
+function sim(rec){
+  const s={inn:1,half:0,outs:0,b:0,s:0,bases:[null,null,null],next:[0,0],runs:[[],[]],pas:[],cur:null,feed:[],over:false,
+    lu:rec.teams.map(t=>t.lineup.map(p=>({...p}))),pit:rec.teams.map(t=>[{name:pitcherOf(t),n:0}])};
+  for(const ev of rec.events)apply(s,ev);
+  return s;
+}
+function curPA(s){
+  if(!s.cur){const t=s.half,slot=s.next[t];s.cur={t,slot,name:pname(s.lu[t],slot),inn:s.inn,p:[],res:null,f:[],bb:null,reach:0,scored:false,out:false,rbi:0,runs:0,pit:s.pit[1-t].length-1,pitName:s.pit[1-t].at(-1).name,done:false};s.pas.push(s.cur)}
+  return s.cur;
+}
+function pitchCount(s){s.pit[1-s.half].at(-1).n++}
+function apply(s,ev){
+  if(s.over)return;
+  switch(ev.t){
+    case'p':{const pa=curPA(s);pitchCount(s);const q={k:ev.k};pa.p.push(q);
+      if(ev.k==='B')s.b++;else if(ev.k==='S'||ev.k==='W')s.s++;else if(ev.k==='F'&&s.s<2)s.s++;
+      q.b=s.b;q.s=s.s;
+      if(s.b>=4)finish(s,'BB',defMoves('BB',s.bases),[],null);
+      else if(s.s>=3)finish(s,ev.k==='W'?'K':'KL',defMoves('K',s.bases),[],null);
+      break}
+    case'pa':{const pa=curPA(s);const pk=ev.res==='HBP'?'H':ev.res==='KWP'?'W':ev.res==='IBB'?null:'X';
+      if(pk){pitchCount(s);pa.p.push({k:pk,b:s.b,s:pk==='W'?3:s.s})}
+      finish(s,ev.res,ev.m,ev.f||[],ev.bb||null);break}
+    case'run':{const runs=move(s,ev.m,null,ev.why);
+      s.feed.push({k:'note',inn:s.inn,half:s.half,text:runText(ev,runs)});three(s);break}
+    case'sub':{const old=pname(s.lu[ev.team],ev.slot);s.lu[ev.team][ev.slot]={name:ev.name,pos:ev.pos,girl:!!ev.girl};
+      if(s.cur&&s.cur.t===ev.team&&s.cur.slot===ev.slot)s.cur.name=ev.name;
+      s.feed.push({k:'note',inn:s.inn,half:s.half,text:`選手交代：${ev.slot+1}番 ${old} → ${ev.name}（${ev.pos||'-'}）`});break}
+    case'pc':{const lu=s.lu[ev.team],j=lu.findIndex(p=>p.name&&p.name===ev.name),pi=lu.findIndex(p=>p.pos==='投');
+      if(j>=0&&pi>=0&&j!==pi){const op=lu[j].pos;lu[j].pos='投';lu[pi].pos=op}
+      s.pit[ev.team].push({name:ev.name,n:0});s.feed.push({k:'note',inn:s.inn,half:s.half,text:`ピッチャー交代：${ev.name}`});break}
+    case'end':s.over=true;s.feed.push({k:'note',inn:s.inn,half:s.half,text:'試合終了'});break;
+  }
+}
+function move(s,m,batter,why){
+  const nb=[null,null,null];let runs=0;const scorers=[];
+  const place=(pa,d)=>{if(d===0){s.outs++;pa.out=true;pa.outNo=s.outs}else if(d>=4){pa.reach=4;pa.scored=true;runs++;scorers.push(pa)}else{nb[d-1]=pa;if(d>pa.reach)pa.reach=d}};
+  for(let i=2;i>=0;i--){const tok=s.bases[i];if(!tok)continue;let d=m&&m.r?m.r[i]:null;if(d==null)d=i+1;place(tok,d)}
+  if(batter)place(batter,m.b==null?1:m.b);
+  s.bases=nb;
+  if(runs){const r=s.runs[s.half];r[s.inn-1]=(r[s.inn-1]||0)+runs}
+  return runs;
+}
+function finish(s,res,m,f,bb){
+  const pa=curPA(s),t=s.half;
+  pa.res=res;pa.f=f||[];pa.bb=bb;pa.done=true;pa.outsBefore=s.outs;pa.bases0=s.bases.map(x=>x?x.name:null);
+  const runs=move(s,m||defMoves(res,s.bases),pa);
+  pa.runs=runs;pa.rbi=RES[res].norbi?0:runs;
+  s.feed.push({k:'pa',inn:s.inn,half:t,pa});
+  s.next[t]=(pa.slot+1)%9;s.cur=null;s.b=0;s.s=0;
+  three(s);
+}
+function three(s){
+  if(s.outs<3)return;
+  const r=s.runs[s.half];if(r[s.inn-1]==null)r[s.inn-1]=0;
+  if(s.cur){if(!s.cur.p.length)s.pas.splice(s.pas.indexOf(s.cur),1);else{s.cur.res='CONT';s.cur.done=true;s.feed.push({k:'pa',inn:s.inn,half:s.half,pa:s.cur})}s.cur=null}
+  s.bases=[null,null,null];s.outs=0;s.b=0;s.s=0;
+  if(s.half===0)s.half=1;else{s.half=0;s.inn++}
+}
+function runText(ev,runs){
+  const n=(ev.m.r||[]).map((d,i)=>d==null||d===i+1?null:`${i+1}塁走者${d===0?'アウト':d===4?'ホームイン':'→'+d+'塁'}`).filter(Boolean);
+  return`${ev.why}：${n.join('、')||'動きなし'}${runs?`（${runs}点）`:''}`;
+}
+
+/* ---------- 打席の言い方 ---------- */
+function dirOf(bb){if(!bb||bb.x==null)return null;const a=Math.atan2(bb.x,bb.z)*180/Math.PI,d=Math.hypot(bb.x,bb.z);return{a,d}}
+function hitWhere(pa){
+  const d=dirOf(pa.bb),f=pa.f[0];
+  if(d&&d.d<30){const n=f||nearestPos(pa.bb.x,pa.bb.z);return POSF[n-1]}
+  if(d){if(pa.res!=='1B'&&d.a>-26&&d.a<-9)return'左中間';if(pa.res!=='1B'&&d.a>9&&d.a<26)return'右中間';return d.a<-15?'レフト':d.a>15?'ライト':'センター'}
+  return f?POSF[f-1]:'';
+}
+function paText(pa){
+  const f=pa.f&&pa.f[0],fn=f?POSF[f-1]:'',w=hitWhere(pa);
+  switch(pa.res){
+    case'1B':return w?(['レフト','センター','ライト'].includes(w)?`${w}前ヒット`:`${w}への内野安打`):'ヒット';
+    case'2B':return w?`${w}への2ベース`:'2ベース';case'3B':return w?`${w}への3ベース`:'3ベース';case'HR':return w?`${w}へのホームラン`:'ホームラン';
+    case'GO':return`${fn}ゴロ`;case'DP':return`${fn}ゴロ併殺打`;case'FO':return`${fn}フライ`;case'LO':return`${fn}ライナー`;
+    case'SH':return`${fn?fn+'への':''}送りバント`;case'SF':return`${fn?fn+'への':''}犠牲フライ`;
+    case'E':return`${fn?fn+'の':''}エラー`;case'FC':return`${fn?fn+'の':''}フィルダースチョイス`;
+    default:return RES[pa.res]?RES[pa.res].l:pa.res;
+  }
+}
+function paShort(pa){
+  const f=pa.f&&pa.f[0];let p=f?POSJ[f-1]:'';
+  if(!p&&pa.bb&&pa.bb.x!=null){const n=nearestPos(pa.bb.x,pa.bb.z);if(n)p=POSJ[n-1]}
+  return{'1B':p+'安','2B':p+'2','3B':p+'3','HR':p+'本','GO':p+'ゴ','FO':p+'飛','LO':p+'直','DP':p+'併','SH':p+'犠','SF':p+'犠飛','E':p+'失','FC':p+'野選','BB':'四球','IBB':'敬遠','HBP':'死球','K':'三振','KL':'見三振','KWP':'振逃','CONT':'-'}[pa.res]||'';
+}
+function nearestPos(x,z){let b=0,bd=1e9;FPOS.forEach(([px,pz],i)=>{if(i===1&&z>3)return;const d=Math.hypot(px-x,pz-z);if(d<bd){bd=d;b=i+1}});return b}
+function innLabel(inn,half){return`${inn}回${half?'ウラ':'オモテ'}`}
+
+/* ---------- UI ---------- */
+const ui={view:'list',id:null,tab:'live',m:null};
+let S=null;
+function recalc(){const r=R();S=r?sim(r):null}
+function render(){
+  const r=R();
+  $('#tabs').hidden=ui.view!=='game';
+  $('#hBack').hidden=ui.view==='list';
+  $('#hField').hidden=ui.view!=='list';
+  $('#tabs').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===ui.tab)));
+  $('#hTitle').textContent=ui.view==='list'?'一球速報':r?`${r.teams[0].name} vs ${r.teams[1].name}`:'';
+  const m=$('#main');
+  if(ui.view==='list')m.innerHTML=vList();
+  else if(ui.view==='io')m.innerHTML=vIO();
+  else if(!r){ui.view='list';return render()}
+  else m.innerHTML=ui.tab==='live'?vLive():ui.tab==='feed'?vFeed():ui.tab==='stats'?vStats():vSetup();
+  renderModal();
+}
+function scoreOf(s){return[0,1].map(t=>s.runs[t].reduce((a,b)=>a+(+b||0),0))}
+
+function vList(){
+  let h=`<button class="newb" data-a="new">＋ 新しい試合を記録する</button><div class="gl">`;
+  const list=recs.slice().sort((a,b)=>b.updated-a.updated);
+  if(!list.length)h+=`<div class="card muted">まだ記録がありません。試合を観ながら1球ずつ入力すると、あとで河川敷の野球場でその試合を再生できます。</div>`;
+  let q=null;try{q=JSON.parse(localStorage.getItem(QKEY)||'null')}catch(e){}
+  for(const r of list){const s=sim(r),[a,b]=scoreOf(s),st=s.over?'試合終了':r.events.length?`${innLabel(s.inn,s.half)}まで`:'未開始';
+    h+=`<div class="gi"><div class="muted">${esc(r.date)}${r.place?'　'+esc(r.place):''}　${st}${q&&q.id===r.id?'　<b style="color:#2f6b4a">▶ 再生予約中</b>':''}</div>
+      <div class="t">${esc(r.teams[0].name)} vs ${esc(r.teams[1].name)}</div><div class="sc">${a} - ${b}</div>
+      <div class="bt"><button class="pri" data-a="open" data-id="${r.id}">開く</button>${r.events.length?`<button class="rp" data-a="replay" data-id="${r.id}">野球場で再生</button>`:''}<button class="danger" data-a="del" data-id="${r.id}">削除</button></div></div>`}
+  h+=`</div><div style="margin-top:14px;text-align:center"><button class="ib" data-a="io">記録の書き出し・読み込み（PCへ移すとき）</button></div>`;
+  return h;
+}
+function vIO(){
+  return`<div class="card"><h2>書き出し</h2><p class="muted">全試合の記録を文字にしたものです。コピーして、別の端末の「読み込み」に貼り付けると移せます。</p>
+    <textarea id="ioOut" readonly>${esc(JSON.stringify(recs))}</textarea><div class="acts"><button class="ok" data-a="copyOut">コピー</button></div></div>
+    <div class="card"><h2>読み込み</h2><p class="muted">書き出した文字を貼り付けてください。同じ試合はあたらしい方で上書きします。</p>
+    <textarea id="ioIn" placeholder="ここに貼り付け"></textarea><div class="acts"><button class="ok" data-a="doImport">読み込む</button></div></div>`;
+}
+
+function lineScore(s,r){
+  const N=Math.max(r.innings,s.over?0:s.inn,...s.runs.map(x=>x.length));const [ta,tb]=scoreOf(s);
+  let h=`<table class="ls"><tr><th></th>`;for(let i=1;i<=N;i++)h+=`<th>${i}</th>`;h+=`<th>計</th><th>安</th><th>失</th></tr>`;
+  const hits=t=>s.pas.filter(p=>p.t===t&&RES[p.res]&&RES[p.res].h).length,errs=t=>s.pas.filter(p=>p.t!==t&&p.res==='E').length;
+  [0,1].forEach(t=>{h+=`<tr><td class="tn">${esc(r.teams[t].name)}</td>`;
+    for(let i=1;i<=N;i++){const v=s.runs[t][i-1],now=!s.over&&s.inn===i&&s.half===t;h+=`<td class="${now?'now':''}">${v!=null?v:now?0:''}</td>`}
+    h+=`<td class="tot">${t?tb:ta}</td><td>${hits(t)}</td><td>${errs(t)}</td></tr>`});
+  return h+`</table>`;
+}
+function diaSvg(s){
+  const n=i=>s.bases[i]?esc(s.bases[i].name.slice(0,5)):'';
+  return`<svg class="dia" viewBox="0 0 84 58" width="110" height="76" aria-label="ランナー">
+    <rect x="36" y="4" width="12" height="12" transform="rotate(45 42 10)" class="${s.bases[1]?'on':''}"/>
+    <rect x="58" y="22" width="12" height="12" transform="rotate(45 64 28)" class="${s.bases[0]?'on':''}"/>
+    <rect x="14" y="22" width="12" height="12" transform="rotate(45 20 28)" class="${s.bases[2]?'on':''}"/>
+    <text x="42" y="29" text-anchor="middle">${n(1)}</text><text x="64" y="47" text-anchor="middle">${n(0)}</text><text x="20" y="47" text-anchor="middle">${n(2)}</text></svg>`;
+}
+function lamps(n,c,max){let h='';for(let i=0;i<max;i++)h+=`<i class="lp ${c}${i<n?' on':''}"></i>`;return h}
+function vLive(){
+  const r=R(),s=S;
+  let h=`<div class="sb">${lineScore(s,r)}<div class="sit"><div class="inn">${s.over?'試合終了':innLabel(s.inn,s.half)}</div>
+    <div class="bso"><div class="lr"><b>B</b>${lamps(s.b,'g',3)}</div><div class="lr"><b>S</b>${lamps(s.s,'y',2)}</div><div class="lr"><b>O</b>${lamps(s.outs,'r',2)}</div></div>${diaSvg(s)}</div></div>`;
+  if(s.over)return h+`<div class="over">試合終了　<button class="ib" data-a="undo" style="margin-left:8px;color:var(--ink)">取り消す</button></div>${feedHTML(s,r,true)}`;
+  const t=s.half,f=1-t,slot=s.cur?s.cur.slot:s.next[t],lu=s.lu[t][slot]||{},pit=s.pit[f].at(-1);
+  const today=s.pas.filter(p=>p.t===t&&p.slot===slot&&p.done&&p.res!=='CONT').map(paShort).join('・');
+  const cur=s.cur?s.cur.p:[];
+  h+=`<div class="card"><div class="mu"><div><div class="who">ピッチャー（${esc(r.teams[f].name)}）</div><div class="nm">${esc(pit.name)}</div><div class="sub">${pit.n}球</div></div>
+    <div class="vs">vs</div><div style="text-align:right"><div class="who">${slot+1}番 ${esc(lu.pos||'')}（${esc(r.teams[t].name)}）</div><div class="nm">${esc(pname(s.lu[t],slot))}</div><div class="sub">${today?'今日：'+esc(today):'今日の初打席'}</div></div></div>
+    <ul class="pl">${cur.length?cur.map((p,i)=>`<li><span class="no">${i+1}球</span><span class="k-${p.k}">${PITCH[p.k]}</span><span class="ct">${p.b}-${p.s}</span></li>`).join(''):'<li><span></span><span class="muted">この打席はまだ投げていません</span><span></span></li>'}</ul></div>
+    <div class="pad"><button class="bB" data-a="p" data-k="B">ボール</button><button class="bS" data-a="p" data-k="S">見逃し</button><button class="bW" data-a="p" data-k="W">空振り</button><button class="bF" data-a="p" data-k="F">ファウル</button></div>
+    <button class="bigx" data-a="openRes">打った！（打球・結果）</button>
+    <div class="row4"><button data-a="openOther">死球など</button><button data-a="openRun"${s.bases.some(Boolean)?'':' disabled'}>走者</button><button data-a="openChg">交代</button><button data-a="undo"${r.events.length?'':' disabled'}>↶ 1つ戻す</button></div>
+    <div style="margin-top:14px">${feedHTML(s,r,true)}</div>
+    <div style="text-align:center;margin-top:10px"><button class="ib" data-a="endAsk">試合終了にする</button></div>`;
+  return h;
+}
+function feedHTML(s,r,recent){
+  let items=s.feed.slice();
+  if(recent)items=items.slice(-6).reverse();
+  let h='<ul class="feed">',lastKey='';
+  for(const it of items){
+    const key=it.inn+'-'+it.half;
+    if(!recent&&key!==lastKey){h+=`<li class="hd">${innLabel(it.inn,it.half)}（${esc(r.teams[it.half].name)}の攻撃）</li>`;lastKey=key}
+    if(it.k==='note'){h+=`<li class="muted">${recent?innLabel(it.inn,it.half)+'　':''}${esc(it.text)}</li>`;continue}
+    const pa=it.pa;
+    const pc=pa.p.map(p=>({B:'ボ',S:'見',W:'空',F:'フ',X:'打',H:'死'}[p.k])).join(' ');
+    h+=`<li>${recent?`<span class="muted">${innLabel(it.inn,it.half)}</span> `:''}<b>${pa.slot+1}番 ${esc(pa.name)}</b>：${esc(paText(pa))}${pa.runs?` <span class="rs">${pa.runs}点</span>`:''}
+      <div class="pt">${pa.p.length}球（${pc||'-'}）${pa.res!=='CONT'?`　${pa.out?(pa.outNo?pa.outNo+'アウト':'アウト'):''}`:''}　投手 ${esc(pa.pitName)}</div></li>`;
+  }
+  if(!items.length)h+=`<li class="muted">ここに打席の結果が並びます</li>`;
+  return h+'</ul>';
+}
+function vFeed(){const r=R(),s=S;return`<div class="sb">${lineScore(s,r)}</div><div class="card">${feedHTML(s,r,false)}</div>`}
+function vStats(){
+  const r=R(),s=S;let h='';
+  [0,1].forEach(t=>{
+    const rows=[];const key=p=>p.slot+'|'+p.name;
+    s.pas.filter(p=>p.t===t&&p.res&&p.res!=='CONT').forEach(p=>{let o=rows.find(x=>x.k===key(p));if(!o){o={k:key(p),slot:p.slot,name:p.name,pa:0,ab:0,h:0,hr:0,rbi:0,r:0,bb:0,so:0,res:[]};rows.push(o)}
+      const d=RES[p.res];o.pa++;if(d.ab)o.ab++;if(d.h)o.h++;if(p.res==='HR')o.hr++;o.rbi+=p.rbi;if(d.bb||p.res==='BB')o.bb++;if(d.k)o.so++;if(p.scored)o.r++;o.res.push(paShort(p))});
+    rows.sort((a,b)=>a.slot-b.slot);
+    h+=`<div class="card"><h2>${esc(r.teams[t].name)}　打撃</h2><div class="tbl"><table><tr><th>選手</th><th>打席</th><th>打数</th><th>安打</th><th>本</th><th>打点</th><th>得点</th><th>四死</th><th>三振</th><th style="text-align:left">結果</th></tr>
+      ${rows.map(o=>`<tr><td>${o.slot+1} ${esc(o.name)}</td><td>${o.pa}</td><td>${o.ab}</td><td>${o.h}</td><td>${o.hr}</td><td>${o.rbi}</td><td>${o.r}</td><td>${o.bb}</td><td>${o.so}</td><td style="text-align:left">${esc(o.res.join(' '))}</td></tr>`).join('')||'<tr><td colspan="10" class="muted">まだありません</td></tr>'}</table></div>`;
+    const ps=s.pit[1-t];
+    h+=`<h2 style="margin-top:12px">${esc(r.teams[1-t].name)}　投手</h2><div class="tbl"><table><tr><th>投手</th><th>球数</th><th>打者</th><th>被安打</th><th>奪三振</th><th>四死球</th><th>失点</th></tr>
+      ${ps.map((p,i)=>{const pp=s.pas.filter(x=>x.t===t&&x.pit===i&&x.res&&x.res!=='CONT');const runs=s.pas.filter(x=>x.t===t&&x.scored&&x.pit===i).length;
+        return`<tr><td>${esc(p.name)}</td><td>${p.n}</td><td>${pp.length}</td><td>${pp.filter(x=>RES[x.res].h).length}</td><td>${pp.filter(x=>RES[x.res].k).length}</td><td>${pp.filter(x=>RES[x.res].bb||x.res==='BB').length}</td><td>${runs}</td></tr>`}).join('')}</table></div></div>`;
+  });
+  return h+`<p class="muted">失点はその打者を出塁させた投手につけています。</p>`;
+}
+function vSetup(){
+  const r=R();
+  let h=`<div class="card frm"><div><label>日付</label><input type="date" data-k="date" value="${esc(r.date)}"></div>
+    <div><label>グラウンド・大会名など</label><input type="text" data-k="place" value="${esc(r.place)}" placeholder="例：河川敷第2グラウンド"></div>
+    <div><label>回数</label><select data-k="innings">${[5,6,7,9].map(n=>`<option ${r.innings==n?'selected':''}>${n}</option>`).join('')}</select></div></div>`;
+  r.teams.forEach((t,ti)=>{
+    h+=`<div class="card"><h2>${ti?'後攻':'先攻'}チーム</h2><div class="frm"><input type="text" data-k="tname" data-t="${ti}" value="${esc(t.name)}">
+      <div><label>帽子の色（野球場で再生するときの色）</label><div class="caps">${CAPS.map(c=>`<button data-a="cap" data-t="${ti}" data-v="${c.k}" style="background:${c.c}" aria-pressed="${t.cap===c.k}" aria-label="${c.k}"></button>`).join('')}</div></div>
+      <div><label>打順・名前・守備・女子</label>${t.lineup.map((p,i)=>`<div class="lu"><span class="n">${i+1}</span><input type="text" data-k="pn" data-t="${ti}" data-i="${i}" value="${esc(p.name)}" placeholder="${i+1}番打者">
+        <select data-k="pp" data-t="${ti}" data-i="${i}">${POSOPT.map(o=>`<option value="${o}" ${p.pos===o?'selected':''}>${o||'-'}</option>`).join('')}</select>
+        <button data-a="girl" data-t="${ti}" data-i="${i}" aria-pressed="${!!p.girl}">女子</button></div>`).join('')}</div></div></div>`;
+  });
+  return h+`<p class="muted">途中の選手交代・ピッチャー交代は「速報」の「交代」から入れてください（ここを変えると試合の最初からの記録に反映されます）。</p>`;
+}
+
+/* ---------- 入力シート ---------- */
+function batterName(){const s=S;return s.cur?s.cur.name:pname(s.lu[s.half],s.next[s.half])}
+function runnerRows(st,withBatter,opts){
+  const s=S;let h='';
+  const row=(key,label,from,val)=>{
+    const lbls=['アウト','1塁','2塁','3塁','本塁'];
+    h+=`<div class="rrow"><div class="rn">${label}</div><div class="seg5">${lbls.map((l,d)=>{const dis=d!==0&&d<Math.max(1,from);return`<button class="${d===0?'out':''}" data-a="mv" data-w="${key}" data-d="${d}" aria-pressed="${val===d}"${dis?' disabled':''}>${l}</button>`}).join('')}</div></div>`};
+  for(let i=2;i>=0;i--){if(!s.bases[i])continue;row(i,`${i+1}塁<br><b>${esc(s.bases[i].name)}</b>`,i+1,st.m.r[i]==null?i+1:st.m.r[i])}
+  if(withBatter)row('b',`打者<br><b>${esc(batterName())}</b>`,0,st.m.b);
+  return h;
+}
+function checkMoves(m,withBatter){
+  const s=S;const seq=[];for(let i=2;i>=0;i--)if(s.bases[i])seq.push(m.r[i]==null?i+1:m.r[i]);if(withBatter)seq.push(m.b);
+  let last=5,outs=0,runs=0;
+  for(const d of seq){if(d===0){outs++;continue}if(d===4){runs++;if(last!==5&&last!==4)return{err:'前のランナーを追い越しています'};last=4;continue}if(d>=last)return{err:'同じ塁に2人いるか、前のランナーを追い越しています'};last=d}
+  return{outs,runs};
+}
+function fieldSvg(st){
+  const bb=st.bb;let mk='';
+  if(bb&&bb.x!=null){const x=bb.x,y=-bb.z;
+    if(bb.ty==='G'||bb.ty==='B')mk=`<line x1="0" y1="0" x2="${x}" y2="${y}" stroke="#c0392b" stroke-width=".9" stroke-dasharray="2 1.4"/>`;
+    else{const cx=x/2,cy=y/2-(bb.ty==='L'?4:14);mk=`<path d="M0 0 Q${cx} ${cy} ${x} ${y}" fill="none" stroke="#c0392b" stroke-width=".9"/>`}
+    mk+=`<circle cx="${x}" cy="${y}" r="2.4" fill="#fff" stroke="#c0392b" stroke-width="1"/>`}
+  const fp=FPOS.map(([x,z],i)=>`<text x="${x}" y="${-z+1.6}" text-anchor="middle" font-size="4.2" fill="#55704a">${POSJ[i]}</text>`).join('');
+  return`<svg class="fld" id="fld" viewBox="-72 -70 144 80" aria-label="打球の方向をタップ">
+    <rect x="-72" y="-70" width="144" height="80" fill="#cfdcc0"/>
+    <path d="M0 0 L-44.55 -44.55 A63 63 0 0 1 44.55 -44.55 Z" fill="#9cc58a"/>
+    <path d="M0 0 L-44.55 -44.55 A63 63 0 0 1 44.55 -44.55" fill="none" stroke="#5f8a4f" stroke-width="1.2"/>
+    <circle cx="0" cy="-17" r="23" fill="#d9b98c"/>
+    <path d="M0 0 L16.3 -16.3 L0 -32.6 L-16.3 -16.3 Z" fill="#9cc58a"/>
+    <circle cx="0" cy="-15.6" r="2" fill="#d9b98c"/>
+    <path d="M0 0 L-70 -70 M0 0 L70 -70" stroke="#fff" stroke-width=".6"/>
+    ${BASES.map(([x,z])=>`<rect x="${x-1.1}" y="${-z-1.1}" width="2.2" height="2.2" fill="#fff" transform="rotate(45 ${x} ${-z})"/>`).join('')}
+    ${fp}${mk}</svg>`;
+}
+function autoF(st){
+  if(!st.fAuto)return;
+  const res=st.res;if(!res||!st.bb||st.bb.x==null){if(st.fAuto)st.f=[];return}
+  const n=nearestPos(st.bb.x,st.bb.z);
+  if(['GO'].includes(res))st.f=n===3?[3]:[n,3];
+  else if(res==='DP')st.f=n===6||n===5?[n,4,3]:n===4||n===3?[n,6,3]:[n,6,3];
+  else if(res==='SH')st.f=n===3?[3]:[n,3];
+  else st.f=[n];
+}
+function mRes(){
+  const st=ui.m,s=S;
+  const groups=['安打','アウト','出塁'];
+  let h=`<h3>打球・結果　<span class="muted">${esc(batterName())}</span></h3>
+    <div class="lbl">打球が飛んだところをタップ</div>${fieldSvg(st)}
+    <div class="lbl">打球の種類</div><div class="chips">${Object.entries(TY).map(([k,l])=>`<button data-a="ty" data-v="${k}" aria-pressed="${st.bb&&st.bb.ty===k}">${l}</button>`).join('')}</div>
+    <div class="lbl">結果</div>`;
+  groups.forEach(g=>{h+=`<div class="chips" style="margin-bottom:5px">${INPLAY.filter(k=>RES[k].g===g).map(k=>`<button data-a="res" data-v="${k}" aria-pressed="${st.res===k}"${k==='DP'&&!s.bases.some(Boolean)||k==='SF'&&!s.bases[2]||k==='FC'&&!s.bases.some(Boolean)?' disabled':''}>${RES[k].l}</button>`).join('')}</div>`});
+  if(st.res){
+    h+=`<div class="lbl">ボールを捕った・送球した守備（順にタップ。例 6→3）</div>
+      <div class="chips">${POSJ.map((p,i)=>`<button data-a="fp" data-v="${i+1}">${i+1} ${p}</button>`).join('')}<button data-a="fclr">クリア</button></div>
+      <div class="sum">守備：${st.f.length?st.f.map(n=>POSJ[n-1]).join('→'):'なし'}　→　「${esc(paText({res:st.res,f:st.f,bb:st.bb}))}」</div>
+      <div class="lbl">ランナーと打者がどこまで進んだか</div>${runnerRows(st,true)}`;
+    const c=checkMoves(st.m,true);
+    if(c.err)h+=`<div class="warn">${c.err}</div>`;else h+=`<div class="sum">アウト ${c.outs}つ・得点 ${c.runs}</div>`;
+    if(!c.err&&S.outs+c.outs>3)h+=`<div class="warn">アウトが4つ以上になっています</div>`;
+  }
+  const ok=st.res&&!checkMoves(st.m,true).err;
+  h+=`<div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="resOk"${ok?'':' disabled'}>確定</button></div>`;
+  return h;
+}
+function mOther(){
+  const st=ui.m;
+  let h=`<h3>その他の結果　<span class="muted">${esc(batterName())}</span></h3><div class="chips">${['HBP','IBB','KWP'].map(k=>`<button data-a="ores" data-v="${k}" aria-pressed="${st.res===k}">${RES[k].l}</button>`).join('')}</div>
+    <p class="muted">四球・三振はボール・ストライクの入力で自動で決まります。振り逃げは3つめの空振りを含めてここで入れてください。</p>`;
+  if(st.res){h+=`<div class="lbl">ランナーと打者</div>${runnerRows(st,true)}`;const c=checkMoves(st.m,true);if(c.err)h+=`<div class="warn">${c.err}</div>`}
+  const ok=st.res&&!checkMoves(st.m,true).err;
+  return h+`<div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="otherOk"${ok?'':' disabled'}>確定</button></div>`;
+}
+function mRun(){
+  const st=ui.m;
+  let h=`<h3>走者の動き（投球と投球のあいだ）</h3><div class="chips">${WHY.map(w=>`<button data-a="why" data-v="${w}" aria-pressed="${st.why===w}">${w}</button>`).join('')}</div>
+    <p class="muted">暴投・捕逸はその球（ボールなど）を入れてから、ここで走者を進めてください。</p>`;
+  if(st.why){h+=`<div class="lbl">ランナー</div>${runnerRows(st,false)}`;const c=checkMoves(st.m,false);if(c.err)h+=`<div class="warn">${c.err}</div>`;else h+=`<div class="sum">アウト ${c.outs}つ・得点 ${c.runs}</div>`}
+  const c=st.why?checkMoves(st.m,false):{err:1};
+  const moved=st.why&&[0,1,2].some(i=>S.bases[i]&&st.m.r[i]!=null&&st.m.r[i]!==i+1);
+  return h+`<div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="runOk"${!c.err&&moved?'':' disabled'}>確定</button></div>`;
+}
+function mChg(){
+  const st=ui.m,s=S,r=R();
+  let h=`<h3>交代</h3><div class="chips"><button data-a="ckind" data-v="sub" aria-pressed="${st.kind==='sub'}">選手交代（代打・代走・守備）</button><button data-a="ckind" data-v="pc" aria-pressed="${st.kind==='pc'}">ピッチャー交代</button></div>`;
+  if(st.kind==='sub'){
+    h+=`<div class="lbl">チーム</div><div class="chips">${[0,1].map(t=>`<button data-a="cteam" data-v="${t}" aria-pressed="${st.team===t}">${esc(r.teams[t].name)}${t===s.half?'（攻撃）':'（守備）'}</button>`).join('')}</div>
+      <div class="lbl">打順（入れかわる選手）</div><div class="chips">${s.lu[st.team].map((p,i)=>`<button data-a="cslot" data-v="${i}" aria-pressed="${st.slot===i}">${i+1} ${esc(pname(s.lu[st.team],i))}</button>`).join('')}</div>
+      <div class="frm" style="margin-top:10px"><label>新しく入る選手の名前</label><input type="text" id="cName" value="${esc(st.name||'')}">
+      <label>守備位置</label><select id="cPos">${POSOPT.map(o=>`<option value="${o}" ${st.pos===o?'selected':''}>${o||'-'}</option>`).join('')}</select></div>`;
+  }else if(st.kind==='pc'){
+    const ft=1-s.half;
+    h+=`<div class="lbl">${esc(r.teams[ft].name)} の新しいピッチャー（今守っている選手から選ぶか、名前を入れる）</div>
+      <div class="chips">${s.lu[ft].map((p,i)=>p.pos==='投'?'':`<button data-a="cpick" data-v="${esc(pname(s.lu[ft],i))}" aria-pressed="${st.name===pname(s.lu[ft],i)}">${esc(p.pos||'-')} ${esc(pname(s.lu[ft],i))}</button>`).join('')}</div>
+      <div class="frm" style="margin-top:10px"><input type="text" id="cName" value="${esc(st.name||'')}" placeholder="名前"></div>`;
+  }
+  return h+`<div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="chgOk"${st.kind?'':' disabled'}>確定</button></div>`;
+}
+function mConfirm(){const st=ui.m;return`<h3>${esc(st.title)}</h3><p>${esc(st.text)}</p><div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="${st.ok}" data-id="${st.id||''}">${esc(st.okl||'OK')}</button></div>`}
+function mInfo(){const st=ui.m;return`<h3>${esc(st.title)}</h3><p style="line-height:1.6">${st.html}</p><div class="acts"><button data-a="close">閉じる</button>${st.link?`<a href="${st.link}" class="ok" style="flex:1;text-align:center;text-decoration:none;border-radius:12px;padding:13px 0;font-weight:700;background:var(--navy);color:#fff">野球場へ</a>`:''}</div>`}
+function renderModal(){
+  const md=$('#modal');
+  if(!ui.m){md.innerHTML='';return}
+  const sc=md.querySelector('.sheet');const top=sc?sc.scrollTop:0;
+  const f={res:mRes,other:mOther,run:mRun,chg:mChg,confirm:mConfirm,info:mInfo}[ui.m.type];
+  md.innerHTML=`<div class="ov" data-a="ovclose"><div class="sheet" role="dialog">${f()}</div></div>`;
+  const ns=md.querySelector('.sheet');if(ns&&sc)ns.scrollTop=top;
+  const fld=$('#fld');if(fld)fld.addEventListener('click',onField);
+}
+function onField(e){
+  const svg=e.currentTarget,pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
+  const p=pt.matrixTransform(svg.getScreenCTM().inverse());
+  const st=ui.m;const x=Math.round(p.x*10)/10,z=Math.round(-p.y*10)/10;
+  st.bb={ty:st.bb&&st.bb.ty||guessTy(st.res,x,z),x,z};
+  if(!st.res){const d=Math.hypot(x,z);if(d>=63&&Math.abs(Math.atan2(x,z))<Math.PI/4)setRes(st,'HR')}
+  autoF(st);renderModal();
+}
+function guessTy(res,x,z){if(res&&RES[res].ty)return RES[res].ty;const d=Math.hypot(x,z);return d<8?'B':d<34?'G':'F'}
+function setRes(st,k){
+  st.res=k;st.m=defMoves(k,S.bases);
+  if(RES[k].ty&&(!st.bb||!st.tyManual)){st.bb=st.bb?{...st.bb,ty:RES[k].ty}:{ty:RES[k].ty,x:null,z:null};if(k==='1B'&&st.bb.x!=null&&Math.hypot(st.bb.x,st.bb.z)<34)st.bb.ty='G'}
+  autoF(st);
+}
+
+/* ---------- 操作 ---------- */
+function push(ev){
+  const r=R(),s=S;ev.i=s.inn;ev.h=s.half;ev.s=s.cur?s.cur.slot:s.next[s.half];ev.o=s.outs;ev.bs=s.bases.map(x=>x?1:0).join('');
+  r.events.push(ev);touch();recalc();
+}
+let toastT=0;function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2200)}
+function act(a,d,el,ev0){
+  const r=R();
+  switch(a){
+    case'new':{const n=newRec();recs.push(n);save();ui.id=n.id;ui.view='game';ui.tab='setup';recalc();break}
+    case'open':ui.id=d.id;ui.view='game';ui.tab=R().events.length?'live':'setup';recalc();break;
+    case'del':ui.m={type:'confirm',title:'記録を削除',text:'この試合の記録を消します。元に戻せません。',ok:'delYes',okl:'削除する',id:d.id};break;
+    case'delYes':recs=recs.filter(x=>x.id!==d.id);save();ui.m=null;break;
+    case'replay':{try{localStorage.setItem(QKEY,JSON.stringify({id:d.id,t:Date.now()}));localStorage.setItem(RSKEY,String(Date.now()))}catch(e){}
+      ui.m={type:'info',title:'野球場で再生します',html:'河川敷の野球場に戻ると、この試合が最初から1球ずつ再生されます（夜でもナイターで再生します）。<br>壁紙にしている場合も、次に壁紙が表示されたときに始まります。',link:'./'};break}
+    case'io':ui.view='io';break;
+    case'copyOut':{const t=$('#ioOut');t.select();(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).then(()=>toast('コピーしました')).catch(()=>{try{document.execCommand('copy');toast('コピーしました')}catch(e){toast('長押しでコピーしてください')}});return}
+    case'doImport':{let v;try{v=JSON.parse($('#ioIn').value)}catch(e){toast('読み込めませんでした');return}if(!Array.isArray(v))v=[v];let n=0;
+      v.forEach(x=>{if(!x||!x.id||!x.teams||!x.events)return;const i=recs.findIndex(y=>y.id===x.id);if(i<0){recs.push(x);n++}else if((x.updated||0)>=(recs[i].updated||0)){recs[i]=x;n++}});save();toast(`${n}試合を読み込みました`);ui.view='list';break}
+    case'tab':ui.tab=d.v;break;
+    case'p':if(S.over)return;push({t:'p',k:d.k});break;
+    case'openRes':ui.m={type:'res',res:null,bb:null,f:[],fAuto:true,m:{b:1,r:[null,null,null]}};break;
+    case'openOther':ui.m={type:'other',res:null,m:{b:1,r:[null,null,null]}};break;
+    case'openRun':ui.m={type:'run',why:null,m:{r:[null,null,null]}};break;
+    case'openChg':ui.m={type:'chg',kind:null,team:S.half,slot:S.cur?S.cur.slot:S.next[S.half],name:'',pos:''};break;
+    case'close':ui.m=null;break;
+    case'ovclose':if(ev0&&el===ev0.target&&!['res','other','run','chg'].includes(ui.m&&ui.m.type))ui.m=null;else return;break;
+    case'ty':ui.m.bb={...(ui.m.bb||{x:null,z:null}),ty:d.v};ui.m.tyManual=true;break;
+    case'res':setRes(ui.m,d.v);break;
+    case'fp':if(ui.m.fAuto){ui.m.f=[];ui.m.fAuto=false}ui.m.f.push(+d.v);break;
+    case'fclr':ui.m.f=[];ui.m.fAuto=false;break;
+    case'mv':{const st=ui.m,dd=+d.d;if(d.w==='b')st.m.b=dd;else st.m.r[+d.w]=dd;break}
+    case'resOk':{const st=ui.m;if(!st.res||checkMoves(st.m,true).err)return;
+      const bb=st.bb&&st.bb.x!=null?{ty:st.bb.ty||RES[st.res].ty,x:st.bb.x,z:st.bb.z}:(st.bb&&st.bb.ty?{ty:st.bb.ty}:null);
+      push({t:'pa',res:st.res,f:st.f.slice(),bb,m:norm(st.m)});ui.m=null;break}
+    case'ores':{ui.m.res=d.v;ui.m.m=defMoves(d.v,S.bases);break}
+    case'otherOk':{const st=ui.m;if(!st.res||checkMoves(st.m,true).err)return;push({t:'pa',res:st.res,f:[],bb:null,m:norm(st.m)});ui.m=null;break}
+    case'why':{const st=ui.m;st.why=d.v;const s=S,r0=[null,null,null];
+      if(['盗塁','暴投','捕逸','ボーク'].includes(d.v)){for(let i=0;i<3;i++)if(s.bases[i])r0[i]=i+2}
+      else if(['盗塁死','牽制死'].includes(d.v)){const i=s.bases[0]?0:s.bases[1]?1:2;r0[i]=0}
+      st.m={r:r0};break}
+    case'runOk':{const st=ui.m;push({t:'run',why:st.why,m:norm(st.m)});ui.m=null;break}
+    case'ckind':ui.m.kind=d.v;ui.m.name='';break;
+    case'cteam':ui.m.team=+d.v;break;
+    case'cslot':{ui.m.slot=+d.v;const p=S.lu[ui.m.team][ui.m.slot];ui.m.pos=p?p.pos:'';break}
+    case'cpick':ui.m.name=d.v;break;
+    case'chgOk':{const st=ui.m,nm=($('#cName')||{}).value||st.name;if(!nm.trim()){toast('名前を入れてください');return}
+      if(st.kind==='sub')push({t:'sub',team:st.team,slot:st.slot,name:nm.trim(),pos:($('#cPos')||{}).value||''});
+      else push({t:'pc',team:1-S.half,name:nm.trim()});ui.m=null;break}
+    case'undo':{if(!r||!r.events.length)return;r.events.pop();touch();recalc();toast('1つ戻しました');break}
+    case'endAsk':ui.m={type:'confirm',title:'試合終了',text:'ここで試合終了にしますか？（あとで「取り消す」で戻せます）',ok:'endYes',okl:'試合終了'};break;
+    case'endYes':push({t:'end'});ui.m=null;break;
+    case'cap':r.teams[+d.t].cap=d.v;touch();recalc();break;
+    case'girl':{const p=r.teams[+d.t].lineup[+d.i];p.girl=!p.girl;touch();recalc();break}
+    default:return;
+  }
+  render();
+}
+function norm(m){return{b:m.b,r:[0,1,2].map(i=>S.bases[i]?(m.r[i]==null?i+1:m.r[i]):null)}}
+document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el||el.disabled)return;act(el.dataset.a,el.dataset,el,e)});
+document.addEventListener('change',e=>{const el=e.target,k=el.dataset.k,r=R();if(!k||!r)return;
+  if(k==='date')r.date=el.value;else if(k==='place')r.place=el.value;else if(k==='innings')r.innings=+el.value;
+  else if(k==='tname')r.teams[+el.dataset.t].name=el.value||'チーム';
+  else if(k==='pn')r.teams[+el.dataset.t].lineup[+el.dataset.i].name=el.value.trim();
+  else if(k==='pp')r.teams[+el.dataset.t].lineup[+el.dataset.i].pos=el.value;
+  touch();recalc();$('#hTitle').textContent=`${r.teams[0].name} vs ${r.teams[1].name}`;
+  if(k==='pp')render();
+});
+document.addEventListener('input',e=>{const el=e.target;if(el.id==='cName'&&ui.m)ui.m.name=el.value;if(el.id==='cPos'&&ui.m)ui.m.pos=el.value});
+$('#hBack').addEventListener('click',()=>{if(ui.m){ui.m=null}else{ui.view='list';ui.id=null}render()});
+window.addEventListener('storage',e=>{if(e.key===RKEY){load();recalc();render()}});
+load();render();
+</script>
+</body></html>

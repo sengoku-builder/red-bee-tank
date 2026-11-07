@@ -738,7 +738,7 @@ function placeCoaches(t){
   if(t.preCo){const pc=t.preCo;t.preCo=null;t.all.forEach(k=>{k.pre=false});
     Object.entries(pc).forEach(([b,k])=>{t.bcoach[b]=k;k.role='CO';k.helmet=true;k.idlePose='stand';k.idleFace=b==='3'?'r':'l'});
     if(Object.keys(t.bcoach).length===2)return;}
-  const cand=t.all.filter(k=>!k.role&&!t.kids.includes(k));
+  const cand=t.all.filter(k=>!k.role&&!t.kids.includes(k)&&!t.order.includes(k));
   const pool=cand.length>=2?cand:t.all.filter(k=>!k.role&&k!==peekNext(t));
   [3,1].forEach((b,i)=>{if(t.bcoach[b])return;const k=pool.filter(k=>!Object.values(t.bcoach).includes(k))[0];if(!k)return;k.role='CO';k.helmet=true;k.idlePose='stand';k.idleFace=b===3?'r':'l';t.bcoach[b]=k;k.walkTo(CBOX[b][0],CBOX[b][1],3.6)});
 }
@@ -1784,7 +1784,7 @@ async function halfInning(bat,fld,res){
 function nthNext(t,n){const out=[];for(let i=0;i<9&&out.length<=n;i++){const k=t.order[(t.bi+i)%9];if(!out.includes(k))out.push(k)}return out[n]}
 function preBat(t){
   const lead=nthNext(t,0),od=nthNext(t,1);
-  const cand=t.all.filter(k=>!t.kids.includes(k));
+  const cand=t.all.filter(k=>!t.kids.includes(k)&&!t.order.includes(k));
   const pool=cand.length>=2?cand:t.all.filter(k=>k!==lead&&k!==od);
   t.preCo={};[3,1].forEach((b,i)=>{const k=pool[i];if(k)t.preCo[b]=k});
   const go=(k,role,x,z,face,pose)=>{if(!k)return;const[bx,bz]=benchPos(t,k);k.pre=true;
@@ -1889,10 +1889,13 @@ function recTeam(tr,side){
   const mk=(p,i)=>{const e={};SKK.forEach(k=>e[k]=62);return new Ent({sk:e,name:(p&&p.name)||`${i+1}ばん`,girl:!!(p&&p.girl),num:i+1,team:def,size:rnd(.88,1.08),lefty:!!(p&&p.left),spd:4.5+rnd(-.2,.2)})};
   const lu=(tr.lineup||[]).slice(0,9);while(lu.length<9)lu.push({});
   const order=lu.map(mk),kids=new Array(9).fill(null);
-  order.forEach((k,i)=>{const pi=POSJ.indexOf(lu[i].pos);if(pi>=0&&!kids[pi])kids[pi]=k});
-  const rest=order.filter(k=>!kids.includes(k));for(let i=0;i<9;i++)if(!kids[i])kids[i]=rest.shift();
-  const used=new Set(order.map(k=>k.name)),subs=[];
-  for(const n of shuffle(BOY_NAMES)){if(subs.length>=3)break;if(used.has(n))continue;subs.push(mk({name:n},9+subs.length))}
+  // DH制：打順外のピッチャーがマウンドに立ち、DHの子は打つだけ（守備はしない）
+  const dh=order.filter((k,i)=>lu[i].pos==='DH');
+  if(dh.length){const pp=tr.dhp||{};kids[0]=mk({name:pp.name||'ピッチャー',girl:pp.girl},9)}
+  order.forEach((k,i)=>{if(dh.includes(k))return;const pi=POSJ.indexOf(lu[i].pos);if(pi>=0&&!kids[pi])kids[pi]=k});
+  const rest=order.filter(k=>!kids.includes(k)&&!dh.includes(k));for(let i=0;i<9;i++)if(!kids[i])kids[i]=rest.shift()||mk({},9+i);
+  const used=new Set(order.map(k=>k.name).concat(kids.map(k=>k.name))),subs=dh.slice();
+  for(const n of shuffle(BOY_NAMES)){if(subs.length>=3+dh.length)break;if(used.has(n))continue;subs.push(mk({name:n},9+subs.length))}
   const t=finishTeam(def,side,kids,subs,false,null);t.order=order;t.chem=.6;t.pitchers=[kids[0]];return t;
 }
 function rpTeams(){const rec=G.rp.rec;return{away:recTeam(rec.teams[0],1),home:recTeam(rec.teams[1],-1)}}

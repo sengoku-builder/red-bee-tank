@@ -166,7 +166,8 @@ function touch(){const r=R();if(r)r.updated=Date.now();save()}
 
 /* ---------- 試合の進行（記録から毎回組み立てる） ---------- */
 function pname(lu,slot){const p=lu[slot];return(p&&p.name)||`${slot+1}番打者`}
-function pitcherOf(t){const p=t.lineup.find(x=>x.pos==='投');return p&&p.name?p.name:'ピッチャー'}
+function hasDH(t){return t.lineup.some(x=>x.pos==='DH')}
+function pitcherOf(t){if(hasDH(t))return(t.dhp&&t.dhp.name)||'ピッチャー';const p=t.lineup.find(x=>x.pos==='投');return p&&p.name?p.name:'ピッチャー'}
 function defMoves(res,bases){
   const o=bases.map(Boolean),r=[null,null,null];
   const stay=()=>{for(let i=0;i<3;i++)if(o[i])r[i]=i+1};
@@ -392,7 +393,9 @@ function vSetup(){
       <div><label>帽子の色（野球場で再生するときの色）</label><div class="caps">${CAPS.map(c=>`<button data-a="cap" data-t="${ti}" data-v="${c.k}" style="background:${c.c}" aria-pressed="${t.cap===c.k}" aria-label="${c.k}"></button>`).join('')}</div></div>
       <div><label>打順・名前・守備・女子</label>${t.lineup.map((p,i)=>`<div class="lu"><span class="n">${i+1}</span><input type="text" data-k="pn" data-t="${ti}" data-i="${i}" value="${esc(p.name)}" placeholder="${i+1}番打者">
         <select data-k="pp" data-t="${ti}" data-i="${i}">${POSOPT.map(o=>`<option value="${o}" ${p.pos===o?'selected':''}>${o||'-'}</option>`).join('')}</select>
-        <button data-a="girl" data-t="${ti}" data-i="${i}" aria-pressed="${!!p.girl}">女子</button></div>`).join('')}</div></div></div>`;
+        <button data-a="girl" data-t="${ti}" data-i="${i}" aria-pressed="${!!p.girl}">女子</button></div>`).join('')}</div>
+      ${hasDH(t)?`<div><label>ピッチャー（DH制・打順に入らない）</label><div class="lu"><span class="n">投</span><input type="text" data-k="dhp" data-t="${ti}" value="${esc((t.dhp&&t.dhp.name)||'')}" placeholder="ピッチャーの名前"><span></span>
+        <button data-a="dhgirl" data-t="${ti}" aria-pressed="${!!(t.dhp&&t.dhp.girl)}">女子</button></div></div>`:''}</div></div>`;
   });
   return h+`<p class="muted">途中の選手交代・ピッチャー交代は「速報」の「交代」から入れてください（ここを変えると試合の最初からの記録に反映されます）。</p>`;
 }
@@ -575,6 +578,7 @@ function act(a,d,el,ev0){
     case'endYes':push({t:'end'});ui.m=null;break;
     case'cap':r.teams[+d.t].cap=d.v;touch();recalc();break;
     case'girl':{const p=r.teams[+d.t].lineup[+d.i];p.girl=!p.girl;touch();recalc();break}
+    case'dhgirl':{const t=r.teams[+d.t];t.dhp=t.dhp||{name:''};t.dhp.girl=!t.dhp.girl;touch();recalc();break}
     default:return;
   }
   render();
@@ -586,6 +590,7 @@ document.addEventListener('change',e=>{const el=e.target,k=el.dataset.k,r=R();if
   else if(k==='tname')r.teams[+el.dataset.t].name=el.value||'チーム';
   else if(k==='pn')r.teams[+el.dataset.t].lineup[+el.dataset.i].name=el.value.trim();
   else if(k==='pp')r.teams[+el.dataset.t].lineup[+el.dataset.i].pos=el.value;
+  else if(k==='dhp'){const t=r.teams[+el.dataset.t];t.dhp=t.dhp||{};t.dhp.name=el.value.trim()}
   touch();recalc();$('#hTitle').textContent=`${r.teams[0].name} vs ${r.teams[1].name}`;
   if(k==='pp')render();
 });

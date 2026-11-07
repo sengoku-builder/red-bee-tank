@@ -339,7 +339,7 @@ function vList(){
   for(const r of list){const s=sim(r),[a,b]=scoreOf(s),st=s.over?(ENDW[s.endWhy]||'試合終了'):r.events.length?`${innLabel(s.inn,s.half)}まで`:'未開始';
     h+=`<div class="gi"><div class="muted">${esc(r.date)}${r.place?'　'+esc(r.place):''}　${st}${q&&q.id===r.id?'　<b style="color:#2f6b4a">▶ 再生予約中</b>':''}</div>
       <div class="t">${esc(r.teams[0].name)} vs ${esc(r.teams[1].name)}</div><div class="sc">${a} - ${b}</div>
-      <div class="bt"><button class="pri" data-a="open" data-id="${r.id}">開く</button>${r.events.length?`<button class="rp" data-a="replay" data-id="${r.id}">野球場で再生</button>`:''}<button class="danger" data-a="del" data-id="${r.id}">削除</button></div></div>`}
+      <div class="bt"><button class="pri" data-a="open" data-id="${r.id}">開く</button>${q&&q.id===r.id?`<button data-a="stopRp" data-id="${r.id}">再生をやめる</button>`:''}${r.events.length?`<button class="rp" data-a="replay" data-id="${r.id}">野球場で再生</button>`:''}<button class="danger" data-a="del" data-id="${r.id}">削除</button></div></div>`}
   h+=`</div><div style="margin-top:14px;text-align:center"><button class="ib" data-a="io">記録の書き出し・読み込み（PCへ移すとき）</button></div>`;
   return h;
 }
@@ -598,6 +598,7 @@ function act(a,d,el,ev0){
     case'delYes':recs=recs.filter(x=>x.id!==d.id);save();ui.m=null;break;
     case'replay':{try{localStorage.setItem(QKEY,JSON.stringify({id:d.id,t:Date.now()}));localStorage.setItem(RSKEY,String(Date.now()))}catch(e){}
       ui.m={type:'info',title:'野球場で再生します',html:'河川敷の野球場に戻ると、この試合が最初から1球ずつ再生されます（夜でもナイターで再生します）。<br>壁紙にしている場合も、次に壁紙が表示されたときに始まります。',link:'./'};break}
+    case'stopRp':{try{localStorage.removeItem(QKEY);localStorage.setItem(RSKEY,String(Date.now()))}catch(e){}ui.m={type:'info',title:'再生をやめました',html:'河川敷の野球場は、元の少年野球の試合（キャプテンのじゃんけんから）に戻ります。記録はそのまま残っています。',link:'./'};break}
     case'io':ui.view='io';break;
     case'copyOut':{const t=$('#ioOut');t.select();(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).then(()=>toast('コピーしました')).catch(()=>{try{document.execCommand('copy');toast('コピーしました')}catch(e){toast('長押しでコピーしてください')}});return}
     case'doImport':{let v;try{v=JSON.parse($('#ioIn').value)}catch(e){toast('読み込めませんでした');return}if(!Array.isArray(v))v=[v];let n=0;

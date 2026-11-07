@@ -142,6 +142,7 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
       </div>
     </div>
     <button class="appbtn" id="bTeams" style="background:#2f6b4a">チーム・成績</button>
+    <a class="appbtn" href="sokuho.html" style="background:#c0392b;text-align:center;text-decoration:none">一球速報（記録・野球場で再生）</a>
     <button class="appbtn" id="bRestart" style="background:#8a5a34">試合を最初からやり直す</button>
     <div id="appBox" hidden><button class="appbtn" id="bWp">この野球場を壁紙にする</button></div>
     <p class="note">朝練7:00〜、試合8:30〜17:00、整備〜17:40、夕方以降は誰もいないグラウンドになります。スマホでは指で左右に見回せます。</p>
@@ -169,7 +170,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261107045817';
+const BUILD='20261107115520';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 if(WALL)document.body.classList.add('wp');
@@ -386,7 +387,7 @@ function st(k,key,n=1){const b=bx(k);if(b)b[key]+=n}
 function appear(k,pitch=false){const b=bx(k);if(!b)return;b.g=1;if(pitch)b.pg=1}
 function bv(k,key){const b=bx(k);return b?b[key]:0}
 function addOut(){G.outs++;st(fielder('P'),'po');updateHUD();if(G.outs===3&&!G.walkoff&&willContinue())changeRun()}
-function willContinue(){const m=COLD[G.inning],d=G.score[0]-G.score[1];
+function willContinue(){if(G.rp)return rpHasMore();const m=COLD[G.inning],d=G.score[0]-G.score[1];
   if(G.top)return!((G.inning>=LAST&&d>0)||(m&&d>=m));
   return!(G.inning>=LAST||(m&&Math.abs(d)>=m)||(phaseAt(hourNow())!=='game'&&G.inning>=2))}
 function chainGo(k,steps,after){k.chain=(k.chain||0)+1;const my=k.chain;(async()=>{for(const st of steps){if(typeof st==='function'){st();continue}if(st.wait){await sleep(st.wait);if(k.chain!==my)return;continue}await k.goto(st[0],st[1],st[2]);if(k.chain!==my)return}if(after)after()})()}
@@ -398,7 +399,7 @@ function changeRun(){const nf=G.bat;if(!nf)return;
     chainGo(k,[[bx,bz,4.4],()=>{k.helmet=false},{wait:.4},[x,z,5.4]],()=>{k.toPos=false})});
   nf.kids.forEach((k,i)=>{if(k.role||k.toPos)return;const[x,z]=POS[POSN[i]];k.chain=(k.chain||0)+1;const my=k.chain;k.toPos=true;k.helmet=false;k.carry=null;k.idlePose='ready';k.idleFace='f';k.goto(x,z,4.6).then(()=>{if(k.chain===my)k.toPos=false})})}
 function commitGame(){
-  if(!REC)return;
+  if(!REC||G.rp)return;
   const sh=G.score[0],sa=G.score[1];
   if(sh!==sa){const win=sh>sa?G.home:G.away,lose=sh>sa?G.away:G.home;
     st(win.pitchers.slice().sort((a,b)=>bv(b,'po')-bv(a,'po'))[0],'w');
@@ -447,7 +448,7 @@ function updateHUD(){
     [['#lsA',1,G.away],['#lsH',0,G.home]].forEach(([id,ti,t])=>{const tds=document.querySelectorAll(id+' td');tds[0].textContent=t.def.name;
       for(let i=0;i<6;i++){const v=(G.line&&G.line[ti][i]);tds[i+1].textContent=v==null?'':v;tds[i+1].classList.toggle('now',!G.pre&&!G.over&&G.inning===i+1&&(ti===1)===G.top)}
       tds[7].textContent=G.score[ti]});
-    $('#inn').textContent=G.pre?'まもなく試合':G.over?(G.cold?'コールドゲーム':'試合終了'):`${G.inning}回${G.top?'オモテ':'ウラ'}`;
+    $('#inn').textContent=G.pre?'まもなく試合':G.over?(G.cold?'コールドゲーム':'試合終了'):`${G.inning}回${G.top?'オモテ':'ウラ'}`+(G.rp?'・記録再生':'');
     $('#bso').hidden=!!(G.pre||G.over);
     updateDia();
     const rows=document.querySelectorAll('#bso .lr');[G.balls||0,G.strikes||0,Math.min(2,G.outs||0)].forEach((n,r)=>rows[r].querySelectorAll('.lp').forEach((l,i)=>l.classList.toggle('on',i<n)));
@@ -520,7 +521,7 @@ function scoreRun(k){
   const bk=benchKids(t);bk.forEach(b=>b.setPose('cheer',2.2));
   say(pick(bk)||k,pick(['ナイスラン!','ホームイン!','やったー!']),1);
   t.parents.forEach(p=>p.setPose('cheer',2));
-  if(!G.top){const lead=G.score[0]-G.score[1];if(G.inning>=LAST&&lead>0){G.walkoff='sayonara';spot([0,0],3)}else if(COLD[G.inning]&&lead>=COLD[G.inning])G.walkoff='cold'}
+  if(!G.top&&!G.rp){const lead=G.score[0]-G.score[1];if(G.inning>=LAST&&lead>0){G.walkoff='sayonara';spot([0,0],3)}else if(COLD[G.inning]&&lead>=COLD[G.inning])G.walkoff='cold'}
 }
 
 /* ---------- plays ---------- */
@@ -1617,7 +1618,9 @@ async function atBat(res){
   const bat=G.bat,fld=G.field,p=fielder('P'),c=fielder('C');
   resetFielders();
   let batter=res&&bat.all[res.batter];
-  if(!batter){batter=nextBatter(bat);batter=await pinchHit(bat,batter)}
+  if(G.rp&&!res){const pk=rpNextPlay();if(!pk){G.walkoff='end';return}
+    if(pk.i!==G.inning||pk.h!==(G.top?0:1)){console.warn('replay desync',pk,G.inning,G.top);G.outs=3;updateHUD();return}}
+  if(!batter){if(G.rp){const pk=rpNextPA()||rpNextPlay();batter=bat.order[pk.s]||nextBatter(bat);bat.bi=pk.s+1}else{batter=nextBatter(bat);batter=await pinchHit(bat,batter)}}
   batter.chain=(batter.chain||0)+1;batter.pre=false;
   const bs=batter.lefty?1:-1,bface=batter.lefty?'l':'r';
   G.ump.walkTo(bs*.55,-2.6,1.6);
@@ -1630,7 +1633,7 @@ async function atBat(res){
   let plan=null;
   let cs2=strikes>=2,cb3=balls>=3;const cnt=['ノー','ワン','ツー','スリー'];
   const countCall=()=>{(async()=>{if(!cs2&&strikes>=2){cs2=true;await sleep(.9);G.ump.setPose('count',1.4);say(G.ump,`${cnt[balls]}ボール、ツーストライク!`,2)}else if(!cb3&&balls===3){cb3=true;await sleep(.9);G.ump.setPose('count',1.4);say(G.ump,`スリーボール、${cnt[Math.min(2,strikes)]}ストライク!`,2)}})()};
-  if(res){}else if(G.outs<2&&G.bases[2]&&chance(.16))plan='squeeze';
+  if(res||G.rp){}else if(G.outs<2&&G.bases[2]&&chance(.16))plan='squeeze';
   else if(G.outs<2&&(G.bases[0]||G.bases[1])&&!G.bases[2]&&chance(.2))plan='bunt';
   if(plan){bat.coach.setPose('sign',1.6,bat.side<0?'r':'l');await sleep(.6);bat.coach.setPose('sign',1.2,bat.side<0?'r':'l');await sleep(1.4);batter.setPose('stand',.6,'l');await sleep(.6)}
   while(true){
@@ -1649,8 +1652,10 @@ async function atBat(res){
     if(G.needPlay){await readyForPlay();await sleep(.4);doPlayCall();await sleep(.9)}
     await sleep(rnd(1.1,2.2));
     if(chance(.5))say(pick(fld.kids.filter(k=>k.role!=='P')),chance(.55)?'バッチこーい!':pick(['打たせていこー!','ピッチャーがんばれー!','声出していこー!']),0);
-    if(!plan&&await (async()=>{G.inPlay=true;const r=await prePitch(p,c,bat);G.inPlay=false;return r})()){if(G.outs>=3)return;continue}
-    let steal=!plan&&balls<3&&strikes<2?pickSteal():null;
+    let rpEv=null;
+    if(G.rp){const r=await rpBetween(batter,bat);if(r==='ret')return;if(r==='cont')continue;rpEv=r}
+    if(!plan&&!G.rp&&await (async()=>{G.inPlay=true;const r=await prePitch(p,c,bat);G.inPlay=false;return r})()){if(G.outs>=3)return;continue}
+    let steal=!plan&&!G.rp&&balls<3&&strikes<2?pickSteal():null;
     leadOff();
     if(steal){bat.coach.setPose('sign',1.4,bat.side<0?'r':'l');await sleep(.9)}
     p.setPose('windup',.7,'f');G.ump.setPose('crouch',6,'b');
@@ -1662,6 +1667,7 @@ async function atBat(res){
     let out=r<pH?'hbp':r<pB?'ball':r<pB+.16?'look':r<pB+.16+pM?'miss':r<pB+.28+pM?'foul':'hit';
     if(steal&&!['ball','look','miss'].includes(out))out=chance(.5)?'ball':'look';
     if(steal&&steal.type==='home')out='look';
+    if(rpEv)out=rpEv.t==='p'?({B:'ball',S:'look',W:'miss',F:'foul'}[rpEv.k]||'ball'):rpEv.res==='HBP'?'hbp':rpEv.res==='KWP'?'kwp':'hit';
     if(out==='hbp'){
       await G.ball.flyTo(batter.x*.9,batter.z+.2,.7,.25,1.6,.9);G.ump.poseO=null;
       batter.fall(1.6,batter.lefty?1:-1,false);say(batter,'いたっ!',2);
@@ -1675,16 +1681,17 @@ async function atBat(res){
       await sleep(.3);await throwTo(c,p,10);playCall();return;
     }
     const bp=G.ball.flyTo(.05,-.95,.75,.3,1.6,.7);
-    if(out==='miss'||out==='foul'||out==='hit'){await sleep(.45);batter.setPose('swing',.75,bface)}
+    if(out==='miss'||out==='foul'||out==='hit'||out==='kwp'){await sleep(.45);batter.setPose('swing',.75,bface)}
+    if(out==='kwp'){await sleep(.08);G.ump.poseO=null;G.playRuns=0;say(G.ump,'ストライクスリー!',2);await playScripted(batter,rpEv);st(batter,'pa');st(batter,'ab');st(batter,'so');return}
     if(out==='hit'){
-      await sleep(.08);G.ump.poseO=null;G.playRuns=0;const res=await contact(batter);
+      await sleep(.08);G.ump.poseO=null;G.playRuns=0;const res=rpEv?await playScripted(batter,rpEv):await contact(batter);
       st(batter,'pa');st(batter,'ab');
       if(res==='1B'||res==='2B'||res==='3B'||res==='HR'){st(batter,'h');if(res==='HR')st(batter,'hr')}
       if(res!=='E')st(batter,'rbi',G.playRuns);
       if(res==='SF'){const b=bx(batter);if(b){b.ab--;b.sh++}}
       return;
     }
-    if(out==='foul'&&chance(.4)){
+    if(out==='foul'&&!G.rp&&chance(.4)){
       await sleep(.08);G.ump.poseO=null;
       const r=await foulFly(batter,c);
       if(r==='out'){st(batter,'pa');st(batter,'ab');sendToBench(bat,batter);await relayToPitcher();
@@ -1709,7 +1716,7 @@ async function atBat(res){
       await sleep(.4);await throwTo(G.ump,p,10);playCall();
       continue;
     }
-    const loose=out==='ball'&&balls<3&&G.bases.some(Boolean)?(chance(.015+.07*(1-sk(p,'thr')/100))?'wp':chance(.01+.06*(1-sk(c,'fld')/100))?'pb':null):null;
+    const loose=!G.rp&&out==='ball'&&balls<3&&G.bases.some(Boolean)?(chance(.015+.07*(1-sk(p,'thr')/100))?'wp':chance(.01+.06*(1-sk(c,'fld')/100))?'pb':null):null;
     await bp;G.ball.holder=c;c.setPose('squat',1.1,'b');backToBase();
     if(loose){balls++;G.balls=balls;updateHUD();say(G.ump,'ボール!',2);countCall();G.inPlay=true;await loosePitch(loose,p,c,bat);G.inPlay=false;if(G.walkoff||G.outs>=3)return;continue}
     if(out==='ball'){balls++;G.balls=Math.min(3,balls);updateHUD();say(G.ump,'ボール!',2);G.ump.setPose('crouch',.7,'b');if(balls<4)countCall();if(chance(.5))say(pick(benchKids(bat)),pick(['ナイスセン!','見えてるよー!']),0)}
@@ -1720,7 +1727,7 @@ async function atBat(res){
       G.playRuns=0;await walkBatter(batter);st(batter,'pa');st(batter,'bb');st(batter,'rbi',G.playRuns);
       await sleep(.3);await throwTo(c,p,10);return;
     }
-    if(strikes>=3&&!G.bases[0]&&chance(.03+.12*(1-sk(c,'fld')/100))){G.inPlay=true;await furinige(batter,p,c,out,bat);G.inPlay=false;return}
+    if(strikes>=3&&!G.rp&&!G.bases[0]&&chance(.03+.12*(1-sk(c,'fld')/100))){G.inPlay=true;await furinige(batter,p,c,out,bat);G.inPlay=false;return}
     if(strikes>=3){
       if(out==='look'){G.ump.setPose('strike3',1.8);say(G.ump,'ストライクスリー!',2)}else{G.ump.setPose('outCall',1.4);say(G.ump,'ストライクスリー!',2)}G.balls=G.strikes=0;
       st(batter,'pa');st(batter,'ab');st(batter,'so');st(p,'pk');addOut();
@@ -1730,7 +1737,7 @@ async function atBat(res){
       return;
     }
     await catcherReturn(c,p);
-    {const [r1,r2]=G.bases;if(r1&&!r2&&G.outs<3&&chance(.012+.03*sk(r1,'run')/100*(1-chem(G.field)))){G.inPlay=true;await stealPlay({type:'s2',delayed:true,thrower:p},c,p,bat);G.inPlay=false;if(G.outs>=3)return}}
+    {const [r1,r2]=G.bases;if(r1&&!r2&&!G.rp&&G.outs<3&&chance(.012+.03*sk(r1,'run')/100*(1-chem(G.field)))){G.inPlay=true;await stealPlay({type:'s2',delayed:true,thrower:p},c,p,bat);G.inPlay=false;if(G.outs>=3)return}}
   }
 }
 
@@ -1754,7 +1761,7 @@ async function halfInning(bat,fld,res){
   if(!res)await warmupPitches(fld);
   playCall();
   while(G.outs<3){
-    if(!res)await pitchingChange(fld);
+    if(!res&&!G.rp)await pitchingChange(fld);
     await atBat(res);res=null;
     if(G.walkoff)return;
   }
@@ -1814,7 +1821,11 @@ async function lineUp(mode){
 }
 
 async function playGame(){
-  let first=loadResume();const nx=first?null:G.next;G.next=null;
+  G.rp=null;
+  let first=loadResume();
+  if(first&&first.rp){G.rp=makeRp(first.rp.id,first.rp.i);if(!G.rp){clearResume();first=null}}
+  let nx=first?null:G.next;G.next=null;
+  if(!first){const q=rpReq();if(q){G.rp=makeRp(q.id,0);if(G.rp)nx=null;else rpDrop()}}
   try{setupGame(first,nx)}catch(e){console.error(e);clearResume();first=null;setupGame(null)}
   if(!first){
   G.pre=true;updateHUD();
@@ -1834,10 +1845,13 @@ async function playGame(){
     const m=COLD[G.inning];
     if(!(first&&!first.top)){
     G.top=true;await halfInning(G.away,G.home,first);first=null;
+    if(G.rp){if(G.walkoff||!rpHasMore()){if(G.outs>=3&&G.score[0]>G.score[1]){G.line[0][G.inning-1]='x';updateHUD()}break}}
+    else{
     if(G.inning>=LAST&&G.score[0]>G.score[1]){G.line[0][G.inning-1]='x';updateHUD();break}
     if(m&&G.score[0]-G.score[1]>=m){G.cold=true;G.line[0][G.inning-1]='x';updateHUD();break}
-    }
+    }}
     G.top=false;await halfInning(G.home,G.away,first);first=null;
+    if(G.rp){if(G.walkoff||!rpHasMore()){if(G.outs<3&&G.score[0]>G.score[1]){say(pick(benchKids(G.home))||G.home.coach,'サヨナラだー!',2);await sleep(1.2)}break}continue}
     if(G.walkoff==='sayonara'){say(pick(benchKids(G.home)),'サヨナラだー!',2);await sleep(1.2);break}
     if(G.walkoff==='cold'){G.cold=true;break}
     if(m&&Math.abs(G.score[0]-G.score[1])>=m){G.cold=true;break}
@@ -1846,7 +1860,7 @@ async function playGame(){
   }
   if(G.cold){const w=G.score[0]>G.score[1]?G.home:G.away;say(pick(benchKids(w).length?benchKids(w):w.all),'コールドだー!',2);await sleep(.5)}
   G.over=true;updateHUD();
-  commitGame();clearResume();
+  commitGame();clearResume();if(G.rp)rpDone();
   await lineUp('end');
   [G.home,G.away].forEach(t=>t.all.forEach(k=>sendToBench(t,k)));
   G.umps.forEach((u,i)=>{u.idleFace='f';u.walkTo(-8.6+UMP_SLOT[i]*1.2,-4.6,1.4)});
@@ -1858,6 +1872,194 @@ async function playGame(){
   await sleep(6);
   if(phaseAt(hourNow())==='game')G.next=await interlude();
   else await sleep(20);
+}
+
+/* ---------- 一球速報の記録を再生 ---------- */
+// sokuho.html で記録した試合（kawajiki.records.v1）を、1球ずつ・打球の方向と結果・走者の動きどおりに再現する
+const RECKEY='kawajiki.records.v1',QKEY='kawajiki.replayReq';
+let rpCache={t:0,v:null};
+function rpReq(){const n=Date.now();if(n-rpCache.t<1500)return rpCache.v;let v=null;try{v=JSON.parse(localStorage.getItem(QKEY)||'null')}catch(e){}rpCache={t:n,v};return v}
+function rpDrop(){try{localStorage.removeItem(QKEY)}catch(e){}rpCache.t=0}
+function rpDone(){const q=rpReq();if(q&&G.rp&&q.id===G.rp.id)rpDrop()}
+function makeRp(id,i){let rec=null;try{const a=JSON.parse(localStorage.getItem(RECKEY)||'[]');rec=a.find(r=>r&&r.id===id)}catch(e){}
+  if(!rec||!rec.events||!rec.events.length||!rec.teams||rec.teams.length!==2)return null;return{id,rec,evs:rec.events,i:i||0}}
+function rpNextPA(){const r=G.rp;if(!r)return null;for(let j=r.i;j<r.evs.length;j++){const e=r.evs[j];if(e.t==='end')return null;if(e.t==='p'||e.t==='pa')return e}return null}
+function rpNextPlay(){const r=G.rp;if(!r)return null;for(let j=r.i;j<r.evs.length;j++){const e=r.evs[j];if(e.t==='end')return null;if(e.t==='p'||e.t==='pa'||e.t==='run')return e}return null}
+function rpHasMore(){const r=G.rp;if(!r)return false;for(let j=r.i;j<r.evs.length;j++){const t=r.evs[j].t;if(t==='end')return false;if(t==='p'||t==='pa'||t==='run')return true}return false}
+const POSJ=['投','捕','一','二','三','遊','左','中','右'];
+function recTeam(tr,side){
+  const def=teamDef({name:tr.name||'チーム',cap:tr.cap||'navy',body:tr.body||'white'});
+  const mk=(p,i)=>{const e={};SKK.forEach(k=>e[k]=62);return new Ent({sk:e,name:(p&&p.name)||`${i+1}ばん`,girl:!!(p&&p.girl),num:i+1,team:def,size:rnd(.88,1.08),lefty:!!(p&&p.left),spd:4.5+rnd(-.2,.2)})};
+  const lu=(tr.lineup||[]).slice(0,9);while(lu.length<9)lu.push({});
+  const order=lu.map(mk),kids=new Array(9).fill(null);
+  order.forEach((k,i)=>{const pi=POSJ.indexOf(lu[i].pos);if(pi>=0&&!kids[pi])kids[pi]=k});
+  const rest=order.filter(k=>!kids.includes(k));for(let i=0;i<9;i++)if(!kids[i])kids[i]=rest.shift();
+  const used=new Set(order.map(k=>k.name)),subs=[];
+  for(const n of shuffle(BOY_NAMES)){if(subs.length>=3)break;if(used.has(n))continue;subs.push(mk({name:n},9+subs.length))}
+  const t=finishTeam(def,side,kids,subs,false,null);t.order=order;t.chem=.6;t.pitchers=[kids[0]];return t;
+}
+function rpTeams(){const rec=G.rp.rec;return{away:recTeam(rec.teams[0],1),home:recTeam(rec.teams[1],-1)}}
+function rpTeamOf(ti){return ti===0?G.away:G.home}
+function rpApply(ev){
+  const t=rpTeamOf(ev.team);if(!t)return;
+  if(ev.t==='sub'){const k=t.order[ev.slot];if(k){k.name=ev.name;say(t.coach,`${ev.name}、たのむぞ!`,1)}return}
+  if(ev.t==='pc'){
+    const j=t.kids.findIndex(k=>k.name===ev.name);
+    if(j>0){const a=t.kids[0],b=t.kids[j];t.kids[0]=b;t.kids[j]=a;if(t===G.field){setRole(t,b,0);setRole(t,a,j);resetFielders()}t.pitchers.push(b)}
+    else if(j<0){t.kids[0].name=ev.name}
+    say(t.coach,'ピッチャー交代!',1);
+  }
+}
+function runPath(k,from,to){k.rb=(k.rb||0)+1;const my=k.rb;
+  return(async()=>{for(let b=from+1;b<=to;b++){const[x,z]=BASES[b%4];await k.goto(x+(b===1?.3:0),z,k.spd);if(k.rb!==my)return;if(b===4){scoreRun(k);return}}k.idlePose='stand';k.idleFace='f'})()}
+function runOut(k,from,tb,sl){k.rb=(k.rb||0)+1;const my=k.rb;
+  (async()=>{for(let b=from+1;b<tb;b++){const[x,z]=BASES[b%4];await k.goto(x,z,k.spd);if(k.rb!==my)return}
+    const[x,z]=bpos(tb),[ax,az]=bpos(Math.max(0,tb-1));await k.goto(ax+(x-ax)*.86,az+(z-az)*.86,k.spd*sl)})()}
+function umpAt(tb){return tb===4||tb===0?G.ump:G.umps[tb]}
+// アウトにする塁へ送球してアウト。holder＝今ボールを持っている子
+async function rpOut(holder,r,tb,fn){
+  const recv=fn?fielder(POSN[fn-1]):baseMan(tb);const[x,z]=bpos(tb);const bx=x+(tb===1?.3:0);
+  if(recv===holder){await holder.goto(bx,z,5.6)}
+  else{recv.distracted=false;recv.walkTo(bx,z,6.2);for(let i=0;i<25&&dist(recv,bx,z)>1.2;i++)await sleep(.1);await throwTo(holder,recv,17)}
+  cancelRun(r.k);r.k.walkTo(r.k.x,r.k.z);
+  call(umpAt(tb),'out');addOut();
+  const k=r.k;(async()=>{await sleep(.6);sendToBench(G.bat,k)})();
+  await sleep(.35);return recv;
+}
+function rpBallPoint(res,fl,bb){
+  if(bb&&bb.x!=null)return[bb.x,bb.z];
+  const n=fl[0],pp=n?POS[POSN[n-1]]:null,a0=pp&&n>1?Math.atan2(pp[0],pp[1]):rnd(-.6,.6);
+  const at=(a,d)=>[Math.sin(a)*d,Math.cos(a)*d];
+  if(res==='1B')return n&&n<=6?at(a0,24):at(a0,40);
+  if(res==='2B')return at(a0,54);if(res==='3B')return at(a0,58);if(res==='HR')return at(a0,68);
+  if(res==='SH')return[rnd(-4,4),6];
+  if(pp)return['GO','DP','E','FC'].includes(res)?[pp[0]*.9+rnd(-1.5,1.5),pp[1]*.9]:[pp[0]+rnd(-2,2),pp[1]+rnd(-2,3)];
+  return at(a0,30);
+}
+// 打った球の再現（記録の結果・守備・走者の行き先どおり）
+async function playScripted(batter,ev){
+  const b=G.ball,res=ev.res,fl=(ev.f||[]).filter(n=>n>=1&&n<=9),m=ev.m||{b:1,r:[]},bb=ev.bb||{};
+  let [tx,tz]=res==='KWP'?[rnd(-2.5,2.5),-5.6]:rpBallPoint(res,fl,bb);
+  const ty=res==='KWP'?'G':bb.ty||({GO:'G',DP:'G',E:'G',FC:'G',SH:'B',FO:'F',SF:'F',LO:'L',HR:'F'}[res]||'L');
+  G.inPlay=true;G.balls=G.strikes=0;updateHUD();
+  G.b0=[...G.bases];G.relay=null;G.forgot=false;if(res!=='KWP')coverBases(tx);
+  b.holder=null;b.path=null;b.vis=true;b.x=batter.x*.35;b.z=.6;b.h=.9;
+  if(res==='KWP'){b.x=0;b.z=-.9;b.h=.5}
+  batter.role='R';batter.idlePose='stand';batter.idleFace='f';
+  if(res==='HR'){const d=Math.hypot(tx,tz)||1;if(d<64){tx*=66/d;tz*=66/d}const r=await playHomer(tx,tz,batter);G.inPlay=false;return r}
+  const R=[];for(let i=2;i>=0;i--){const k=G.bases[i];if(!k)continue;const d=m.r&&m.r[i]!=null?m.r[i]:i+1;R.push({k,from:i+1,to:d})}
+  R.push({k:batter,from:0,to:m.b==null?1:m.b,bat:true});
+  const hitB={'1B':1,'2B':2,'3B':3}[res]||0,hit=hitB>0;
+  const caught=['FO','LO','SF'].includes(res)||(res==='DP'&&(ty==='F'||ty==='L'));
+  const d=Math.hypot(tx,tz);
+  const f0=res==='KWP'?fielder('C'):fl.length?fielder(POSN[fl[0]-1]):(ty==='B'&&d<9&&Math.abs(tx)<3?fielder('P'):nearest(tx,tz,['C']));
+  f0.distracted=false;
+  const nb=[null,null,null];R.forEach(r=>{if(r.to>=1&&r.to<=3)nb[r.to-1]=r.k});
+  const outs=R.filter(r=>r.to===0&&!(caught&&r.bat));
+  outs.forEach(r=>{r.tb=caught?r.from:(hit||res==='E'||res==='KWP')?Math.min(4,r.from+Math.max(1,hitB)+1):r.bat?1:Math.min(4,r.from+1)});
+  outs.sort((a,b2)=>b2.from-a.from);
+  let dur,bp;
+  if(ty==='G'||ty==='B'){dur=Math.max(d/(ty==='B'?6:14),.5);bp=b.flyTo(tx,tz,dur,ty==='B'?.12:.35,.9,.1,true)}
+  else if(ty==='L'){dur=Math.max(.45,d/24);bp=b.flyTo(tx,tz,dur,1+d*.03,.9,caught?1:.1)}
+  else{dur=clamp(1.5+d/28,1.6,3.6);bp=b.flyTo(tx,tz,dur,7+d*.13,.9,caught?1:.1)}
+  if(!hit){f0.walkTo(tx,tz,clamp(dist(f0,tx,tz)/Math.max(.35,dur-.1),3.2,7.5))}
+  else f0.walkTo(f0.x+(tx-f0.x)*.85,f0.z+(tz-f0.z)*.85,clamp(dist(f0,tx,tz)/(dur+.6),3,5.5));
+  if(dur>2.4||hitB>=2)spot([tx,tz],dur+1,Math.max(.1,dur-.3));
+  const runP=[];
+  {const scoring=R.some(r=>r.to===4),hold3=R.some(r=>r.to===3);
+   if(!caught){if(scoring)coachSay(3,'回れ回れー!','wave',2);else if(hold3)coachSay(3,'ストップ!','stop',1);else if(hitB>=2)coachSay(1,'行け行けー!','wave',0);else coachSay(1,'駆け抜けろー!',null,0)}}
+  if(caught){
+    batter.rb=(batter.rb||0)+1;{const[x,z]=lerpBase(0,.55);batter.walkTo(x,z,batter.spd*.8)}
+    outs.forEach(r=>{r.k.rb=(r.k.rb||0)+1;const[x,z]=lerpBase(r.from,.32);r.k.walkTo(x,z,r.k.spd*.8)});
+  }else{
+    R.forEach(r=>{if(r.to===0){runOut(r.k,r.from,r.tb,hit?.95:.78);return}if(r.to!==r.from||r.bat)runP.push(runPath(r.k,r.from,r.to))});
+  }
+  G.bases=nb;
+  await bp;
+  if(caught){
+    b.holder=f0;f0.setPose('catchUp',.6);call(nearestUmp(tx,tz),'out');addOut();
+    say(pick(G.field.kids.filter(k=>k!==f0)),'ナイスキャッチ!',0);
+    (async()=>{await sleep(.7);sendToBench(G.bat,batter)})();
+    R.filter(r=>!r.bat&&r.to>r.from).forEach(r=>runP.push((async()=>{await sleep(.3);coachSay(3,'タッチアップ!','wave',1);await runPath(r.k,r.from,r.to)})()));
+    let h=f0,fi=1;
+    for(const r of outs){const[x,z]=lerpBase(r.from,.08);r.k.walkTo(x,z,r.k.spd*.55);say(r.k,'わっ!',1);h=await rpOut(h,r,r.tb,fl[fi++])}
+  }else if(hit||res==='KWP'){
+    let px=tx,pz=tz;
+    if(res==='KWP'){say(f0,'あっ!',1);say(pick(benchKids(G.bat))||G.bat.coach,'振り逃げー!',2)}
+    else if(ty!=='G'){px=tx*1.07;pz=tz*1.07;await b.flyTo(px,pz,.7,.15,.1,.05,true)}
+    await f0.goto(px,pz,5.2);b.holder=f0;f0.setPose('ready',.3);await sleep(.2);
+    let h=f0;
+    for(const r of outs)h=await rpOut(h,r,r.tb,null);
+    if(!outs.length){
+      if(res==='KWP'){await throwTo(h,fielder('1B'),14);call(G.umps[1],'safe',1)}
+      else{const cut=(hitB>=2||Math.hypot(px,pz)>34)?cutoffFor(px):fielder(px<0?'SS':'2B');if(cut!==h){cut.distracted=false;await throwTo(h,cut,15)}}
+    }
+  }else if(res==='E'){
+    await sleep(.05);f0.setPose('squat',.8);say(f0,'あっ…!',2);markErr(f0);
+    const ex=tx*1.25+rnd(-3,3),ez=tz*1.25+rnd(0,3);await b.flyTo(ex,ez,1.1,.2,.15,.05,true);
+    await f0.goto(ex,ez,4.6);b.holder=f0;
+    let h=f0;for(const r of outs)h=await rpOut(h,r,r.tb,null);
+    say(pick(G.field.kids),pick(['ドンマイドンマイ!','ドンマイ!']),1);
+  }else{
+    for(let i=0;i<25&&dist(f0,tx,tz)>.4;i++)await sleep(.1);
+    b.holder=f0;f0.setPose('ready',.3);await sleep(.25);
+    let h=f0,fi=1;
+    for(const r of outs){h=await rpOut(h,r,r.tb,fl[fi]);fi++}
+    if(res==='DP'&&outs.length>=2)say(pick(G.field.parents),'ゲッツー!',1);
+  }
+  await Promise.race([Promise.all(runP),sleep(9)]);
+  G.inPlay=false;outChorus();await relayToPitcher();
+  return res;
+}
+// 投球と投球のあいだの走者の動き（盗塁・暴投・けん制など）
+async function replayRun(ev){
+  const bat=G.bat,p=fielder('P'),c=fielder('C'),why=ev.why;
+  const mv=[];for(let i=2;i>=0;i--){const k=G.bases[i];if(!k)continue;const d=ev.m&&ev.m.r&&ev.m.r[i]!=null?ev.m.r[i]:i+1;mv.push({k,from:i+1,to:d})}
+  const act=mv.filter(r=>r.to!==r.from);if(!act.length)return;
+  G.inPlay=true;
+  const loose=why==='暴投'||why==='捕逸',steal=why==='盗塁'||why==='盗塁死',pko=why==='牽制死';
+  const nb=[null,null,null];mv.forEach(r=>{if(r.to>=1&&r.to<=3)nb[r.to-1]=r.k});
+  const outs=act.filter(r=>r.to===0);outs.forEach(r=>{r.tb=pko?r.from:Math.min(4,r.from+1)});
+  let holder=p;
+  if(why==='ボーク'){G.ump.setPose('point',1.3,'b');say(G.ump,'ボーク!',2);await sleep(1)}
+  if(pko){p.setPose('throw',.5,faceTo(p,baseMan(outs[0].tb)));outs.forEach(r=>{r.k.rb=(r.k.rb||0)+1;const[x,z]=lerpBase(r.from,.22);r.k.place(x,z)});await sleep(.25)}
+  if(steal||loose){leadOff();await sleep(.6);p.setPose('windup',.7,'f');G.ump.setPose('crouch',3,'b');await sleep(.7)}
+  if(steal)say(pick(benchKids(bat))||bat.coach,'走ったー!',1);
+  G.bases=nb;
+  const ps=act.filter(r=>r.to>0).map(r=>runPath(r.k,r.from,r.to));
+  outs.forEach(r=>{if(!pko)runOut(r.k,r.from,r.tb,.8);else r.k.walkTo(...lerpBase(r.from,.1),r.k.spd*.5)});
+  if(steal||loose){await G.ball.flyTo(.05,-.95,.75,.3,1.6,.7);holder=c}
+  if(loose){const wx=rnd(-3,3),wz=-5.6;say(c,'あっ!',1);say(pick(benchKids(bat))||bat.coach,why==='暴投'?'ワイルドピッチ!':'パスボール!',1);
+    c.walkTo(wx,wz,4.4);await G.ball.flyTo(wx,wz,.9,.3,.5,.05,true);await c.goto(wx,wz,4.4)}
+  if(holder)G.ball.holder=holder;
+  for(const r of outs)holder=await rpOut(holder,r,r.tb,null);
+  if(steal&&!outs.length){const lead=act[0];if(lead.to<4){await sleep(.3);const recv=baseMan(lead.to);recv.walkTo(...bpos(lead.to),6);await sleep(.4);await throwTo(c,recv,16);call(umpAt(lead.to),'safe',1);holder=recv}}
+  await Promise.race([Promise.all(ps),sleep(7)]);
+  G.inPlay=false;
+  if(G.ball.holder&&G.ball.holder!==p)await relayToPitcher();else G.ball.holder=p;
+}
+// 記録と野球場のアウト数・ランナーがずれていたら記録に合わせる（念のため）
+function rpSync(ev){
+  if(ev.o!=null&&ev.o!==G.outs){console.warn('replay outs fix',G.rp.i-1,G.outs,'->',ev.o,JSON.stringify(G.rp.evs[G.rp.i-2]||{}));G.outs=ev.o;updateHUD()}
+  if(ev.bs){const want=ev.bs.split('').map(Number),have=G.bases.map(k=>k?1:0);
+    if(want.join('')!==have.join('')){console.warn('replay bases fix',G.rp.i-1,have.join(''),'->',ev.bs,JSON.stringify(G.rp.evs[G.rp.i-2]||{}));
+      for(let i=0;i<3;i++){if(have[i]&&!want[i]){const k=G.bases[i];G.bases[i]=null;sendToBench(G.bat,k)}}
+      for(let i=0;i<3;i++){if(want[i]&&!G.bases[i]){const k=G.bat.all.find(x=>!x.role&&!G.bases.includes(x)&&!G.bat.kids.includes(x))||G.bat.all.find(x=>!x.role&&!G.bases.includes(x));if(k){k.role='R';k.helmet=true;k.idlePose='stand';k.idleFace='f';k.walkTo(BASES[i+1][0],BASES[i+1][1],5);G.bases[i]=k}}}
+      updateDia()}}
+}
+// 次の1球の前に、交代・走者の動きなどを順に進める。戻り値：'ret'＝打席を終える、'cont'＝もう一度、イベント＝その1球
+async function rpBetween(batter,bat){
+  const r=G.rp;
+  for(;;){
+    const ev=r.evs[r.i];
+    if(!ev||ev.t==='end'){if(ev)r.i++;G.walkoff='end';return'ret'}
+    if(ev.t==='sub'||ev.t==='pc'){r.i++;rpApply(ev);await sleep(.8);continue}
+    if(ev.t==='run'){r.i++;await replayRun(ev);if(G.outs>=3)return'ret';return'cont'}
+    if(ev.t==='pa'&&ev.res==='IBB'){r.i++;G.ump.setPose('point',1.2,'b');say(G.ump,'申告敬遠!',2);await sleep(1.2);
+      G.balls=G.strikes=0;updateHUD();batter.role='R';batter.idlePose='stand';batter.idleFace='f';G.playRuns=0;await walkBatter(batter);st(batter,'pa');st(batter,'bb');await sleep(.4);return'ret'}
+    if(ev.t==='p'||ev.t==='pa'){r.i++;rpSync(ev);return ev}
+    r.i++;
+  }
 }
 
 /* ---------- captains' janken ---------- */
@@ -1888,7 +2090,7 @@ async function janken(){
   benchKids(wt).filter(k=>k!==w).forEach(k=>k.setPose('cheer',1.4));say(pick(benchKids(wt).filter(k=>k!==w))||wt.coach,'よっしゃー!',1);
   say(pick(benchKids(lt).filter(k=>k!==l))||lt.coach,'あ〜',0);
   await sleep(1.6);
-  const firstBat=chance(.55);say(w,firstBat?'先攻で!':'後攻で!',2);await sleep(1.3);
+  const firstBat=G.rp?wt===B:chance(.55);say(w,firstBat?'先攻で!':'後攻で!',2);await sleep(1.3);
   const away=firstBat?wt:lt;
   if(G.away!==away){const h=G.away;G.away=G.home;G.home=h}
   G.field=G.home;G.bat=G.away;updateHUD();
@@ -1994,7 +2196,7 @@ function saveResume(batter,balls,strikes){
   G.prog=simT;
   if(!G.home||G.over||G.pre||!G.bat)return;
   try{localStorage.setItem(RKEY,JSON.stringify({v:1,t:Date.now(),home:teamSnap(G.home),away:teamSnap(G.away),score:G.score,line:G.line,inning:G.inning,top:G.top,outs:G.outs,
-    bases:G.bases.map(k=>k?G.bat.all.indexOf(k):-1),runsThis:G.runsThis,box:G.box,pchg:G.pchg,conceded:G.conceded,batter:G.bat.all.indexOf(batter),balls,strikes}))}catch(e){}
+    bases:G.bases.map(k=>k?G.bat.all.indexOf(k):-1),runsThis:G.runsThis,box:G.box,pchg:G.pchg,conceded:G.conceded,batter:G.bat.all.indexOf(batter),balls,strikes,rp:G.rp?{id:G.rp.id,i:G.rp.i}:null}))}catch(e){}
 }
 function clearResume(){try{localStorage.removeItem(RKEY)}catch(e){}}
 function loadResume(){try{const r=JSON.parse(localStorage.getItem(RKEY)||'null');if(r&&r.v===1&&r.t>restartAt()&&r.home&&r.away&&r.batter>=0&&r.home.kids.length===9&&r.away.kids.length===9)return r}catch(e){}return null}
@@ -2002,7 +2204,7 @@ function loadResume(){try{const r=JSON.parse(localStorage.getItem(RKEY)||'null')
 function setupGame(res,nx){
   const keep=new Set(nx?nx.keep:[]);
   ents=ents.filter(e=>!e.gameEnt||keep.has(e));
-  const {home,away:aw}=res?{home:teamFrom(res.home),away:teamFrom(res.away)}:nx?nx:pickMatch();
+  const {home,away:aw}=res?{home:teamFrom(res.home),away:teamFrom(res.away)}:G.rp?rpTeams():nx?nx:pickMatch();
   Object.assign(G,{home,away:aw,score:[0,0],inning:1,top:true,outs:0,balls:0,strikes:0,bases:[null,null,null],over:false,walkoff:false,cold:false,inPlay:false,pre:true,box:{},pchg:null,playRuns:0,line:[[],[]],conceded:[0,0],errKids:new Set(),runsThis:0,noChat:false,prog:0,infKey:null,gid:Math.random(),startedAt:Date.now()});
   if(res)Object.assign(G,{score:res.score,line:res.line,inning:res.inning,top:res.top,box:res.box||{},pchg:res.pchg,conceded:res.conceded||[0,0],pre:false});
   [home,aw].forEach(t=>{
@@ -2162,8 +2364,8 @@ function skyAt(h){
   return{top:mix(hx(A[1]),hx(B[1]),u),bot:mix(hx(A[2]),hx(B[2]),u),tint:mix(A[3],B[3],u),star:A[4]+(B[4]-A[4])*u};
 }
 function hourNow(){if(S.hour!=null)return S.hour;const d=new Date();return d.getHours()+d.getMinutes()/60+d.getSeconds()/3600}
-function phaseAt(h){if(S.night&&(h>=17||h<7))return'game';if(h<5.5||h>=18.3)return'night';if(h<7)return'dawn';if(h<8.5)return'warmup';if(h<17)return'game';if(h<17.7)return'maint';return'dusk'}
-function lightsOn(){return S.night&&phaseName==='game'&&skyAt(hourNow()).tint[3]>.12}
+function phaseAt(h){if(rpReq())return'game';if(S.night&&(h>=17||h<7))return'game';if(h<5.5||h>=18.3)return'night';if(h<7)return'dawn';if(h<8.5)return'warmup';if(h<17)return'game';if(h<17.7)return'maint';return'dusk'}
+function lightsOn(){return(S.night||!!rpReq())&&phaseName==='game'&&skyAt(hourNow()).tint[3]>.12}
 
 /* ---------- background (static, regenerated per time) ---------- */
 const bg=document.createElement('canvas');const bgc=bg.getContext('2d');

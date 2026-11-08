@@ -789,6 +789,7 @@ async function rundown0(k,a){
 // 同じ塁に二人いたら、後から来たランナーがタッチでアウト（気づかなければ元の塁へ戻る）
 async function fixBases(bat){
   if(!bat||G.outs>=3)return;
+  G.bases.forEach((k,i)=>{if(k&&!k.moving&&!k.ext&&dist(k,BASES[i+1][0],BASES[i+1][1])>.8){const[x,z]=BASES[i+1];k.walkTo(x,z,3)}});
   const orph=bat.all.filter(k=>k.role==='R'&&!G.bases.includes(k)&&!k.moving);
   for(const k of orph){
     let bi=-1,bd=9;for(let i=1;i<=3;i++){const d=dist(k,BASES[i][0],BASES[i][1]);if(d<bd){bd=d;bi=i}}

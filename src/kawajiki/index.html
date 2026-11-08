@@ -1824,8 +1824,10 @@ async function halfInning(bat,fld,res){
   if(res)G.bases.forEach((k,i)=>{if(!k)return;k.role='R';k.helmet=true;k.idlePose='stand';k.idleFace='f';const[x,z]=BASES[i+1];k.place(x,z)});
   placeCoaches(bat);
   if(res){[bat,fld].forEach(t=>{if(t.bcoach)Object.values(t.bcoach).forEach(k=>{k.place(k.tx,k.tz)})});updateHUD();await sleep(2.5)}
-  else{changeChatter(bat,fld);await sleep(.8)}
-  {const p0=fielder('P');if(G.ball.holder===G.ump&&!res){await throwTo(G.ump,p0,9)}else{G.ball.vis=true;G.ball.holder=p0}}
+  else{changeChatter(bat,fld);await sleep(.2)}
+  {const p0=fielder('P');
+    if(!res){for(let i=0;i<15;i++){const h=G.ball.holder;if(h===p0||h===G.ump||(!h&&dist(p0,G.ball.x,G.ball.z)<1.5&&dist(p0,...POS.P)<.8))break;await sleep(.15)}}
+    if(G.ball.holder===G.ump&&!res){await throwTo(G.ump,p0,9)}else{G.ball.vis=true;G.ball.holder=p0}}
   if(!res)await warmupPitches(fld);
   fld.kids.forEach(k=>{k.toPos=false});
   if(!res)await shimatte(fld);
@@ -1850,8 +1852,7 @@ async function halfInning(bat,fld,res){
       await k.goto(x,z,5.4);if(k.chain===my)k.toPos=false})();
   });
   preBat(fld);
-  for(let i=0;i<60;i++){if(fld.all.every(k=>!k.moving||k.pre))break;await sleep(.25)}
-  await sleep(.8);
+  await sleep(.3);
 }
 // 次に攻撃するチーム：コーチャー・先頭バッター・ネクストは、ベンチに着いたらすぐ定位置へ
 function nthNext(t,n){const out=[];for(let i=0;i<9&&out.length<=n;i++){const k=t.order[(t.bi+i)%9];if(!out.includes(k))out.push(k)}return out[n]}

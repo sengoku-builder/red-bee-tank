@@ -268,7 +268,7 @@ class Ball{
     this.path=p;return new Promise(r=>{p.res=r});
   }
   update(){
-    if(this.holder){const k=this.holder;this.path=null;this.x=k.x+0.18;this.z=k.z-0.08;this.h=(k.kind==='adult'?1.15:0.8)*k.size;return}
+    if(this.holder){const k=this.holder;if(this.path&&this.path.res)this.path.res();this.path=null;this.x=k.x+0.18;this.z=k.z-0.08;this.h=(k.kind==='adult'?1.15:0.8)*k.size;return}
     const p=this.path;if(!p)return;
     let u=Math.min(1,(simT-p.t0)/p.dur);
     this.x=p.x0+(p.x1-p.x0)*u;this.z=p.z0+(p.z1-p.z0)*u;
@@ -520,6 +520,88 @@ async function runBases(k,from,to,how){
   if(from===0&&to===1&&how==='over'){await k.goto(13.4,19.4,k.spd*.85);await sleep(.4);await k.goto(16.6,16.3,2.4)}
   k.idlePose='stand';k.idleFace='f';
 }
+/* ---------- ランナーの判断（その瞬間のボール・塁・自分の位置と足で決める） ---------- */
+function ballETA(bx,bz){ // ボールが塁(bx,bz)に届くまでの見込み時間
+  const b=G.ball,h=b.holder;
+  if(h&&G.field&&G.field.kids.includes(h)){const far=Math.hypot(h.x,h.z)>34?1.5:0;return .45+far+.5*(1-sk(h,'iq')/100)+dist(h,bx,bz)/13}
+  const p=b.path;let ex=b.x,ez=b.z,rem=0;if(p){ex=p.x1;ez=p.z1;rem=Math.max(0,p.t0+p.dur-simT)}
+  let best=99;if(G.field)for(const f of G.field.kids){const t=Math.max(rem,dist(f,ex,ez)/4.6)+.4;if(t<best)best=t}
+  return best+Math.hypot(ex-bx,ez-bz)/13+.45+(Math.hypot(ex,ez)>34?1.9:0);
+}
+function liveRun(batter,opt={}){
+  const two=G.outs>=2,st=[];
+  G.bases.forEach((k,i)=>{if(k)st.push({k,base:i+1,tgt:null,mode:'hold',maxB:i+1,t:0})});
+  if(batter){batter.role='R';st.push({k:batter,base:0,tgt:1,mode:'run',maxB:0,t:0,bat:true,forced:true})}
+  st.sort((a,b)=>b.base-a.base);
+  const iq=k=>sk(k,'iq')/100,occupied=(b,me)=>st.some(o=>o!==me&&o.mode!=='done'&&o.mode!=='out'&&o.base===b&&o.mode!=='run');
+  const forcedTo=(b,me)=>st.some(o=>o!==me&&o.mode==='run'&&o.tgt===b);
+  const goNext=(o,strict)=>{const b=o.base+1;if(b>4)return false;if(occupied(b,o))return false;
+    const[x,z]=BASES[b%4],tR=dist(o.k,x,z)/Math.max(2,o.k.spd),tB=ballETA(x,z);
+    const noise=(Math.random()-.5)*2*(1-iq(o.k))*1.1;return tR+(strict?.8:.15)+noise<tB*(strict?1:b===2?1.32:b===3?1.12:1.08)};
+  const sync=()=>{const nb=[null,null,null];st.forEach(o=>{if(o.mode!=='done'&&o.mode!=='out'&&o.base>=1&&o.base<=3&&o.mode!=='run'&&!nb[o.base-1])nb[o.base-1]=o.k});G.bases=nb};
+  // 打った瞬間：詰まっているランナーは必ず、そうでなければ判断して走る
+  {let f=!!batter;for(let b=1;b<=3;b++){const o=st.find(q=>q.base===b&&!q.bat);if(!o){f=false;continue}if(f)o.forced=true;else f=false}}
+  for(const o of st){if(o.bat)continue;if(two||o.forced||(o.base===2&&!G.bases[2]?true:goNext(o))){o.mode='run';o.tgt=o.base+1}}
+  const t0=simT;let pickT=0,calm=0;
+  return(async()=>{
+    while(true){
+      const alive=st.filter(o=>o.mode!=='done'&&o.mode!=='out');
+      for(const o of alive){
+        const k=o.k;if(k.role!=='R'){o.mode='out';continue}
+        if(o.mode==='run'){
+          if(o.tgt<4&&occupied(o.tgt,o)){
+            const oc=st.find(q=>q!==o&&q.base===o.tgt&&q.mode!=='run'&&q.mode!=='done'&&q.mode!=='out');
+            if(o.forced&&oc){oc.mode='run';oc.tgt=oc.base+1;oc.forced=true;oc.cont=null}   // 押し出し：前のランナーは進まなければならない
+            else if(o.base>=1){o.tgt=null;const[x,z]=BASES[o.base];k.walkTo(x,z,k.spd);o.mode='back';if(!o.saidBack){o.saidBack=true;coachSay(1,'戻れー!',null,1)}continue}}
+          const[x,z]=BASES[o.tgt%4];const xx=x+(o.tgt===1?.3:0);
+          if(Math.hypot(k.tx-xx,k.tz-z)>.3||!k.moving)k.walkTo(xx,z,k.spd);
+          if(o.cont==null&&o.tgt<4&&dist(k,xx,z)<4){const ob=o.base;o.base=o.tgt;o.cont=forcedTo(o.base,o)||goNext(o);o.base=ob}
+          if(dist(k,xx,z)<.45){o.base=o.tgt;o.maxB=Math.max(o.maxB,o.base);o.tgt=null;
+            if(o.base===4){cancelRun(k);scoreRun(k);o.mode='done';continue}
+            const cont=o.cont;o.cont=null;
+            if(forcedTo(o.base,o)||cont){o.tgt=o.base+1;if(o.tgt===4)coachSay(3,'回れ回れー!','wave',1);else if(o.tgt===3)coachSay(3,'来い来いー!','wave',0);continue}
+            // 止まる：一塁の駆け抜け、それ以外は少し回ってから戻る（判断が弱い子ほど大きく回る）
+            if(o.base===3)coachSay(3,'ストップ!','stop',1);
+            const ball=G.ball,infield=Math.hypot(ball.x,ball.z)<30&&!(ball.path&&Math.hypot(ball.path.x1,ball.path.z1)>30);
+            if(o.bat&&o.base===1&&infield&&!opt.turn){o.mode='through';k.walkTo(21.2,21.0,k.spd)}
+            else{o.mode='turn';const d=1.4+4.5*(1-iq(k))*Math.random(),[nx,nz]=BASES[(o.base+1)%4],[bx,bz]=BASES[o.base],L=Math.hypot(nx-bx,nz-bz)||1;
+              o.turnTo=[bx+(nx-bx)*d/L,bz+(nz-bz)*d/L];o.turnD=d;k.walkTo(o.turnTo[0],o.turnTo[1],k.spd*.8)}
+          }
+          continue;
+        }
+        if(o.mode==='through'){if(!k.moving){const[x,z]=BASES[1];k.walkTo(x+.3,z,2.2);o.mode='back'}continue}
+        if(o.mode==='turn'){if(!k.moving){if(o.turnD>3.6&&chance(.6)){say(k,'あっ!',1);mistake(k,'fly',true)}const[x,z]=BASES[o.base];k.walkTo(x,z,k.spd*.9);o.mode='back'}continue}
+        if(o.mode==='back'){const[x,z]=BASES[o.base];if(dist(k,x,z)<.5){o.mode='hold';k.idlePose='stand';k.idleFace='f'}continue}
+        if(o.mode==='hold'){o.t+=.1;if(o.t>.5){o.t=0;if(o.base<4&&forcedTo(o.base,o)&&st.some(q=>q.mode==='run'&&q.tgt===o.base&&q.forced)){o.tgt=o.base+1;o.mode='run';o.forced=true}else if(goNext(o,true)){o.tgt=o.base+1;o.mode='run';coachSay(3,'行けー!','wave',0)}}}
+      }
+      sync();
+      // 塁を離れているランナーに、内野手が素早く投げて刺しにいく
+      const h=G.ball.holder;
+      if(h&&G.field&&G.field.kids.includes(h)&&!h.moving&&simT>pickT&&!G.relay?.busy){
+        const off=st.find(o=>(o.mode==='turn'||o.mode==='back')&&o.base>=1&&o.base<=3&&dist(o.k,...BASES[o.base])>2.4);
+        if(off&&Math.hypot(h.x,h.z)<36&&chance(.25+.5*sk(h,'iq')/100)){pickT=simT+3;
+          const recv=baseMan(off.base);const[bx,bz]=BASES[off.base];if(recv!==h)recv.walkTo(bx+.3,bz-.3,5);say(pick(G.field.kids),'戻ったぞ!',0);
+          off.mode='back2';const k=off.k;slideTo(k,bx,bz);
+          if(recv!==h)await throwTo(h,recv,16);
+          const r=await tagJudge(k,bx,bz,recv,null,off.base);
+          if(r===true){call(nearestUmp(bx,bz),'out');addOut();sendToBench(G.bat,k);off.mode='out';say(pick(G.field.kids),'ナイスタッチ!',1);say(G.bat.coach,`${k.name}、回りすぎだ!`,1);mistake(k,'fly',true)}
+          else if(r==='far'){off.mode='out';await farRundown(k,off.base)}
+          else{call(nearestUmp(bx,bz),'safe',1);off.mode='hold'}
+          sync();if(G.outs>=3)break;
+        }else pickT=simT+.6;
+      }
+      for(const o of st)if(o.mode==='back2')o.mode='hold';
+      const settled=st.every(o=>o.mode==='done'||o.mode==='out'||o.mode==='hold');
+      const hb=G.ball.holder,quiet=hb&&(!G.field||G.field.kids.includes(hb))&&Math.hypot(hb.x,hb.z-14)<30;
+      calm=settled&&(quiet||!G.ball.path||simT>G.ball.path.t0+G.ball.path.dur+3)?calm+.1:0;
+      if(calm>=.8||simT-t0>32||G.outs>=3)break;
+      await sleep(.1);
+    }
+    st.forEach(o=>{if(o.mode==='hold'){const[x,z]=BASES[o.base];o.k.walkTo(x+(o.base===1?.3:0),z,2);o.k.idlePose='stand'}});
+    sync();
+    const bo=st.find(o=>o.bat);return{bat:bo?(bo.mode==='out'?0:bo.base):0,maxB:bo?bo.maxB:0};
+  })();
+}
 function advanceAll(adv,batter,batterTo,how){
   const ps=[],nb=[null,null,null];
   {const scoring=G.bases.some((k,i)=>k&&i+1+adv>=4&&i>=1),hold3=G.bases.some((k,i)=>k&&i+1+adv===3)||(batter&&batterTo===3);
@@ -585,6 +667,7 @@ function prepRelay(tx,tz){
 }
 async function relayOrThrow(of){
   const r=G.relay;
+  if(Math.hypot(of.x,of.z)>34){of.setPose('squat',.4);await sleep(.25+.75*(1-sk(of,'fld')/100))}
   if(r&&!r.said){r.said=true;say(fielder('C'),r.word,1);await sleep(.35)}
   if(!r||of.z<33||of===r.cut){await throwTo(of,cutoffFor(of.x),14);return}
   await throwTo(of,r.cut,13);await sleep(.25);
@@ -892,8 +975,8 @@ async function playGrounder(tx,tz,d,batter){
   const ext=[tx*1.65,tz*1.65];
   let runs;
   if(ev==='out'||ev==='dive'){runs=runnersOnOut()}
-  else if(ev==='wild')runs=advanceAll(2,batter,2);
-  else runs=advanceAll(1,batter,1,ev==='through'?'over':'through');
+  else if(ev==='wild')runs=liveRun(batter);
+  else runs=liveRun(batter);
   const batterRun=(ev==='out'||ev==='dive')?runBases(batter,0,1,'out'):null;
   f.walkTo(tx,tz,5);
   const bp=b.flyTo(tx,tz,bdur,.35,.9,.1,true);
@@ -972,7 +1055,7 @@ async function playFly(tx,tz,d,batter){
   const flyPlan=(G.outs<2&&G.bases.some(Boolean))?planFly(tx,tz):null;
   let runs,adv=1;
   if(caught){const two=G.outs>=2;runs=(async()=>{const ps=[batter.goto(7,7.5,batter.spd)];if(two)G.bases.forEach((k,i)=>{if(k)ps.push(fakeRun(k,i+1))});await Promise.all(ps);batter.idlePose='stand'})()}
-  else{adv=ev==='collide'?2:(ev==='drop'||ev==='omiai')&&d>44?2:1;if(tz<32)adv=1;runs=flyPlan?(async()=>{batter.walkTo(16.6,16.3,batter.spd);await bp;return advanceAll(adv,batter,adv,'over')})():advanceAll(adv,batter,adv,'over')}
+  else{adv=ev==='collide'?2:(ev==='drop'||ev==='omiai')&&d>44?2:1;if(tz<32)adv=1;runs=flyPlan?(async()=>{batter.walkTo(16.6,16.3,batter.spd);await bp;return liveRun(batter,{turn:true})})():liveRun(batter,{turn:true})}
   if(ev==='collide'||ev==='omiai'||ev==='nearCatch'){
     const L=f1.x<f2.x?f1:f2,Rk=L===f1?f2:f1,off=ev==='omiai'?.85:.42;
     const tArr=Math.max(.6,hang-(ev==='omiai'?.5:.1));
@@ -1066,9 +1149,9 @@ async function playLine(tx,tz,d,batter,advO){
   if(chance(.12*(1-sk(of,'fld')/100)+.01)){if(!advO&&(G.bases[1]||G.bases[2])&&chance(.4))oe='charge';else oe=chance(.22)?'big':'fumble'}
   const adv2=oe==='charge'?4:oe==='big'?Math.min(3,adv+2):oe==='fumble'?Math.min(3,adv+1):adv;
   let over=null;
-  if(!oe){const lead=[2,1,0].map(i=>[G.bases[i],i+1]).find(([k])=>k);if(lead&&G.outs<2){const [k,i]=lead,to=i+adv;if(to<=2&&chance(.18*(1-sk(k,'iq')/100)+.02))over={k,base:to}}}
+  if(false){const lead=[2,1,0].map(i=>[G.bases[i],i+1]).find(([k])=>k);if(lead&&G.outs<2){const [k,i]=lead,to=i+adv;if(to<=2&&chance(.18*(1-sk(k,'iq')/100)+.02))over={k,base:to}}}
   if(oe==='charge')G.b0=[1,1,1];
-  const runs=advanceAll(adv2,batter,adv2,'over');prepRelay(tx,tz);
+  const runs=oe==='charge'?advanceAll(adv2,batter,adv2,'over'):liveRun(batter,{turn:true});prepRelay(tx,tz);
   const dive=dn<5&&chance(.5);
   if(dive){near.distracted=false;near.walkTo(mx,mz,5)}
   of.walkTo(tx,tz,oe==='charge'?5.8:4.6);
@@ -1104,10 +1187,10 @@ async function playLine(tx,tz,d,batter,advO){
   await sleep(.15);
   if(over){(async()=>{await sleep(.4);if(G.bases[over.base-1]===over.k){const[x,z]=lerpBase(over.base,.45);over.k.walkTo(x,z,over.k.spd);coachSay(3,'戻れー!',null,2)}})()}
   await relayOrThrow(of);
-  await runs;
+  const rr=await runs;
   if(oe)say(pick(G.field.kids),pick(['ドンマイ!','ドンマイドンマイ!']),1);
-  if(over&&G.bases[over.base-1]===over.k&&G.outs<3){G.bases[over.base-1]=null;mistake(over.k,'fly',true);const rd=await rundown(over.k,over.base);placeAfterRundown(over.k,rd,over.base)}
-  return adv>2?'3B':adv>1?'2B':'1B';
+  const reach=Math.max(1,Math.min(3,rr&&rr.maxB||1)),hb=oe?Math.min(reach,adv):reach;
+  return hb>2?'3B':hb>1?'2B':'1B';
 }
 
 async function outfieldDive(tx,tz,d,batter,f){
@@ -1409,14 +1492,11 @@ async function playDeepFly(tx,tz,d,batter,rob){
   // 捕れなかった：フェンスに当たって跳ね返る、または頭を越えて転がる
   if(d>=61){b.flyTo(lx*.9,lz*.9,.7,.6,.3,.05,true);say(f,'うわっ!',1)}else{b.flyTo(Math.sin(ang)*60,Math.cos(ang)*60,1.0,.3,.1,.05,true);say(f,'あっ!',1)}
   coachSay(3,'まわれまわれー!','wave',1);
-  const adv=chance(.2+.35*sk(batter,'run')/100)?3:2;
-  const nb=[null,null,null],ps=[];
-  G.bases.forEach((k,i)=>{if(!k)return;k.chain=(k.chain||0)+1;const base=i+1,m=mv.find(x=>x.k===k);const from=m&&m.full&&base+1<4&&dist(k,...BASES[base+1])<4?base+1:base;const to=Math.min(base+adv,4);if(to<4)nb[to-1]=k;ps.push(runBases(k,from,to))});
-  batter.chain++;const bfrom=Math.hypot(batter.x-16.6,batter.z-16.3)<3?1:0;nb[adv-1]=batter;ps.push(runBases(batter,bfrom,adv));
-  G.bases=nb;
+  G.bases.forEach(k=>{if(k)k.chain=(k.chain||0)+1});batter.chain++;
+  const lr=liveRun(batter,{turn:true});
   await sleep(.8);await f.goto(b.x,b.z,4.6);b.holder=f;await relayOrThrow(f);
-  await Promise.all(ps);
-  return adv===3?'3B':'2B';
+  const rr=await lr;const hb=Math.max(1,Math.min(3,rr.maxB||1));
+  return hb>2?'3B':hb>1?'2B':'1B';
 }
 async function hrBallFetch(ball,bat,hitter){
   const gid=G.gid,pa=pick(bat.parents),ok=()=>G.gid===gid&&!ball.dead;if(!pa){ball.dead=true;return}

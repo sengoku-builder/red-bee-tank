@@ -671,7 +671,8 @@ async function rundown0(k,a){
   const q=clamp((sk(fa,'iq')+sk(fb,'iq')+sk(fa,'thr')+sk(fb,'thr'))/400+(knows(fa,'rundown')||knows(fb,'rundown')?.3:0),0,1);
   say(pick(benchKids(G.bat))||G.bat.coach,'戻れ戻れー!',1);if(chance(.6))say(pick([fa,fb]),pick(['挟んだぞ!','挟め挟めー!']),1);
   const nThrows=q>.7?1+(chance(.5)?1:0):2+Math.floor(rnd(0,3));
-  const near=()=>dist(k,ax,az)<dist(k,bx,bz)?bA:bB;
+  const freeB=b=>(b<4&&G.bases[b-1]&&G.bases[b-1]!==k)?(b===bA?bB:bA):b;
+  const near=()=>freeB(dist(k,ax,az)<dist(k,bx,bz)?bA:bB);
   let other=holder===fa?fa===holder?fb:fa:fa;
   for(let n=0;n<nThrows;n++){
     other=holder===fa?fb:fa;
@@ -692,17 +693,33 @@ async function rundown0(k,a){
     prev.walkTo(px+(px<0?-.9:.9),pz+(pz<16?-.6:.6),3.8);
     const vac=other===fa?[bx,bz]:[ax,az];
     if(helpers.length&&chance(.35+.6*q)){const h=helpers.shift();h.walkTo(vac[0],vac[1],4.6);if(other===fa)fb=h;else fa=h}
-    else{mistake(prev,'rundown',true);if(chance(.55)){const vb=other===fa?bB:bA;const[vx,vz]=bpos(vb);say(G.field.coach,'カバー!',1);await k.goto(vx,vz,k.spd);return{res:'safe',base:vb}}}
+    else{mistake(prev,'rundown',true);if(chance(.55)){const vb=freeB(other===fa?bB:bA);const[vx,vz]=bpos(vb);say(G.field.coach,'カバー!',1);await k.goto(vx,vz,k.spd);return{res:'safe',base:vb}}}
     holder=other;
   }
   holder.walkTo(k.x,k.z,4.8);{const nb2=near(),[sx,sz]=bpos(nb2);if(dist(k,sx,sz)<3)slideTo(k,sx,sz)}await sleep(.55);spot(k,1.6,.25);await sleep(.25);
   if(chance(.25+.7*q)){call(nearestUmp(k.x,k.z),'out');addOut();sendToBench(G.bat,k);didRight(holder,'rundown');say(pick(G.field.kids),'ナイスタッチ!',0);return{res:'out'}}
   say(holder,'あっ…',1);mistake(holder,'rundown');const tb=near();const[tx2,tz2]=bpos(tb);await k.goto(tx2,tz2,k.spd);return{res:'safe',base:tb};
 }
+// 同じ塁に二人いたら、後から来たランナーがタッチでアウト（気づかなければ元の塁へ戻る）
+async function fixBases(bat){
+  if(!bat||G.outs>=3)return;
+  const orph=bat.all.filter(k=>k.role==='R'&&!G.bases.includes(k)&&!k.moving);
+  for(const k of orph){
+    let bi=-1,bd=9;for(let i=1;i<=3;i++){const d=dist(k,BASES[i][0],BASES[i][1]);if(d<bd){bd=d;bi=i}}
+    if(bi<0)continue;
+    if(!G.bases[bi-1]){G.bases[bi-1]=k;continue}
+    const f=G.field.kids.slice().sort((a,b)=>dist(a,k.x,k.z)-dist(b,k.x,k.z))[0];
+    if(chance(.75)){say(f,'二人いるぞ! タッチ!',2);const h=G.ball.holder;if(h&&h!==f&&h.kind==='kid')await throwTo(h,f,14);else G.ball.holder=f;
+      for(let i=0;i<25&&dist(f,k.x,k.z)>.8;i++){f.walkTo(k.x,k.z,4.6);await sleep(.1)}
+      call(nearestUmp(k.x,k.z),'out');addOut();sendToBench(bat,k);await sleep(.6);if(G.outs<3)await relayToPitcher();
+    }else{const back=[1,2,3].filter(i=>i<bi&&!G.bases[i-1]).pop();if(back){G.bases[back-1]=k;const[x,z]=BASES[back];k.walkTo(x,z,k.spd);say(k,'わわっ、戻らなきゃ!',1)}else sendToBench(bat,k)}
+  }
+}
 function placeAfterRundown(k,rd,fallback){
   if(rd.res==='out')return;
   if(rd.base===4){scoreRun(k);return}
-  if(!G.bases[rd.base-1])G.bases[rd.base-1]=k;else if(!G.bases[fallback-1])G.bases[fallback-1]=k;
+  let b=rd.base;if(G.bases[b-1]&&G.bases[b-1]!==k)b=!G.bases[fallback-1]?fallback:[1,2,3].find(i=>!G.bases[i-1]&&i<rd.base)||b;
+  if(!G.bases[b-1]||G.bases[b-1]===k){G.bases[b-1]=k;if(b!==rd.base){const[x,z]=BASES[b];k.walkTo(x,z,k.spd)}}
   k.idlePose='stand';k.idleFace='f';
 }
 function fakeRun(k,from){const [x,z]=BASES[(from+1)%4];return k.goto(x,z,k.spd)}
@@ -793,7 +810,7 @@ function setRole(t,k,i){k.role=POSN[i];k.helmet=k.role==='C';k.carry=null;k.idle
 async function warmupPitches(fld){
   const p=fielder('P'),c=fielder('C');if(!p||!c)return;
   G.noChat=true;
-  for(let i=0;i<20;i++){if(dist(p,...POS.P)<.5&&dist(c,...POS.C)<.5)break;await sleep(.25)}
+  for(let i=0;i<80;i++){if(dist(p,...POS.P)<.6&&dist(c,...POS.C)<.6)break;await sleep(.2)}
   if(G.ball.holder!==p)G.ball.holder=p;
   const allSet=()=>fld.kids.every(k=>{const q=spotOf(k);return !q||dist(k,q[0],q[1])<.6});
   // 2球投げたら確認。全員そろっていれば次がラスト、そろっていなければ続ける
@@ -1213,21 +1230,11 @@ async function loosePitch(kind,p,c,bat){
   await sleep(.4);say(G.field.coach,'カバー!',1);p.walkTo(0,.8,5);
   await sleep(.4);await c.goto(tx,tz,3.8);b.holder=c;
   if(r3){
-    const tt=dist(c,p.x,p.z)/15+.3,rt=dist(r3,0,0)/r3.spd;
-    if(rt>tt+1.1&&dist(r3,0,0)>5){
-      // 楽々アウトのタイミング：ランナーは三塁へ戻ろうとして挟殺プレー
-      r3.goto(r3.x,r3.z);say(r3,'わっ!',1);coachSay(3,'戻れー!',null,2);
-      const rd=await rundown(r3,3);placeAfterRundown(r3,rd,3);
-    }else{
-      await throwTo(c,p,15);
-      const dh=dist(r3,0,0);
-      if(dh<.5){await home;scoreRun(r3);call(G.ump,'safe',2)}
-      else if(dh<2.2){slideTo(r3,0,0);spot([0,0],1.8,.15);await sleep(.3);
-        if(chance(.3+.5*sk(p,'fld')/100)){r3.walkTo(r3.x,r3.z);call(G.ump,'out');addOut();sendToBench(bat,r3);say(pick(G.field.kids),'ナイスカバー!',1)}
-        else{await home;scoreRun(r3);call(G.ump,'safe',2)}}
-      else if(chance(.05+.15*(1-sk(p,'fld')/100))){say(p,'あっ!',1);markErr(p);await home;scoreRun(r3);call(G.ump,'safe',2)}
-      else{r3.goto(r3.x,r3.z);p.walkTo(r3.x,r3.z,4);await sleep(.4);call(G.ump,'out');addOut();sendToBench(bat,r3);say(pick(G.field.kids),'ナイスカバー!',1)}
-    }
+    await throwTo(c,p,15);
+    const o=await tagJudge(r3,0,0,p,null,3);
+    if(o==='far'){coachSay(3,'戻れー!',null,2);await farRundown(r3,3)}
+    else if(o){call(G.ump,'out');addOut();sendToBench(bat,r3);say(pick(G.field.kids),'ナイスカバー!',1)}
+    else{await home;scoreRun(r3);call(G.ump,'safe',2)}
   }else{await sleep(.3);say(G.field.coach,'止めろー!',0);await throwTo(c,p,12)}
   await Promise.all(ps);
   c.walkTo(...POS.C,3);
@@ -1311,9 +1318,12 @@ function startSteal(st){const [r1,r2,r3]=G.bases;const go=(k,b)=>{if(!k)return;k
 async function tagJudge(k,bx,bz,tagger,ump,a){
   const dr=dist(k,bx,bz);
   if(dr<.45)return false;
-  if(dr<2.4){slideTo(k,bx,bz);spot([bx,bz],1.6,.2);await sleep(.35);return chance(.45+.3*sk(tagger,'fld')/100-.3*sk(k,'run')/100)}
+  if(dr<2.4){slideTo(k,bx,bz);spot([bx,bz],1.6,.2);tagger.walkTo(bx+(k.x-bx)*.4,bz+(k.z-bz)*.4,5);await sleep(.35);return chance(.45+.3*sk(tagger,'fld')/100-.3*sk(k,'run')/100)}
   if(a!=null&&dr>4.5){cancelRun(k);k.goto(k.x,k.z);return'far'}
-  for(let i=0;i<30&&dist(tagger,k.x,k.z)>.8;i++){tagger.walkTo(k.x,k.z,4.6);await sleep(.1)}
+  // 野手がランナーに追いついてタッチするまでコールしない。先に塁に着かれたらセーフ
+  let caught=false;
+  for(let i=0;i<60;i++){if(dist(tagger,k.x,k.z)<.8){caught=true;break}if(dist(k,bx,bz)<.45)break;tagger.walkTo(k.x,k.z,4.8);await sleep(.1)}
+  if(!caught)return false;
   if(chance(.03+.08*(1-sk(tagger,'fld')/100))){say(tagger,'あっ!',1);return false}
   cancelRun(k);k.goto(k.x,k.z);return true;
 }
@@ -1333,8 +1343,11 @@ async function stealPlay(sp,c,p,bat){
   let r3go=false;if(sp.type==='d13'&&r3){r3go=chance(.4+.4*sk(r3,'iq')/100);if(r3go){r3.stealing=true;r3.goto(0,0,r3.spd)}}
   if(chance(.05+.15*(1-sk(thr,'thr')/100))){
     const wx=bx+rnd(-3,3),wz=bz+rnd(3,6);await throwTo(thr,cover,17,G.ball,[wx,wz]);say(cover,'あっ!',1);markErr(thr);
-    const nx=tgt+1;k.stealing=false;st(k,'sb');
-    const ps=[];G.bases[tgt-2]=null;if(nx<4){G.bases[nx-1]=k;ps.push(k.goto(BASES[nx][0],BASES[nx][1],k.spd))}else ps.push(k.goto(0,0,k.spd).then(()=>scoreRun(k)));
+    let nx=tgt+1;k.stealing=false;st(k,'sb');
+    const ps=[];G.bases[tgt-2]=null;
+    {const ld=nx<4?G.bases[nx-1]:null;if(ld&&ld!==k&&!(r3go&&ld===r3)){if(chance(.45+.45*sk(ld,'iq')/100)){G.bases[nx-1]=null;coachSay(3,'回れー!','wave',1);ps.push(runBases(ld,nx,4))}else{nx=tgt;say(pick(benchKids(bat))||bat.coach,'なんで行かないのー!',1)}}}
+    if(nx===tgt){G.bases[tgt-1]=k;ps.push(k.goto(BASES[tgt][0],BASES[tgt][1],k.spd))}
+    else if(nx<4){G.bases[nx-1]=k;ps.push(k.goto(BASES[nx][0],BASES[nx][1],k.spd))}else ps.push(k.goto(0,0,k.spd).then(()=>scoreRun(k)));
     if(sp.type==='d12'&&r1){r1.stealing=false;G.bases[0]=null;G.bases[1]=G.bases[1]||r1;st(r1,'sb')}
     if(r3go){r3.stealing=false;G.bases[2]=G.bases[2]===r3?null:G.bases[2];ps.push(r3.goto(0,0,r3.spd).then(()=>scoreRun(r3)))}
     const bk=fielder('CF');await bk.goto(wx,wz,4.6);G.ball.holder=bk;await Promise.all(ps);await relayToPitcher();return;
@@ -1668,6 +1681,7 @@ async function atBat(res){
   else if(G.outs<2&&(G.bases[0]||G.bases[1])&&!G.bases[2]&&chance(.2))plan='bunt';
   if(plan){bat.coach.setPose('sign',1.6,bat.side<0?'r':'l');await sleep(.6);bat.coach.setPose('sign',1.2,bat.side<0?'r':'l');await sleep(1.4);batter.setPose('stand',.6,'l');await sleep(.6)}
   while(true){
+    await fixBases(bat);
     saveResume(batter,balls,strikes);
     if(plan&&strikes<2){const r=await buntPitch(batter,plan,p,c);
       if(r==='done')return;
@@ -1810,10 +1824,10 @@ async function halfInning(bat,fld,res){
   if(res)G.bases.forEach((k,i)=>{if(!k)return;k.role='R';k.helmet=true;k.idlePose='stand';k.idleFace='f';const[x,z]=BASES[i+1];k.place(x,z)});
   placeCoaches(bat);
   if(res){[bat,fld].forEach(t=>{if(t.bcoach)Object.values(t.bcoach).forEach(k=>{k.place(k.tx,k.tz)})});updateHUD();await sleep(2.5)}
-  else{changeChatter(bat,fld);await sleep(7)}
-  fld.kids.forEach(k=>{k.toPos=false});
+  else{changeChatter(bat,fld);await sleep(.8)}
   {const p0=fielder('P');if(G.ball.holder===G.ump&&!res){await throwTo(G.ump,p0,9)}else{G.ball.vis=true;G.ball.holder=p0}}
   if(!res)await warmupPitches(fld);
+  fld.kids.forEach(k=>{k.toPos=false});
   if(!res)await shimatte(fld);
   playCall();
   while(G.outs<3){

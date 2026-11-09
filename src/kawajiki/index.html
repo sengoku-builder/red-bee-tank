@@ -568,6 +568,8 @@ function liveRun(batter,opt={}){
           if(Math.hypot(k.tx-xx,k.tz-z)>.3||!k.moving)k.walkTo(xx,z,k.spd);
           if(o.cont==null&&o.tgt<4&&dist(k,xx,z)<4){const ob=o.base;o.base=o.tgt;o.cont=forcedTo(o.base,o)||goNext(o);o.base=ob}
           if(dist(k,xx,z)<.45){o.base=o.tgt;o.maxB=Math.max(o.maxB,o.base);o.tgt=null;
+            // フォース（押し出し）は次の塁まで。塁を回ってさらに進むときは、後ろから押されていない限りタッチプレー
+            o.forced=st.some(q=>q!==o&&q.mode==='run'&&q.tgt===o.base&&q.forced);k.forcedTo=null;
             if(o.base===4){cancelRun(k);scoreRun(k);o.mode='done';continue}
             const cont=o.cont;o.cont=null;
             if(forcedTo(o.base,o)||cont){o.tgt=o.base+1;if(o.tgt===4)coachSay(3,'回れ回れー!','wave',1);else if(o.tgt===3)coachSay(3,'来い来いー!','wave',0);continue}

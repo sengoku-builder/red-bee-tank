@@ -176,7 +176,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261109102044';
+const BUILD='20261109104716';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 // スマホの壁紙（?wallpaper）は歯車を隠す。PCの壁紙（?wallpaper=1 など）は歯車を出して設定できるようにする
@@ -2225,13 +2225,19 @@ async function atBat(res){
 }
 
 async function halfInning(bat,fld,res){
-  G.prog=simT+30;
+  G.prog=simT+30;G.playOn=false;
   G.bat=bat;G.field=fld;G.balls=G.strikes=0;
   if(res){G.outs=res.outs;G.runsThis=res.runsThis||0;G.bases=res.bases.map(i=>i>=0?bat.all[i]:null);G.umps.forEach((u,i)=>{u.idleFace=i===0?'b':'f';u.place(UMP_POS[i][0],UMP_POS[i][1])})}
   else{umpsToPosts();G.outs=0;G.bases=[null,null,null];G.runsThis=0}
   {const ti=bat===G.home?0:1;if(G.line[ti][G.inning-1]==null)G.line[ti][G.inning-1]=0}updateHUD();
   const mv=(k,x,z,sp)=>res?k.place(x,z):k.walkTo(x,z,sp);
   fld.kids.forEach((k,i)=>{setRole(fld,k,i);const[x,z]=POS[k.role];if(res||!k.toPos)mv(k,x,z,4.6)});
+  // 守備につく子が途中で止まってしまったら（ベンチに着いたまま等）、守備位置へ向かわせる
+  if(!res)(async()=>{const idle=new Map();for(let n=0;n<60&&G.field===fld;n++){await sleep(.5);let all=true;
+    for(const k of fld.kids){const[x,z]=POS[k.role]||[];if(x==null)continue;if(dist(k,x,z)<.6){idle.delete(k);continue}all=false;
+      if(k.moving||k.stunUntil>simT){idle.delete(k);continue}const c=(idle.get(k)||0)+1;idle.set(k,c);
+      if(c>=2){k.chain=(k.chain||0)+1;k.toPos=false;k.helmet=false;k.carry=null;k.idlePose='ready';k.idleFace='f';k.walkTo(x,z,5);idle.delete(k)}}
+    if(all&&G.playOn)break}})();
   fld.all.filter(k=>!fld.kids.includes(k)).forEach(k=>{const[x,z]=benchPos(fld,k);benchIdle(fld,k);mv(k,x,z,3.6)});
   bat.all.forEach(k=>{if(k.pre&&!res)return;const[x,z]=benchPos(bat,k);benchIdle(bat,k);mv(k,x,z,3.6)});
   if(res)G.bases.forEach((k,i)=>{if(!k)return;k.role='R';k.helmet=true;k.idlePose='stand';k.idleFace='f';const[x,z]=BASES[i+1];k.place(x,z)});
@@ -2243,7 +2249,7 @@ async function halfInning(bat,fld,res){
     if(G.ball.holder===G.ump&&!res){await throwTo(G.ump,p0,9)}else{G.ball.vis=true;G.ball.holder=p0}}
   if(!res)await warmupPitches(fld);
   fld.kids.forEach(k=>{k.toPos=false});
-  if(!res)await shimatte(fld);
+  if(!res)await shimatte(fld);G.playOn=true;
   playCall();
   while(G.outs<3){
     if(!res&&!G.rp)await pitchingChange(fld);

@@ -176,7 +176,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261109091558';
+const BUILD='20261109092859';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 // スマホの壁紙（?wallpaper）は歯車を隠す。PCの壁紙（?wallpaper=1 など）は歯車を出して設定できるようにする
@@ -1722,17 +1722,20 @@ function fieldPlan(tr){
       if(!a&&isIF&&r>33)continue;                 // 外野の芝まで抜けたゴロは内野手では間に合わない
       const d=Math.hypot(x-f.x,z-f.z),need=re+d/rs;
       if(need<=t){got={f,t,x,z,air:a,dive:false};break}
-      if(!dv&&f.role!=='P'&&d>1.6&&re+(d-(a?2.1:1.8))/rs<=t&&t>.35)dv={f,t,x,z,air:a,dive:true};
+      if(!dv&&f.role!=='P'&&(a||!isOF)&&d>1.6&&re+(d-(a?2.1:1.8))/rs<=t&&t>.35)dv={f,t,x,z,air:a,dive:true};
     }
     if(!got&&isOF){const[x,z]=tr.end,t=Math.max(tr.Tend,re+Math.hypot(x-f.x,z-f.z)/rs);got={f,t,x,z,air:false,dive:false,late:true}}
     if(dv&&(!got||got.t>dv.t+.25))evs.push(dv);
     if(got)evs.push(got);
   }
   evs.sort((a,b)=>a.t-b.t);
-  const missed=[];
-  for(const e of evs){
-    if(missed.includes(e.f))continue;
-    if(e.dive){const p=(e.air?.22:.28)+.5*sk(e.f,'fld')/100;if(chance(p))return{ev:e,missed};missed.push(e.f);continue}
+  const missed=[],failT=new Map();G.diveMiss=new Map();
+  for(let i=0;i<evs.length;i++){const e=evs[i];
+    if(e.dive){if(missed.includes(e.f))continue;const p=(e.air?.22:.28)+.5*sk(e.f,'fld')/100;if(chance(p))return{ev:e,missed};missed.push(e.f);failT.set(e.f,e.t);G.diveMiss.set(e.f,{t:e.t,x:e.x,z:e.z});continue}
+    // 飛びついて届かなかった子も、起き上がってからボールを追える
+    if(failT.has(e.f)&&e.t<failT.get(e.f)+1.1){const t=failT.get(e.f)+1.1,[x,z]=tr.at(Math.min(t,tr.Tend));
+      if(!['LF','CF','RF'].includes(e.f.role)&&Math.hypot(x,z)>33)continue;
+      const e2={...e,t:t+Math.hypot(x-e.x,z-e.z)/runSpd(e.f),x,z,air:false};evs.splice(i+1,0,e2);evs.sort((a,b)=>a.t-b.t);failT.delete(e.f);continue}
     return{ev:e,missed};
   }
   return{ev:null,missed};
@@ -1799,7 +1802,13 @@ async function playHit(tr,ev,batter,missed){
   {const bk=G.field.kids.filter(k=>['LF','CF','RF'].includes(k.role)&&k!==of).sort((a,z)=>dist(a,px,pz)-dist(z,px,pz))[0];
     if(bk&&dist(bk,px,pz)<24){bk.distracted=false;(async()=>{await sleep(.5);const a=Math.atan2(px,pz);bk.walkTo(px+Math.sin(a)*4,pz+Math.cos(a)*4,runSpd(bk)*.9)})()}}
   const bp=runPath(tr,Math.min(T,tr.Tend));
-  {const rs=runSpd(of),re=reactT(of);(async()=>{await sleep(re);if(G.inPlay&&!b.holder)of.walkTo(px,pz,oe==='charge'?rs*1.1:clamp(dist(of,px,pz)/Math.max(.3,T-re),2,rs))})()}
+  {const rs=runSpd(of),re=reactT(of),dm=G.diveMiss&&G.diveMiss.get(of);
+    (async()=>{await sleep(re);if(!G.inPlay||b.holder)return;
+      if(dm){// 外野手が飛びついて届かなかった：起き上がってから追う
+        const dir=dm.x>of.x?1:-1;of.walkTo(dm.x-dir*1.8,dm.z,rs);await sleep(Math.max(0,dm.t-re-.34));if(!G.inPlay)return;
+        diveTo(of,dm.x-dir*.4,dm.z,dir,.34);say(of,'えいっ!',1);await sleep(.4);of.walkTo(of.x,of.z);of.fall(.8,dir,false);await sleep(1.0);if(!G.inPlay||b.holder)return;
+        of.walkTo(px,pz,rs);return}
+      of.walkTo(px,pz,oe==='charge'?rs*1.1:clamp(dist(of,px,pz)/Math.max(.3,T-re),2,rs))})()}
   if(oe==='charge'){
     say(G.field.coach,'バックホームだ!',1);
     await bp;await of.goto(px,pz,runSpd(of));of.setPose('squat',1.2,'f');spot(of,2,.1);G.ballPlan=null;

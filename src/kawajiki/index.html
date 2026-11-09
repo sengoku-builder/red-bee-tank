@@ -2912,7 +2912,7 @@ function drawKid(c,e){
   const hasGlove=e.role&&!['B','R','OD','CO'].includes(e.role)&&e.kind==='kid'&&!e.carry;
   hands.forEach(([x,y],i)=>{c.fillStyle=e.skin;c.beginPath();c.arc(x*U,(y+sq*.6)*U,.04*U,0,7);c.fill()});
   if(hasGlove||(e.glove)){let gi=(side&&pose==='throw')?1:(face==='b'&&!side?1:0);if(e.lthrow&&side)gi=1-gi;const [x,y]=hands[gi];c.fillStyle='#9a5b2c';c.beginPath();c.arc(x*U,(y+sq*.6)*U,.068*U,0,7);c.fill();c.fillStyle='#b97440';c.beginPath();c.arc(x*U-.015*U,(y+sq*.6)*U-.015*U,.035*U,0,7);c.fill()}
-  if(e.signUntil>simT&&!side){const k=Math.floor(simT*6)%3;c.fillStyle=e.skin;c.beginPath();c.arc((k-1)*.035*U,(-.1+sq)*U,.04*U,0,7);c.fill();c.fillStyle='#fff';c.fillRect((k-1)*.035*U-.008*U,(-.16+sq)*U,.016*U,.06*U)}
+  if(e.signUntil>simT&&e.signUntil-simT<.8&&!side){const k=Math.floor(simT*6)%3;c.fillStyle=e.skin;c.beginPath();c.arc((k-1)*.035*U,(-.1+sq)*U,.04*U,0,7);c.fill();c.fillStyle='#fff';c.fillRect((k-1)*.035*U-.008*U,(-.16+sq)*U,.016*U,.06*U)}
   // bat
   if(e.role==='OD'){const [x,y]=hands[1];limb(c,x*U,(y+sq*.6)*U,(x+.04)*U,(y+sq*.6-.55)*U,.06*U,'#c99456');limb(c,(x+.02)*U,(y+sq*.6-.3)*U,(x+.04)*U,(y+sq*.6-.55)*U,.085*U,'#d6a466')}
   if(e.role==='B'&&pose==='bunt'){const [x0,y0]=hands[0],[x1,y1]=hands[1];limb(c,(x0-.12)*U,y0*U,(x1+.42)*U,(y1-.06)*U,.06*U,'#c99456');limb(c,(x1+.2)*U,(y1-.04)*U,(x1+.42)*U,(y1-.06)*U,.085*U,'#d6a466')}
@@ -2924,7 +2924,7 @@ function drawKid(c,e){
   const lookAway=e.role==='B'&&side&&(pose==='bat'||(pose==='swing'&&clamp((simT-(e.poseT0||0))/(e.poseDur||.5),0,1)<.55));
   let hy=(-.7+sq)*U;const hr=.27*U;let hxo=0;
   if(bow){hy+=.14*U;hxo=side?.14*U:0}
-  if(e.nod&&simT<e.nod.t1){const ph=(simT-e.nod.t0)*15;if(e.nod.y)hy+=Math.max(0,Math.sin(ph))*.07*U;else hxo+=Math.sin(ph)*.06*U}
+  if(e.nod&&simT>=e.nod.t0&&simT<e.nod.t1){const ph=(simT-e.nod.t0)*15;if(e.nod.y)hy+=Math.max(0,Math.sin(ph))*.07*U;else hxo+=Math.sin(ph)*.06*U}
   c.fillStyle=e.hair;c.beginPath();c.arc(hxo,hy,hr*1.02,0,7);c.fill();
   if(e.girl){c.fillStyle=e.hair;c.beginPath();if(face==='b'&&!side)c.ellipse(hxo,hy+hr*.9,hr*.22,hr*.45,0,0,7);else if(side)c.ellipse(hxo-hr*.95,hy+hr*.3,hr*.22,hr*.42,.5,0,7);else c.ellipse(hxo+hr*.98,hy+hr*.25,hr*.18,hr*.35,-.3,0,7);c.fill()}
   if((face!=='b'||side)&&!lookAway){c.fillStyle=e.skin;c.beginPath();if(side)c.arc(hxo+hr*.06,hy+hr*.06,hr*.93,0,7);else c.arc(hxo,hy+hr*.06,hr*.95,0,7);c.fill()}
@@ -3231,7 +3231,7 @@ function startPhase(ph){if(typeof RP!=='undefined'&&RP){RP=null}if(typeof RBUF!=
 
 let last=performance.now();
 /* ---------- 早送りとリプレイ ---------- */
-let ffMul=1,RP=null,recAcc=0;const RBUF=[],RF=['x','z','tx','tz','moving','poseO','poseUntil','faceO','poseT0','poseDur','stunUntil','fallDir','carry','helmet','role','idlePose','idleFace','glove','joy','lookUp','h','holder','vis','mface','dead','speed'];
+let ffMul=1,RP=null,recAcc=0;const RBUF=[],RF=['x','z','tx','tz','moving','poseO','poseUntil','faceO','poseT0','poseDur','stunUntil','fallDir','carry','helmet','role','idlePose','idleFace','glove','joy','lookUp','h','holder','vis','mface','dead','speed','nod','signUntil','leadSt'];
 function rsnap(){return{t:simT,ents:ents.slice(),v:ents.map(e=>RF.map(f=>e[f])),b:bubbles.slice()}}
 function applySnap(sn,sn2,u){ents=sn.ents.slice();sn.ents.forEach((e,i)=>{const v=sn.v[i];RF.forEach((f,j)=>{e[f]=v[j]});
     if(sn2&&u>0){const j=sn2.ents.indexOf(e);if(j>=0){const w=sn2.v[j];e.x+=(w[0]-e.x)*u;e.z+=(w[1]-e.z)*u;if(typeof w[20]==='number'&&typeof e.h==='number')e.h+=(w[20]-e.h)*u}}});

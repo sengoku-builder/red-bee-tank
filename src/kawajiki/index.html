@@ -1341,8 +1341,10 @@ async function doublePlay(f,fb,r1,batter,batterRun,runs){
   await sleep(.05+.45*(1-q));
   if(chance(.02+.1*(1-q))){await throwTo(piv,fb,16,b,[fb.x+3,fb.z-3.5]);oops(fb,'recv');oops(piv,'thr',0);markErr(piv);await batterRun;batter.goto(16.6,16.3,2.2);G.bases[0]=batter;fb.walkTo(b.x,b.z,4);await sleep(1);b.holder=fb;await runs;return'E'}
   await throwTo(piv,fb,22);
-  const dpOut=chance(.12+.55*q-.3*sk(batter,'run')/100+(kn?.15:0)+.15*chem(G.field));
-  if(!passed1B(batter)||(dpOut&&Math.hypot(batter.x-16.6,batter.z-16.3)<4.5)){
+  // 一塁は送球とバッターのどちらが先に着いたかで決める（きわどいときだけ審判の目で五分五分に）
+  const d1=Math.hypot(batter.x-16.6,batter.z-16.3),reached=passed1B(batter);
+  const dpOut=!reached&&(d1>.9||chance(.5));
+  if(dpOut){
     call(G.umps[1],'out');addOut();
     if(out2){spot(fb,1.6);didRight(piv,'dp');didRight(f,'dp');say(pick(G.field.kids),'ゲッツー!',2);await sleep(.5);say(pick(G.field.parents.concat(benchKids(G.field))),'ナイスゲッツー!',1)}
     await batterRun;benchFrom1B(G.bat,batter);await runs;return'O';

@@ -1063,7 +1063,7 @@ async function playGrounder(tx,tz,d,batter,opt={}){
   else runs=liveRun(batter);
   const batterRun=(ev==='out'||ev==='dive')?runBases(batter,0,1,'out'):null;
   if(opt.tr){(async()=>{await sleep(reactT(f)+.1);if(!b.holder)f.walkTo(tx,tz,ev==='dive'?runSpd(f):Math.max(2.5,Math.min(runSpd(f),dist(f,tx,tz)/Math.max(.2,bdur-reactT(f)-.1))))})()}else f.walkTo(tx,tz,5);
-  const bp=opt.tr?runPath(opt.tr,bdur):b.flyTo(tx,tz,bdur,.35,.9,.1,true);
+  const bp=opt.tr?ballPath(opt.tr,bdur):b.flyTo(tx,tz,bdur,.35,.9,.1,true);
   if(ev==='dive'){
     const dir=tx>f.x?1:-1;spot(f,bdur+1.6,Math.max(.05,bdur-.12));
     await sleep(Math.max(.05,bdur-.3));diveTo(f,tx-dir*.3,tz,dir,.34);say(f,'えいっ!',1);
@@ -1083,8 +1083,9 @@ async function playGrounder(tx,tz,d,batter,opt={}){
   if(ev==='trip'||ev==='tunnel'||ev==='through'){
     if(ev==='tunnel'){f.setPose('squat',.8);oops(f,'tunnel',2);mistake(f,'tunnel',true)}
     if(ev!=='through')markErr(f);
-    const of=nearest(ext[0],ext[1],['C','P','1B','2B','3B','SS']);of.distracted=false;
-    of.walkTo(ext[0],ext[1],4.6);prepRelay(ext[0],ext[1]);
+    // 抜けたボールは一番近い子が拾う（うしろにいたショートやセカンドが拾えば内野で止まる）
+    const of=G.field.kids.filter(k=>k!==f&&k.role!=='C'&&k.role!=='1B').sort((a,z)=>dist(a,ext[0],ext[1])-dist(z,ext[0],ext[1]))[0];of.distracted=false;
+    of.walkTo(ext[0],ext[1],runSpd(of));if(['LF','CF','RF'].includes(of.role))prepRelay(ext[0],ext[1]);
     await b.flyTo(ext[0],ext[1],1.8,.2,.15,.05,true);
     await of.goto(ext[0],ext[1],4.6);b.holder=of;
     coachSay(3,'まわれまわれー!','wave',1);
@@ -1741,7 +1742,7 @@ function fieldPlan(tr){
   return{ev:null,missed};
 }
 // 打球を軌道どおりに動かす（捕られたら止まる）
-function runPath(tr,tEnd){
+function ballPath(tr,tEnd){
   const b=G.ball,tok=(G.btok=(G.btok||0)+1),t0=simT;
   return(async()=>{
     while(true){
@@ -1773,7 +1774,7 @@ function chaseMiss(tr,missed,ev,only){
 async function lineCatch(tr,ev,batter){
   const f=ev.f,b=G.ball,dir=ev.x>f.x?1:-1;f.distracted=false;
   const bt=(async()=>{await batter.goto(9,9.4,batter.spd)})();
-  const bp=runPath(tr,ev.t);
+  const bp=ballPath(tr,ev.t);
   if(ev.dive){spot(f,ev.t+1.6,Math.max(.05,ev.t-.15));await sleep(Math.max(.05,ev.t-.34));diveTo(f,ev.x-dir*.25,ev.z,dir,.34);say(f,'えいっ!',1)}
   else{await sleep(reactT(f));f.walkTo(ev.x,ev.z,runSpd(f));await sleep(Math.max(0,ev.t-reactT(f)-.25));f.setPose('catchUp',.8,'f')}
   await bp;G.btok++;b.holder=f;await sleep(.1);
@@ -1801,7 +1802,7 @@ async function playHit(tr,ev,batter,missed){
   // 近くの外野手がバックアップ
   {const bk=G.field.kids.filter(k=>['LF','CF','RF'].includes(k.role)&&k!==of).sort((a,z)=>dist(a,px,pz)-dist(z,px,pz))[0];
     if(bk&&dist(bk,px,pz)<24){bk.distracted=false;(async()=>{await sleep(.5);const a=Math.atan2(px,pz);bk.walkTo(px+Math.sin(a)*4,pz+Math.cos(a)*4,runSpd(bk)*.9)})()}}
-  const bp=runPath(tr,Math.min(T,tr.Tend));
+  const bp=ballPath(tr,Math.min(T,tr.Tend));
   {const rs=runSpd(of),re=reactT(of),dm=G.diveMiss&&G.diveMiss.get(of);
     (async()=>{await sleep(re);if(!G.inPlay||b.holder)return;
       if(dm){// 外野手が飛びついて届かなかった：起き上がってから追う
@@ -2030,7 +2031,7 @@ async function buntPitch(batter,plan,p,c){
   const tx=rnd(-5,5),tz=rnd(5,9);
   const f=nearest(tx,tz,['C','2B','SS','LF','CF','RF'])||p;
   say(batter,'えいっ!',0);
-  const ps=[];
+  const ps=[],old=[...G.bases];
   for(let i=2;i>=0;i--){const k=G.bases[i];if(!k)continue;ps.push(runBases(k,i+1,Math.min(i+2,4)))}
   const nb=[null,G.bases[0],G.bases[1]];G.bases=nb;
   const bp2=G.ball.flyTo(tx,tz,1.3,.15,.2,.05,true);
@@ -2038,6 +2039,23 @@ async function buntPitch(batter,plan,p,c){
   const cover=f===fb?fielder('2B'):fb;
   const bRun=runBases(batter,0,1,'out');
   f.walkTo(tx,tz,5);await bp2;await f.goto(tx,tz,5);G.ball.holder=f;await sleep(.2);
+  // 先の塁（満塁ならホーム）で楽にアウトにできるなら、そっちへ投げる
+  {const lead=old[0]?(old[1]?(old[2]?4:3):2):1;
+    if(lead>1&&G.outs<3){const k=old[lead-2],[bx,bz]=lead===4?[0,0]:BASES[lead];
+      const recv=lead===4?fielder('C'):lead===3?fielder('3B'):(f.role==='SS'?fielder('2B'):fielder('SS'));
+      if(recv&&recv!==f){const tR=dist(k,bx,bz)/k.spd,tT=.28+Math.hypot(bx-f.x,bz-f.z)/thrSpd(f);
+        if(tT<tR-.3&&chance(.45+.5*sk(f,'iq')/100)){
+          recv.walkTo(bx+(lead===4?0:.3),bz+(lead===4?.3:-.3),5.5);say(f,lead===4?'ホーム!':lead===3?'サード!':'セカン!',1);
+          await throwTo(f,recv,thrSpd(f)+2);
+          if(dist(k,bx,bz)>.5){cancelRun(k);G.bases=G.bases.map(x=>x===k?null:x);call(nearestUmp(bx,bz),'out');addOut();sendToBench(G.bat,k);
+            say(pick(G.field.kids),lead===4?'ナイスバックホーム!':'ナイス判断!',1);
+            // 間に合えば一塁へ転送してゲッツー
+            let dp=false;if(G.outs<3&&!passed1B(batter)&&chance(.3+.4*sk(recv,'thr')/100)){await sleep(.25);await throwTo(recv,fb,thrSpd(recv)+2);if(!passed1B(batter)){call(G.umps[1],'out');addOut();dp=true;say(pick(G.field.kids),'ゲッツー!',2)}}
+            if(dp){await bRun;benchFrom1B(G.bat,batter)}else{call(G.umps[1],'safe',0);await bRun;batter.goto(16.6,16.3,2.2);G.bases[0]=batter}
+            await Promise.all(ps);st(batter,'pa');st(batter,'ab');
+            say(pick(benchKids(G.bat)),'あ〜…',0);G.inPlay=false;await relayToPitcher();return'done';
+          }
+        }}}}
   await throwTo(f,cover,15);call(G.umps[1],'out');addOut();
   await bRun;benchFrom1B(G.bat,batter);await Promise.all(ps);
   st(batter,'pa');st(batter,'sh');if(G.playRuns)st(batter,'rbi',G.playRuns);
@@ -3260,8 +3278,15 @@ function drawDog(c,e){
   c.fillStyle='#2a2a2a';c.beginPath();c.arc(.58*U,-.8*U,.03*U,0,7);c.fill();
   c.restore();
 }
+// 高く上がった打球が画面の上へ消えないよう、見た目の高さだけ少し縮める
+function dispH(h){return h<=8?h:8+12*(1-Math.exp(-(h-8)/12))}
 function drawBall(c,b){
-  if(!b.vis)return;const g=P(b.x,b.z),p=P(b.x,b.z,b.h);const r=Math.max(2.1,.13*g.k);
+  if(!b.vis)return;const g=P(b.x,b.z),p=P(b.x,b.z,dispH(b.h));const r=Math.max(2.4,.13*g.k);
+  // 飛んでいる打球にはうっすら軌跡をつけて、どこへ飛んだか追いやすく
+  if(!b.holder&&b.path&&G.inPlay){const tr=b.trail||(b.trail=[]);tr.push([p.x,p.y]);if(tr.length>7)tr.shift();
+    if(tr.length>2){c.lineCap='round';for(let i=1;i<tr.length;i++){c.strokeStyle=`rgba(255,253,240,${.08+.4*i/tr.length})`;c.lineWidth=r*(.5+.9*i/tr.length);c.beginPath();c.moveTo(tr[i-1][0],tr[i-1][1]);c.lineTo(tr[i][0],tr[i][1]);c.stroke()}}}
+  else b.trail=null;
+  if(!b.holder&&b.h>2&&G.inPlay){c.fillStyle='rgba(255,255,255,.32)';c.beginPath();c.arc(p.x,p.y,r*2.3,0,7);c.fill()}
   if(b.h>.05&&!b.holder){c.fillStyle='rgba(30,40,20,.24)';c.beginPath();c.ellipse(g.x,g.y,r*1.15,r*.42,0,0,7);c.fill()}
   c.fillStyle='#fffdf7';c.beginPath();c.arc(p.x,p.y,r,0,7);c.fill();c.strokeStyle='rgba(120,120,120,.55)';c.lineWidth=Math.max(.5,r*.12);c.stroke();
   c.strokeStyle='rgba(190,55,45,.7)';c.lineWidth=r*.18;c.beginPath();c.arc(p.x-r*.9,p.y,r*.75,-.75,.75);c.stroke();c.beginPath();c.arc(p.x+r*.9,p.y,r*.75,Math.PI-.75,Math.PI+.75);c.stroke();

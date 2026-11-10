@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>大会 - 河川敷の少年野球</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#2a3142;--paper:#fffcf3;--line:#ddd4bd;--chip:#f1ead7;--navy:#24418a;--muted:#6b7286;--gold:#c9961a;--win:#1f6b3a;
+  --font:'Zen Maru Gothic','Hiragino Maru Gothic ProN','BIZ UDPGothic','Yu Gothic',sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0;background:#efe8d6;color:var(--ink);font-family:var(--font);-webkit-tap-highlight-color:transparent}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button{font-family:var(--font);color:inherit;cursor:pointer}
+input{font-family:var(--font);font-size:16px;color:var(--ink)}
+[hidden]{display:none!important}
+.wrap{max-width:760px;margin:0 auto;padding:0 12px 80px}
+header.top{position:sticky;top:0;z-index:5;background:#efe8d6;padding:10px 12px 8px;display:flex;align-items:center;gap:8px;max-width:760px;margin:0 auto}
+header.top h1{font-size:17px;margin:0;flex:1}
+.ib{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:7px 12px;font-size:14px;text-decoration:none;color:var(--ink)}
+.card{background:var(--paper);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+.card h2{font-size:15px;margin:0 0 8px}
+.muted{color:var(--muted);font-size:13px;line-height:1.6}
+.stage{display:flex;gap:6px;margin:6px 0 10px}
+.stage span{flex:1;text-align:center;font-size:13px;padding:6px 0;border-radius:8px;background:var(--chip);color:var(--muted);font-weight:700}
+.stage span.on{background:var(--navy);color:#fff}
+.stage span.done{background:#e7d9a8;color:#6b5410}
+.mine{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.mine span{font-size:13px;padding:4px 10px;border-radius:999px;background:#fff;border:1px solid var(--line)}
+.mine span.alive{border-color:var(--win);color:var(--win);font-weight:700}
+.br{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px}
+.brg{display:grid;gap:0 14px;align-items:stretch}
+.col{display:grid}
+.colh{font-size:12px;font-weight:700;text-align:center;color:var(--muted);padding:2px 0 6px;position:sticky;top:0}
+.colh.now{color:var(--navy)}
+.m{align-self:center;background:#fff;border:1px solid var(--line);border-radius:8px;font-size:12.5px;margin:3px 0;overflow:hidden}
+.m .t{display:flex;justify-content:space-between;gap:6px;padding:4px 7px;white-space:nowrap}
+.m .t+.t{border-top:1px solid #eee6d0}
+.m .t .n{overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.m .t.w{font-weight:700}
+.m .t.l{color:#9aa0ad}
+.m .t.my .n::before{content:'★';color:var(--gold);margin-right:2px}
+.m .t.my{background:#fff8e0}
+.m.next{border-color:var(--navy);box-shadow:0 0 0 2px rgba(36,65,138,.15)}
+.m .lot{font-size:10px;color:var(--muted);text-align:right;padding:0 7px 3px}
+.m.bye{opacity:.55}
+.hist{list-style:none;margin:0;padding:0}
+.hist li{padding:8px 0;border-bottom:1px solid #eee6d0;font-size:14px;line-height:1.6}
+.hist li b{color:var(--navy)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row input{width:90px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.btn{border:none;border-radius:12px;padding:11px 16px;font-size:15px;font-weight:700;background:var(--navy);color:#fff}
+.btn.sub{background:var(--chip);color:var(--ink);border:1px solid var(--line)}
+.btn.warn{background:#fff;color:#c0392b;border:1px solid #e5b4ae}
+.big{font-size:22px;font-weight:700;text-align:center;margin:6px 0 2px}
+</style></head>
+<body>
+<header class="top"><a class="ib" href="index.html">← 野球場へ</a><h1>大会</h1></header>
+<div class="wrap" id="app"></div>
+<script>
+const DKEY='kawajiki.data.v1';
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function loadD(){try{return JSON.parse(localStorage.getItem(DKEY)||'null')}catch(e){return null}}
+function saveD(d){try{localStorage.setItem(DKEY,JSON.stringify(d))}catch(e){}}
+function editD(fn){const d=loadD();if(!d)return;fn(d);saveD(d)}
+/* ---------- 大会（トーナメント）：index.html と taikai.html で同じものを使う ---------- */
+const T_STAGES=['地区大会','県大会','全国大会'],T_LV=[[26,60],[42,72],[56,82]];
+const T_TOWN=['みなみ台','ひがし','にし町','きたの','さくら','あおば','つばさ','ひかり','かわせ','やまびこ','みどり','はやて','あさひ','すずかけ','ほしの','わかば','たかね','うみべ','もりの','いずみ','かぜの','おおぞら','ゆうひ','しらかば','こがね','あけぼの','ふじみ','ときわ','かすみ','ひばり','くすのき','なぎさ','やまと','かえで','たちばな','すみれ','あじさい','ひので','つきみ','はなぞの'];
+const T_SUF=['ファイターズ','イーグルス','タイガース','ジュニアーズ','スターズ','ドリームス','ブレーブス','ホークス','少年野球団','クラブ','ベアーズ','レッズ','ウイングス','ライオンズ','スピリッツ','ドラゴンズ','キッズ','ペガサス'];
+const T_CAPS=[['#25408a','#182c63'],['#c9443b','#90302a'],['#2f8a58','#1f6440'],['#d9822b','#a3601c'],['#3b93d4','#2a6fa3'],['#7a4fb3','#5a3889'],['#2b2f3a','#15181f'],['#e0b021','#a88210'],['#d4588f','#a23d6b'],['#8a5a2b','#61401e']];
+const T_BODIES=[['#f7f6ef','#f4f3ec'],['#a9b1bc','#e9ebee'],['#f1ece0','#f1ece0'],['#dcebf5','#eef4f8'],['#2c3c66','#e9ebee']];
+function tPick(a){return a[Math.floor(Math.random()*a.length)]}
+function tShuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function tSize(T,st){return st===2?T.n*2:T.n}
+function tRoundName(R,ri){const k=R-1-ri;return k===0?'決勝':k===1?'準決勝':(k===2&&R>3)?'準々決勝':`${ri+1}回戦`}
+function tLoseLabel(R,ri){const k=R-1-ri;return k===0?'準優勝':k===1?'ベスト4':k===2?'ベスト8':`${ri+1}回戦敗退`}
+function tCpuDef(lv,used){let nm='';for(let i=0;i<60;i++){nm=tPick(T_TOWN)+tPick(T_SUF);if(!used.has(nm))break}used.add(nm);const c=tPick(T_CAPS),b=tPick(T_BODIES);
+  return{name:nm,lv:Math.round(lv),cap:c[0],capD:c[1],body:b[0],trim:c[0],pants:b[1],sock:c[0]}}
+// 勝ち上がり：前の回戦の勝者を次の回戦に入れる
+function tProp(C){for(let r=1;r<C.rounds.length;r++)C.rounds[r].forEach((m,i)=>{const p=C.rounds[r-1];if(m.a==null&&p[2*i].w!=null)m.a=p[2*i].w;if(m.b==null&&p[2*i+1].w!=null)m.b=p[2*i+1].w;
+  if(m.w==null&&m.a!=null&&m.b===-1)m.w=m.a})}
+function tNewStage(T,st,myIds,teams){
+  const n=Math.max(myIds.length+1,tSize(T,st)),used=new Set(teams.map(t=>t.name)),ents=myIds.map(id=>({my:id})),[lo,hi]=T_LV[st];
+  while(ents.length<n)ents.push({cpu:tCpuDef(lo+Math.random()*(hi-lo),used)});
+  tShuffle(ents);
+  let P=2;while(P<n)P*=2;const pairs=P/2,byes=P-n,byeAt=new Set();
+  for(let i=0;i<byes;i++)byeAt.add(Math.floor((i+.5)*pairs/byes));
+  const r0=[];let e=0;for(let i=0;i<pairs;i++){if(byeAt.has(i))r0.push({a:e++,b:-1,w:null,bye:true});else r0.push({a:e++,b:e++,w:null})}
+  r0.forEach(m=>{if(m.bye)m.w=m.a});
+  const rounds=[r0];for(let m=pairs/2;m>=1;m/=2)rounds.push(Array.from({length:m},()=>({a:null,b:null,w:null})));
+  const C={stage:st,ents,rounds,ri:0,show:false};tProp(C);return C;
+}
+function tStart(d,n){d.tour={on:true,n:Math.max(4,Math.min(64,Math.round(n)||16)),no:1,cur:null,log:[],hist:[]};d.tour.cur=tNewStage(d.tour,0,d.teams.map(t=>t.id),d.teams);return d.tour}
+function tOut(C,idx){return C.rounds.some(R=>R.some(m=>m.w!=null&&!m.bye&&(m.a===idx||m.b===idx)&&m.w!==idx))}
+function tEntName(e,teams){if(!e)return'';if(e.my){const t=teams.find(x=>x.id===e.my);return t?t.name:'マイチーム'}return e.cpu.name}
+
+let confirmStop=false;
+function render(){
+  const d=loadD(),app=document.getElementById('app');
+  if(!d||!d.teams){app.innerHTML=`<div class="card"><p class="muted">まだ野球場のデータがありません。先に一度「野球場」を開いてください。</p></div>`;return}
+  const T=d.tour;
+  if(!T||!T.on){app.innerHTML=`<div class="card"><h2>トーナメント大会を始める</h2>
+    <p class="muted">地区大会 → 県大会 → 全国大会と勝ち上がります。次の大会に進めるのは優勝チームだけ。マイチーム（${d.teams.map(t=>esc(t.name)).join('・')}）が全部負けたら、その回は終わり、すぐ次の回の地区大会が始まります。<br>県大会は同じチーム数、全国大会は倍のチーム数で行います。</p>
+    <div class="row" style="margin-top:10px"><label for="n">地区大会のチーム数</label><input id="n" type="number" min="4" max="64" value="16" inputmode="numeric"><button class="btn" id="start">大会を始める</button></div></div>
+    ${histHTML(d)}`;return}
+  const C=T.cur;let body='';
+  if(!C){body=`<div class="card"><p class="muted">次の大会の準備中です。野球場で次の試合が始まると表ができます。</p></div>`}
+  else{
+    const R=C.rounds.length,P=C.rounds[0].length*2;
+    const alive=C.ents.map((e,i)=>({e,i})).filter(x=>x.e.my);
+    const mine=alive.map(x=>{const out=C.ents&&tOutLabel(C,x.i);const nm=tEntName(x.e,d.teams);return`<span class="${out?'':'alive'}">${esc(nm)}：${out||'勝ち残り'}</span>`}).join('');
+    const out=T.log.filter(l=>l.stage<C.stage).map(l=>`<span>${esc(tEntName({my:l.tid},d.teams))}：${T_STAGES[l.stage]} ${esc(l.label)}</span>`).join('');
+    const unit=62;
+    const cols=C.rounds.map((Rd,ri)=>{const span=2**ri;
+      const ms=Rd.map((m,mi)=>{const row=`grid-row:${mi*span*2+1} / span ${span*2}`;
+        if(m.bye){const e=C.ents[m.a];return`<div class="m bye" style="${row}"><div class="t ${e.my?'my':''}"><span class="n">${esc(tEntName(e,d.teams))}</span><span>シード</span></div></div>`}
+        const nx=ri===C.ri&&m.w==null&&m.a!=null&&m.b!=null&&(C.ents[m.a].my||C.ents[m.b].my);
+        const line=(idx,sc)=>{if(idx==null||idx===-1)return`<div class="t"><span class="n" style="color:#b9b3a3">－</span><span></span></div>`;const e=C.ents[idx],w=m.w!=null?(m.w===idx?'w':'l'):'';return`<div class="t ${w} ${e.my?'my':''}"><span class="n">${esc(tEntName(e,d.teams))}</span><span>${sc==null?'':sc}</span></div>`};
+        return`<div class="m${nx?' next':''}" style="${row}">${line(m.a,m.sa)}${line(m.b,m.sb)}${m.lot?'<div class="lot">抽選</div>':''}</div>`}).join('');
+      return`<div><div class="colh${ri===C.ri?' now':''}">${tRoundName(R,ri)}</div><div class="col" style="grid-template-rows:repeat(${P},${unit/2}px)">${ms}</div></div>`}).join('');
+    body=`<div class="card"><h2>第${T.no}回 ${T_STAGES[C.stage]}（${C.ents.length}チーム）</h2>
+      <div class="stage">${T_STAGES.map((s,i)=>`<span class="${i===C.stage?'on':i<C.stage?'done':''}">${s}</span>`).join('')}</div>
+      <div class="mine">${mine}${out}</div></div>
+      <div class="card"><h2>トーナメント表</h2><div class="br"><div class="brg" style="grid-template-columns:repeat(${R},minmax(150px,1fr))">${cols}</div></div>
+      <p class="muted" style="margin-top:6px">★がマイチーム。青い枠が次のマイチームの試合です。マイチームの試合は野球場で行い、ほかの試合は合間に野球場で見られるか、結果だけ決まります。</p></div>`}
+  app.innerHTML=body+histHTML(d)+`<div class="card"><h2>設定</h2>
+    <div class="row"><label for="n2">地区大会のチーム数（次の回から）</label><input id="n2" type="number" min="4" max="64" value="${T.n}" inputmode="numeric"><button class="btn sub" id="saveN">保存</button></div>
+    <div class="row" style="margin-top:12px"><button class="btn warn" id="stop">${confirmStop?'本当にやめる（記録は残ります）':'大会をやめる'}</button></div></div>`;
+}
+function tOutLabel(C,idx){for(let ri=0;ri<C.rounds.length;ri++){const m=C.rounds[ri].find(m=>m.w!=null&&!m.bye&&(m.a===idx||m.b===idx));if(m&&m.w!==idx)return tLoseLabel(C.rounds.length,ri)}
+  const f=C.rounds[C.rounds.length-1][0];if(f.w===idx)return'優勝';return''}
+function histHTML(d){const h=(d.tour&&d.tour.hist)||[];if(!h.length)return'';
+  return`<div class="card"><h2>大会の歴史</h2><ul class="hist">${h.map(x=>{const best={};x.res.forEach(r=>{const k=r.tid,sc=r.stage*10+(r.label==='優勝'?9:r.label==='準優勝'?8:r.label==='ベスト4'?7:r.label==='ベスト8'?6:1);if(!best[k]||best[k].sc<sc)best[k]={sc,txt:`${T_STAGES[r.stage]} ${r.label}`}});
+    const top=Object.values(best).sort((a,b)=>b.sc-a.sc)[0];const champ=top&&top.sc>=29;
+    return`<li><b>第${x.no}回</b>${champ?' 🏆 全国優勝!':''}<br>${Object.entries(best).map(([k,v])=>`${esc(tEntName({my:k},d.teams))}：${v.txt}`).join('　')}</li>`}).join('')}</ul></div>`}
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.id==='start'){const n=+document.getElementById('n').value||16;editD(d=>{const old=d.tour;tStart(d,n);if(old){d.tour.hist=old.hist||[];d.tour.no=old.no||1}});render()}
+  if(b.id==='saveN'){const n=+document.getElementById('n2').value||16;editD(d=>{d.tour.n=Math.max(4,Math.min(64,Math.round(n)))});render()}
+  if(b.id==='stop'){if(!confirmStop){confirmStop=true;render();return}confirmStop=false;editD(d=>{if(d.tour)d.tour.on=false});render()}
+});
+render();setInterval(()=>{if(!document.activeElement||document.activeElement.tagName!=='INPUT')render()},15000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
+</script>
+</body></html>

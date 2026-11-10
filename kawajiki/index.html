@@ -152,6 +152,7 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
       </div>
     </div>
     <button class="appbtn" id="bTeams" style="background:#2f6b4a">チーム・成績</button>
+    <a class="appbtn" href="taikai.html" style="background:#b8860b;text-align:center;text-decoration:none">大会（トーナメント表）</a>
     <a class="appbtn" href="sokuho.html" style="background:#c0392b;text-align:center;text-decoration:none">一球速報（記録・野球場で再生）</a>
     <button class="appbtn" id="bRpStop" style="background:#5a6b8a" hidden>再生をやめて元の試合に戻る</button>
     <button class="appbtn" id="bRestart" style="background:#8a5a34">試合を最初からやり直す</button>
@@ -181,7 +182,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261110003441';
+const BUILD='20261110005550';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 // スマホの壁紙（?wallpaper）は歯車を隠す。PCの壁紙（?wallpaper=1 など）は歯車を出して設定できるようにする
@@ -366,7 +367,7 @@ const RSKEY='kawajiki.restartAt';
 function restartAt(){try{return+localStorage.getItem(RSKEY)||0}catch(e){return 0}}
 function restartGame(){
   clearResume();const o=G.rp?null:[G.home,G.away].find(t=>t&&!t.first);
-  G.forceOpp=o?(o.mine?{ti:DB.teams.findIndex(x=>x.id===o.tid)}:{cpu:o.def.name}):null;G.next=null;
+  G.forceOpp=(o&&!tourOn())?(o.mine?{ti:DB.teams.findIndex(x=>x.id===o.tid)}:{cpu:o.def.name}):null;G.next=null;
   if(phaseName==='game')startPhase('game');
 }
 function checkRestart(){const t=restartAt();if(t&&G.startedAt&&t>G.startedAt&&phaseName==='game')restartGame()}
@@ -486,7 +487,7 @@ function updateHUD(){
     [['#lsA',1,G.away],['#lsH',0,G.home]].forEach(([id,ti,t])=>{const tds=document.querySelectorAll(id+' td');tds[0].textContent=t.def.name;
       for(let i=0;i<6;i++){const v=(G.line&&G.line[ti][i]);tds[i+1].textContent=v==null?'':v;tds[i+1].classList.toggle('now',!G.pre&&!G.over&&G.inning===i+1&&(ti===1)===G.top)}
       tds[7].textContent=G.score[ti]});
-    $('#inn').textContent=G.pre?'まもなく試合':G.over?(G.cold?'コールドゲーム':'試合終了'):`${G.inning}回${G.top?'オモテ':'ウラ'}`+(G.rp?'・記録再生':'');
+    $('#inn').textContent=G.pre?(G.tourM?tourLabel()+'・まもなく試合':'まもなく試合'):G.over?(G.cold?'コールドゲーム':'試合終了'):`${G.inning}回${G.top?'オモテ':'ウラ'}`+(G.rp?'・記録再生':'');
     $('#bso').hidden=!!(G.pre||G.over);
     updateDia();
     const rows=document.querySelectorAll('#bso .lr');[G.balls||0,G.strikes||0,Math.min(2,G.outs||0)].forEach((n,r)=>rows[r].querySelectorAll('.lp').forEach((l,i)=>l.classList.toggle('on',i<n)));
@@ -2383,13 +2384,15 @@ async function playGame(){
   if(G.cold){const w=G.score[0]>G.score[1]?G.home:G.away;say(pick(benchKids(w).length?benchKids(w):w.all),'コールドだー!',2);await sleep(.5)}
   G.over=true;updateHUD();
   commitGame();clearResume();if(G.rp)rpDone();
+  const tmsg=tourResult();
   await lineUp('end');
   [G.home,G.away].forEach(t=>t.all.forEach(k=>sendToBench(t,k)));
   G.umps.forEach((u,i)=>{u.idleFace='f';u.walkTo(-8.6+UMP_SLOT[i]*1.2,-4.6,1.4)});
   const win=G.score[0]>G.score[1]?G.home:G.score[1]>G.score[0]?G.away:null;
   await sleep(4);
   if(win){benchKids(win).forEach(k=>k.setPose('cheer',2.5));say(pick(win.all),'かったー!',1);say(win.coach,'よくがんばった!',1)}
-  else say(G.home.coach,'引き分けか〜',1);
+  else if(!tmsg)say(G.home.coach,'引き分けか〜',1);
+  await tourCheer(tmsg);
   for(const u of (G.lvUp||[]).slice(0,2)){await sleep(4);const t=[G.home,G.away].find(t=>t.all.some(k=>k.pid===u.pid));const k=t&&t.all.find(k=>k.pid===u.pid);if(t){say(t.coach,`${u.name}、上手くなったな!`,2);await sleep(1.2);say(k,'えへへ',1)}}
   await sleep(6);
   if(phaseAt(hourNow())==='game')G.next=await interlude();
@@ -2689,6 +2692,7 @@ async function janken(){
 function makeParents(t){t.parents=[];for(let i=0;i<4;i++){const pa=new Ent({kind:'adult',role:'parent',size:rnd(.92,1.04),idlePose:'sit',idleFace:t.side<0?'r':'l',shirt:pick(['#e7a24a','#7aa7d6','#e88b8b','#9c8bd1','#6fbf9b','#f2f2ee']),hat:chance(.5)});pa.gameEnt=true;t.parents.push(pa)}}
 function parentPos(t,i){return[t.side*(18.5+(i%2)*1.6),4.6+(i>>1)*1.8]}
 async function interlude(){
+  if(tourOn())return tourInterlude();
   G.prog=simT+150;
   const id0=DB.teams[0]&&DB.teams[0].id,t1=[G.home,G.away].find(t=>t.mine&&t.tid===id0)||[G.home,G.away].find(t=>t.first)||G.home,old=t1===G.home?G.away:G.home;
   const tok={on:true};
@@ -2763,7 +2767,122 @@ function pickOpp(side){
   const opp=['t2','cpu','t3','cpu'][r%4];
   return opp==='cpu'?buildCpu(pick(AWAYS),side):buildMine(opp==='t2'?1:2,side);
 }
+/* ---------- 大会（トーナメント）：index.html と taikai.html で同じものを使う ---------- */
+const T_STAGES=['地区大会','県大会','全国大会'],T_LV=[[26,60],[42,72],[56,82]];
+const T_TOWN=['みなみ台','ひがし','にし町','きたの','さくら','あおば','つばさ','ひかり','かわせ','やまびこ','みどり','はやて','あさひ','すずかけ','ほしの','わかば','たかね','うみべ','もりの','いずみ','かぜの','おおぞら','ゆうひ','しらかば','こがね','あけぼの','ふじみ','ときわ','かすみ','ひばり','くすのき','なぎさ','やまと','かえで','たちばな','すみれ','あじさい','ひので','つきみ','はなぞの'];
+const T_SUF=['ファイターズ','イーグルス','タイガース','ジュニアーズ','スターズ','ドリームス','ブレーブス','ホークス','少年野球団','クラブ','ベアーズ','レッズ','ウイングス','ライオンズ','スピリッツ','ドラゴンズ','キッズ','ペガサス'];
+const T_CAPS=[['#25408a','#182c63'],['#c9443b','#90302a'],['#2f8a58','#1f6440'],['#d9822b','#a3601c'],['#3b93d4','#2a6fa3'],['#7a4fb3','#5a3889'],['#2b2f3a','#15181f'],['#e0b021','#a88210'],['#d4588f','#a23d6b'],['#8a5a2b','#61401e']];
+const T_BODIES=[['#f7f6ef','#f4f3ec'],['#a9b1bc','#e9ebee'],['#f1ece0','#f1ece0'],['#dcebf5','#eef4f8'],['#2c3c66','#e9ebee']];
+function tPick(a){return a[Math.floor(Math.random()*a.length)]}
+function tShuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function tSize(T,st){return st===2?T.n*2:T.n}
+function tRoundName(R,ri){const k=R-1-ri;return k===0?'決勝':k===1?'準決勝':(k===2&&R>3)?'準々決勝':`${ri+1}回戦`}
+function tLoseLabel(R,ri){const k=R-1-ri;return k===0?'準優勝':k===1?'ベスト4':k===2?'ベスト8':`${ri+1}回戦敗退`}
+function tCpuDef(lv,used){let nm='';for(let i=0;i<60;i++){nm=tPick(T_TOWN)+tPick(T_SUF);if(!used.has(nm))break}used.add(nm);const c=tPick(T_CAPS),b=tPick(T_BODIES);
+  return{name:nm,lv:Math.round(lv),cap:c[0],capD:c[1],body:b[0],trim:c[0],pants:b[1],sock:c[0]}}
+// 勝ち上がり：前の回戦の勝者を次の回戦に入れる
+function tProp(C){for(let r=1;r<C.rounds.length;r++)C.rounds[r].forEach((m,i)=>{const p=C.rounds[r-1];if(m.a==null&&p[2*i].w!=null)m.a=p[2*i].w;if(m.b==null&&p[2*i+1].w!=null)m.b=p[2*i+1].w;
+  if(m.w==null&&m.a!=null&&m.b===-1)m.w=m.a})}
+function tNewStage(T,st,myIds,teams){
+  const n=Math.max(myIds.length+1,tSize(T,st)),used=new Set(teams.map(t=>t.name)),ents=myIds.map(id=>({my:id})),[lo,hi]=T_LV[st];
+  while(ents.length<n)ents.push({cpu:tCpuDef(lo+Math.random()*(hi-lo),used)});
+  tShuffle(ents);
+  let P=2;while(P<n)P*=2;const pairs=P/2,byes=P-n,byeAt=new Set();
+  for(let i=0;i<byes;i++)byeAt.add(Math.floor((i+.5)*pairs/byes));
+  const r0=[];let e=0;for(let i=0;i<pairs;i++){if(byeAt.has(i))r0.push({a:e++,b:-1,w:null,bye:true});else r0.push({a:e++,b:e++,w:null})}
+  r0.forEach(m=>{if(m.bye)m.w=m.a});
+  const rounds=[r0];for(let m=pairs/2;m>=1;m/=2)rounds.push(Array.from({length:m},()=>({a:null,b:null,w:null})));
+  const C={stage:st,ents,rounds,ri:0,show:false};tProp(C);return C;
+}
+function tStart(d,n){d.tour={on:true,n:Math.max(4,Math.min(64,Math.round(n)||16)),no:1,cur:null,log:[],hist:[]};d.tour.cur=tNewStage(d.tour,0,d.teams.map(t=>t.id),d.teams);return d.tour}
+function tOut(C,idx){return C.rounds.some(R=>R.some(m=>m.w!=null&&!m.bye&&(m.a===idx||m.b===idx)&&m.w!==idx))}
+function tEntName(e,teams){if(!e)return'';if(e.my){const t=teams.find(x=>x.id===e.my);return t?t.name:'マイチーム'}return e.cpu.name}
+
+// 河川敷で行う大会の進め方（野球場側だけで使う）
+function tourOn(){return!!(DB&&DB.tour&&DB.tour.on)}
+function tSim(C,m){const la=C.ents[m.a].cpu?C.ents[m.a].cpu.lv:60,lb=C.ents[m.b].cpu?C.ents[m.b].cpu.lv:60,p=1/(1+Math.exp(-(la-lb)/9)),aw=Math.random()<p;
+  const w=2+Math.floor(Math.random()*9),l=Math.floor(Math.random()*w);m.sa=aw?w:l;m.sb=aw?l:w;m.w=aw?m.a:m.b}
+function tFinish(d){const T=d.tour,C=T.cur;let champ=null;if(C){const f=C.rounds[C.rounds.length-1][0];if(f&&f.w!=null)champ={stage:C.stage,name:tEntName(C.ents[f.w],d.teams)}}
+  T.hist.unshift({no:T.no,at:Date.now(),res:T.log.slice(),champ});T.hist=T.hist.slice(0,60);T.no++;T.cur=null;T.log=[]}
+// 次に河川敷で行う試合を決める（見せない試合は結果だけ決めて表を進める）
+function tourNext(d){const T=d.tour;if(!T||!T.on)return null;
+  for(let g=0;g<400;g++){
+    if(!T.cur){T.cur=tNewStage(T,0,d.teams.map(t=>t.id),d.teams);T.log=[]}
+    const C=T.cur;tProp(C);
+    if(C.ri>=C.rounds.length){const f=C.rounds[C.rounds.length-1][0],ch=C.ents[f.w];
+      if(ch&&ch.my&&C.stage<2){T.cur=tNewStage(T,C.stage+1,[ch.my],d.teams);continue}
+      tFinish(d);continue}
+    const R=C.rounds[C.ri],open=R.map((m,i)=>({m,i})).filter(x=>x.m.w==null&&x.m.a!=null&&x.m.b!=null&&x.m.b!==-1);
+    if(!open.length){if(R.every(m=>m.w!=null))C.ri++;else return null;continue}
+    const isMy=x=>!!(C.ents[x.m.a].my||C.ents[x.m.b].my);
+    const alive=C.ents.some((e,idx)=>e.my&&!tOut(C,idx));
+    if(!alive){open.forEach(x=>tSim(C,x.m));continue}
+    const cpu=open.filter(x=>!isMy(x)),my=open.filter(isMy);
+    if(C.show&&cpu.length){C.show=false;return{...tPick(cpu),ri:C.ri}}
+    if(my.length)return{...my[0],ri:C.ri};
+    cpu.forEach(x=>tSim(C,x.m));
+  }
+  return null;
+}
+function tourPick(){
+  let r=null;editD(d=>{const x=tourNext(d);if(x){const C=d.tour.cur;r={...x,no:d.tour.no,stage:C.stage,ea:C.ents[x.m.a],eb:C.ents[x.m.b],R:C.rounds.length}}});
+  if(!r)return null;
+  const mk=(e,side)=>{if(e.my){const ti=Math.max(0,DB.teams.findIndex(t=>t.id===e.my)),t=buildMine(ti,side);t.first=true;return t}return buildCpu(e.cpu,side)};
+  const A=mk(r.ea,-1),B=mk(r.eb,1),aHome=chance(.5);
+  G.tourM={no:r.no,stage:r.stage,ri:r.ri,mi:r.i,aHome,R:r.R};
+  return aHome?{home:A,away:B}:{home:B,away:A};
+}
+function tourLabel(){const m=G.tourM;return m?`${T_STAGES[m.stage]} ${tRoundName(m.R,m.ri)}`:''}
+// 試合が終わったら大会の表に結果を書き込む（引き分けは抽選）
+function tourResult(){
+  const M=G.tourM;if(!M||G.rp)return null;let out=null;
+  editD(d=>{const T=d.tour;if(!T||!T.on||T.no!==M.no||!T.cur||T.cur.stage!==M.stage)return;const C=T.cur,m=C.rounds[M.ri]&&C.rounds[M.ri][M.mi];if(!m||m.w!=null)return;
+    const sh=G.score[0],sa=G.score[1],scA=M.aHome?sh:sa,scB=M.aHome?sa:sh;m.sa=scA;m.sb=scB;
+    let aw=scA>scB;if(scA===scB){m.lot=true;aw=Math.random()<.5}
+    m.w=aw?m.a:m.b;const W=C.ents[m.w],L=C.ents[aw?m.b:m.a];
+    out={lot:!!m.lot,wName:tEntName(W,d.teams),lName:tEntName(L,d.teams),wMy:!!W.my,lMy:!!L.my,final:M.ri===C.rounds.length-1,stage:C.stage,next:M.ri<C.rounds.length-1?tRoundName(C.rounds.length,M.ri+1):null};
+    if(L.my)T.log.push({tid:L.my,stage:C.stage,label:tLoseLabel(C.rounds.length,M.ri)});
+    if(W.my&&out.final)T.log.push({tid:W.my,stage:C.stage,label:'優勝'});
+    if(W.my||L.my)C.show=true;tProp(C)});
+  return out;
+}
+async function tourCheer(o){
+  if(!o)return;const W=[G.home,G.away].find(t=>t.def.name===o.wName),L=[G.home,G.away].find(t=>t.def.name===o.lName);
+  if(o.lot){say(G.ump,`同点のため抽選で、${o.wName}の勝ち!`,2);await sleep(2)}
+  if(W&&o.wMy){await sleep(1.2);
+    if(o.final){benchKids(W).concat(W.kids).forEach(k=>k.setPose('cheer',4));say(W.coach,`${T_STAGES[o.stage]}優勝だ!よくやった!`,2);await sleep(1.5);
+      say(pick(W.all),o.stage<2?`${T_STAGES[o.stage+1]}に行けるぞー!`:'日本一だー!',2);await sleep(1);say(pick(W.parents),'おめでとうー!',2)}
+    else{say(W.coach,`${o.next}進出だ!次もいくぞ!`,2);await sleep(1);say(pick(W.all),'おー!',1)}}
+  if(L&&o.lMy){await sleep(1.2);say(L.coach,o.final?'準優勝だ!胸を張ろう!':'よくがんばった。次の大会でリベンジだ!',2);await sleep(1);say(pick(L.all),pick(['くやしいー!','次は勝つぞ!','もっと練習する!']),1)}
+}
+// 大会のときの試合の合間：両チームとも帰り、整備のあと次の2チームがやってくる
+async function tourInterlude(){
+  G.prog=simT+150;
+  const olds=[G.home,G.away];
+  olds.forEach(old=>{say(old.coach,'よし、帰るぞー!',1);
+    [...old.all,old.coach,...old.parents].forEach((k,i)=>{k.role=null;k.distracted=false;k.helmet=false;k.idlePose='stand';k.poseO=null;
+      (async()=>{await sleep(.8+i*.35);await k.goto(old.side*15,-7.2,2.3);await k.goto(old.side*52,-7.2,2.3);k.dead=true})()})});
+  let hs=(G.helpers||[]).filter(h=>!h.dead);
+  if(hs.length<2){hs.forEach(h=>h.dead=true);hs=[0,1].map(i=>{const h=new Ent({kind:'adult',role:'helper',team:G.home.def,size:rnd(.95,1.04),idleFace:'r'});h.place(-(15.6+i*1.3),-5.6);h.gameEnt=true;ents.push(h);return h})}
+  G.helpers=hs;await sleep(3);
+  const work=Promise.all([tomboWork(hs[0]),lineWork(hs[1])]);
+  await sleep(14);
+  const m=tourPick();if(!m){await Promise.race([work,sleep(60)]);return null}
+  const arr=[];
+  [m.home,m.away].forEach(nb=>{makeParents(nb);
+    [...nb.all,nb.coach,...nb.parents].forEach((k,i)=>{k.gameEnt=true;k.place(nb.side*52+nb.side*i*.9,-7.2);ents.push(k);
+      let dst;if(k===nb.coach)dst=[nb.side*9.4,-2.4];else if(k.role==='parent')dst=parentPos(nb,nb.parents.indexOf(k));else dst=benchPos(nb,k);
+      arr.push((async()=>{await sleep(i*.3);await k.goto(nb.side*15,-7.2,2.4);await k.goto(dst[0],dst[1],2.4);
+        if(k===nb.coach){k.idleFace=nb.side<0?'r':'l';say(nb.coach,'よろしくお願いします!',1)}else if(k.role==='parent'){k.idlePose='sit';k.idleFace=nb.side<0?'r':'l'}else benchIdle(nb,k)})())})});
+  await Promise.race([Promise.all([work,...arr]),sleep(140)]);
+  hs.forEach((h,i)=>{h.carry=null;h.walkTo(-(15.6+i*1.3),-5.6,2.2);h.idleFace='r'});
+  await sleep(2.5);
+  return{home:m.home,away:m.away,keep:[...m.home.all,m.home.coach,...m.home.parents,...m.away.all,m.away.coach,...m.away.parents,...G.umps,...hs]};
+}
+
 function pickMatch(){
+  G.tourM=null;
+  if(tourOn()&&!G.forceOpp){const m=tourPick();if(m)return m}
   const me=buildMine(0,-1);me.first=true;
   const fo=G.forceOpp;G.forceOpp=null;
   const other=fo?(fo.cpu?buildCpu(AWAYS.find(a=>a.name===fo.cpu)||pick(AWAYS),1):buildMine(Math.max(1,fo.ti),1)):pickOpp(1);
@@ -2784,7 +2903,7 @@ function saveResume(batter,balls,strikes,nx,hv){
   if(!G.home||G.over||G.pre||!G.bat||!batter)return;
   const bt=hv?hv.bat:G.bat;
   try{localStorage.setItem(RKEY,JSON.stringify({v:1,t:Date.now(),home:teamSnap(G.home),away:teamSnap(G.away),score:G.score,line:G.line,inning:hv?hv.inning:G.inning,top:hv?hv.top:G.top,outs:hv?0:G.outs,
-    bases:hv?[-1,-1,-1]:G.bases.map(k=>k?G.bat.all.indexOf(k):-1),runsThis:hv?0:G.runsThis,box:G.box,pchg:G.pchg,conceded:G.conceded,batter:bt.all.indexOf(batter),bnext:!!nx,balls,strikes,rp:G.rp?{id:G.rp.id,i:G.rp.i}:null}))}catch(e){}
+    bases:hv?[-1,-1,-1]:G.bases.map(k=>k?G.bat.all.indexOf(k):-1),runsThis:hv?0:G.runsThis,box:G.box,pchg:G.pchg,conceded:G.conceded,batter:bt.all.indexOf(batter),bnext:!!nx,balls,strikes,rp:G.rp?{id:G.rp.id,i:G.rp.i}:null,tm:G.tourM||null}))}catch(e){}
   safePoint();
 }
 // 新しい版への切り替えは、プレーの結果を保存したあと（打席の合間・チェンジ・試合の合間）にだけ行う
@@ -2798,6 +2917,7 @@ function setupGame(res,nx){
   ents=ents.filter(e=>!e.gameEnt||keep.has(e));
   const {home,away:aw}=res?{home:teamFrom(res.home),away:teamFrom(res.away)}:G.rp?rpTeams():nx?nx:pickMatch();
   Object.assign(G,{home,away:aw,score:[0,0],inning:1,top:true,outs:0,balls:0,strikes:0,bases:[null,null,null],over:false,walkoff:false,cold:false,inPlay:false,pre:true,box:{},pchg:null,playRuns:0,line:[[],[]],conceded:[0,0],errKids:new Set(),runsThis:0,noChat:false,prog:0,infKey:null,gid:Math.random(),startedAt:Date.now()});
+  if(res)G.tourM=res.tm||null;else if(G.rp)G.tourM=null;
   if(res)Object.assign(G,{score:res.score,line:res.line,inning:res.inning,top:res.top,box:res.box||{},pchg:res.pchg,conceded:res.conceded||[0,0],pre:false});
   [home,aw].forEach(t=>{
     if(!res){t.kids.forEach(k=>appear(k));appear(t.kids[0],true)}

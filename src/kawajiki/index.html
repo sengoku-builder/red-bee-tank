@@ -754,7 +754,8 @@ async function relayOrThrow0(of){
     if(G.ball.holder!==h)break;
     const d=decideThrow(h);
     if(!d){ // 間に合う塁がない：外野からは中継へ、内野ならそこで止める
-      if(Math.hypot(h.x,h.z)>34){const c=cutoffFor(h.x);if(c&&c!==h){c.walkTo(h.x*.55,h.z*.55,4.4);say(fielder('C'),pick(['カット!','カット!ボール止めて!']),1);await sleep(.2);await throwTo(h,c,thrSpd(h));h=c;continue}}
+      // 外野手はかならず内野へ返す（持ったまま止まらない）
+      if(Math.hypot(h.x,h.z)>26||['LF','CF','RF'].includes(h.role)){const c=cutoffFor(h.x);if(c&&c!==h){const far=Math.hypot(h.x,h.z)>34;if(far)c.walkTo(h.x*.55,h.z*.55,4.4);say(fielder('C'),pick(['カット!','カット!ボール止めて!','内野に返せー!']),1);await sleep(.2);await throwTo(h,c,thrSpd(h));h=c;continue}}
       break}
     if(!said){said=true;say(fielder('C'),BWORD[d.b],1);await sleep(.2)}
     const far=Math.hypot(h.x,h.z)>34;

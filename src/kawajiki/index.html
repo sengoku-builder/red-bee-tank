@@ -75,6 +75,7 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
 .prow .num{border:1px solid var(--line);border-radius:8px;background:#fff;font:inherit;font-weight:700;padding:6px 0;cursor:pointer;color:var(--ink)}
 .prow .num.oshi{background:#fff6d6;border-color:#e2b23a}
 .prow .rm{border:none;background:none;font-size:18px;color:var(--muted);cursor:pointer;padding:0}
+.prow .rm.sure{font-size:11px;color:#fff;background:#c0392b;border-radius:6px;padding:4px 0;font-weight:700}
 .rosterAct{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .rosterAct button{border:1px dashed var(--line);background:#fff;border-radius:10px;padding:8px 12px;font:inherit;cursor:pointer}
 .num{font-variant-numeric:tabular-nums;font-weight:700;text-align:center;background:var(--chip);border-radius:6px;padding:6px 0;font-size:13px}
@@ -3705,7 +3706,7 @@ $('#hourR').addEventListener('input',e=>{S.hour=+e.target.value;$('#hourV').text
 setInterval(()=>{if(S.hour==null&&!panel.hidden)$('#hourV').textContent=fmtH(hourNow())},20000);
 
 /* ---------- teams & stats sheet ---------- */
-const sheet=$('#sheet'),shBody=$('#shBody');let shTab='team',shTeam=0,shConfirm=false,shNote=null;
+const sheet=$('#sheet'),shBody=$('#shBody');let shTab='team',shTeam=0,shConfirm=false,shNote=null,shRm=-1;
 const SKC={bat:'#e0663a',fld:'#2f8a58',thr:'#3b6fd4',run:'#c99a16',iq:'#8a4fb3'};
 function noteHTML(pid){
   const t=DB.teams.find(t=>t.players.some(p=>p.id===pid));const p=t.players.find(p=>p.id===pid);
@@ -3737,6 +3738,8 @@ function avg(h,ab){if(!ab)return'-';const v=(h/ab).toFixed(3);return v.startsWit
 function ip(o){o=o||0;const r=o%3;return`${Math.floor(o/3)}${r?` ${r}/3`:''}`}
 function renderSheet(){
   DB=loadD();
+  // 選手は背番号の順に並べる（戻した子が一番下にならないように）
+  if(DB.teams.some(t=>t.players.some((p,i,a)=>i&&a[i-1].num>p.num))){editD(d=>d.teams.forEach(t=>t.players.sort((x,y)=>x.num-y.num)));DB=loadD()}
   document.querySelectorAll('#shTabs button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.t===shTab)));
   const t=DB.teams[shTeam];
   if(shTab==='stats'&&shNote){shBody.innerHTML=noteHTML(shNote);return}
@@ -3745,7 +3748,7 @@ function renderSheet(){
     <div class="field"><label class="lbl" for="tName">チーム名</label><input type="text" id="tName" maxlength="10" value="${esc(t.name)}"></div>
     <div><div class="lbl">帽子・ライン</div><div class="sw" id="swCap">${CAPS.map(c=>`<button data-cap="${c.k}" aria-pressed="${t.cap===c.k}"><span class="dot" style="background:${c.c}"></span>${c.l}</button>`).join('')}</div></div>
     <div><div class="lbl">ユニフォーム</div><div class="sw" id="swBody">${BODIES.map(c=>`<button data-body="${c.k}" aria-pressed="${t.body===c.k}"><span class="dot" style="background:${c.c}"></span>${c.l}</button>`).join('')}</div></div>
-    <div><div class="lbl">選手（${t.players.length}人・9〜20人）　背番号をタップで★推し（2人まで）</div><div class="roster">${t.players.map((p,i)=>`<div class="prow"><button class="num${oshiList(t).includes(p.id)?' oshi':''}" data-oshi="${i}" aria-label="背番号${p.num}を推しにする">${oshiList(t).includes(p.id)?'★':''}${p.num}</button><input type="text" id="pn${i}" data-p="${i}" maxlength="8" value="${esc(p.name)}" aria-label="背番号${p.num}の名前"><select data-bt="${i}" aria-label="背番号${p.num}の投打"><option value=""${BTS[p.bt]?'':' selected'}>おまかせ</option>${Object.keys(BTL).map(k=>`<option value="${k}"${p.bt===k?' selected':''}>${BTL[k]}</option>`).join('')}</select><div class="gseg" data-g="${i}"><button data-v="0" aria-pressed="${!p.girl}">男の子</button><button data-v="1" aria-pressed="${!!p.girl}">女の子</button></div>${t.players.length>9?`<button class="rm" data-rm="${i}" aria-label="背番号${p.num}を外す">×</button>`:'<span></span>'}</div>`).join('')}</div>
+    <div><div class="lbl">選手（${t.players.length}人・9〜20人）　背番号をタップで★推し（2人まで）</div><div class="roster">${t.players.map((p,i)=>`<div class="prow"><button class="num${oshiList(t).includes(p.id)?' oshi':''}" data-oshi="${i}" aria-label="背番号${p.num}を推しにする">${oshiList(t).includes(p.id)?'★':''}${p.num}</button><input type="text" id="pn${i}" data-p="${i}" maxlength="8" value="${esc(p.name)}" aria-label="背番号${p.num}の名前"><select data-bt="${i}" aria-label="背番号${p.num}の投打"><option value=""${BTS[p.bt]?'':' selected'}>おまかせ</option>${Object.keys(BTL).map(k=>`<option value="${k}"${p.bt===k?' selected':''}>${BTL[k]}</option>`).join('')}</select><div class="gseg" data-g="${i}"><button data-v="0" aria-pressed="${!p.girl}">男の子</button><button data-v="1" aria-pressed="${!!p.girl}">女の子</button></div>${t.players.length>9?(shRm===i?`<button class="rm sure" data-rm="${i}" aria-label="背番号${p.num}を外す（確認）">外す</button>`:`<button class="rm" data-rm="${i}" aria-label="背番号${p.num}を外す">×</button>`):'<span></span>'}</div>`).join('')}</div>
       <div class="rosterAct">${t.players.length<20?'<button data-add="1">＋ 選手を追加</button>':''}${(t.ob||[]).length&&t.players.length<20?(t.ob||[]).map((p,j)=>`<button data-rs="${j}">↩ ${p.num} ${esc(p.name)} を戻す</button>`).join(''):''}</div>${shNote&&shNote.oshiMax?'<p class="note" style="color:#c0392b">推しは2人までです</p>':''}</div>
     <div class="field"><label class="lbl" for="tCapt">キャプテン（試合前のじゃんけんをします）</label><select id="tCapt">${t.players.map(p=>`<option value="${p.id}"${(t.captain?t.captain===p.id:p.num===10)?' selected':''}>${p.num} ${esc(p.name)}</option>`).join('')}</select></div>
     <p class="note">★推し選手はいつも先発・交代なし・少し早く成長します。変更は次の試合から反映されます。外した子の記録は残り、「戻す」で続きから使えます。投打を「おまかせ」にした子は自動で決まります。先発の9人・守備位置・打順は、出場の少ない子から公平にランダムで決まります。</p>`;
@@ -3782,13 +3785,14 @@ shBody.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   if(b.dataset.note){shNote=b.dataset.note;renderSheet();shBody.scrollTop=0;return}
   if(b.dataset.back){shNote=null;renderSheet();return}
+  if(b.dataset.rm==null&&shRm>=0){shRm=-1}
   if(b.dataset.oshi!=null){const i=+b.dataset.oshi;let over=false;editD(d=>{const t=d.teams[shTeam],id=t.players[i].id;let l=oshiList(t).slice();if(l.includes(id))l=l.filter(x=>x!==id);else if(l.length<2)l.push(id);else over=true;t.oshis=l;delete t.oshi});shNote=over?{oshiMax:true}:null;renderSheet();return}
-  if(b.dataset.rm!=null){shNote=null;editD(d=>{const t=d.teams[shTeam];if(t.players.length<=9)return;const p=t.players.splice(+b.dataset.rm,1)[0];t.ob=(t.ob||[]).concat(p);t.oshis=oshiList(t).filter(x=>x!==p.id);delete t.oshi;if(t.captain===p.id)delete t.captain});renderSheet();return}
-  if(b.dataset.rs!=null){shNote=null;editD(d=>{const t=d.teams[shTeam];if(t.players.length>=20)return;const p=(t.ob||[]).splice(+b.dataset.rs,1)[0];if(p)t.players.push(p)});renderSheet();return}
+  if(b.dataset.rm!=null){if(shRm!==+b.dataset.rm){shRm=+b.dataset.rm;renderSheet();return}shRm=-1;shNote=null;editD(d=>{const t=d.teams[shTeam];if(t.players.length<=9)return;const p=t.players.splice(+b.dataset.rm,1)[0];t.ob=(t.ob||[]).concat(p);t.oshis=oshiList(t).filter(x=>x!==p.id);delete t.oshi;if(t.captain===p.id)delete t.captain});renderSheet();return}
+  if(b.dataset.rs!=null){shNote=null;editD(d=>{const t=d.teams[shTeam];if(t.players.length>=20)return;const p=(t.ob||[]).splice(+b.dataset.rs,1)[0];if(p){t.players.push(p);t.players.sort((x,y)=>x.num-y.num)}});renderSheet();return}
   if(b.dataset.add){shNote=null;editD(d=>{const t=d.teams[shTeam];if(t.players.length>=20)return;const all=t.players.concat(t.ob||[]),nums=new Set(all.map(p=>p.num));let n=1;while(nums.has(n))n++;
     const used=new Set(d.teams.flatMap(x=>x.players.concat(x.ob||[]).map(p=>p.name)));const girl=chance(.1),pool=girl?GIRL_NAMES:BOY_NAMES;let nm=pick(pool);for(let k=0;k<30&&used.has(nm);k++)nm=pick(pool);
-    t.players.push({id:'p'+uid(),num:n,name:nm,girl})});renderSheet();return}
-  if(b.dataset.team!=null){shTeam=+b.dataset.team;renderSheet();return}
+    t.players.push({id:'p'+uid(),num:n,name:nm,girl});t.players.sort((x,y)=>x.num-y.num)});renderSheet();return}
+  if(b.dataset.team!=null){shTeam=+b.dataset.team;shRm=-1;renderSheet();return}
   if(b.dataset.cap){editD(d=>{d.teams[shTeam].cap=b.dataset.cap});renderSheet();return}
   if(b.dataset.body){editD(d=>{d.teams[shTeam].body=b.dataset.body});renderSheet();return}
   const g=b.closest('.gseg');if(g){editD(d=>{d.teams[shTeam].players[+g.dataset.g].girl=b.dataset.v==='1'});g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));return}

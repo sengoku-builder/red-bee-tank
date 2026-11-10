@@ -2853,7 +2853,9 @@ function tourLabel(){const m=G.tourM;return m?`${T_STAGES[m.stage]} ${tRoundName
 function tourResult(){
   const M=G.tourM;if(!M||G.rp)return null;let out=null;
   editD(d=>{const T=d.tour;if(!T||!T.on||T.no!==M.no||!T.cur||T.cur.stage!==M.stage)return;const C=T.cur,m=C.rounds[M.ri]&&C.rounds[M.ri][M.mi];if(!m||m.w!=null)return;
-    const sh=G.score[0],sa=G.score[1],scA=M.aHome?sh:sa,scB=M.aHome?sa:sh;m.sa=scA;m.sb=scB;
+    // じゃんけんで先攻・後攻が入れ替わるので、チームそのもので対応を取る
+    const ea=C.ents[m.a],isA=t=>t&&(ea.my?(t.mine&&t.tid===ea.my):(!t.mine&&t.def.name===ea.cpu.name)),aH=isA(G.home)?true:isA(G.away)?false:M.aHome;
+    const sh=G.score[0],sa=G.score[1],scA=aH?sh:sa,scB=aH?sa:sh;m.sa=scA;m.sb=scB;
     let aw=scA>scB;if(scA===scB){m.lot=true;aw=Math.random()<.5}
     m.w=aw?m.a:m.b;const W=C.ents[m.w],L=C.ents[aw?m.b:m.a];
     out={lot:!!m.lot,wName:tEntName(W,d.teams),lName:tEntName(L,d.teams),wMy:!!W.my,lMy:!!L.my,final:M.ri===C.rounds.length-1,stage:C.stage,next:M.ri<C.rounds.length-1?tRoundName(C.rounds.length,M.ri+1):null};

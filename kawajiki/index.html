@@ -186,7 +186,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261110020709';
+const BUILD='20261110035924';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 // スマホの壁紙（?wallpaper）は歯車を隠す。PCの壁紙（?wallpaper=1 など）は歯車を出して設定できるようにする
@@ -2853,7 +2853,9 @@ function tourLabel(){const m=G.tourM;return m?`${T_STAGES[m.stage]} ${tRoundName
 function tourResult(){
   const M=G.tourM;if(!M||G.rp)return null;let out=null;
   editD(d=>{const T=d.tour;if(!T||!T.on||T.no!==M.no||!T.cur||T.cur.stage!==M.stage)return;const C=T.cur,m=C.rounds[M.ri]&&C.rounds[M.ri][M.mi];if(!m||m.w!=null)return;
-    const sh=G.score[0],sa=G.score[1],scA=M.aHome?sh:sa,scB=M.aHome?sa:sh;m.sa=scA;m.sb=scB;
+    // じゃんけんで先攻・後攻が入れ替わるので、チームそのもので対応を取る
+    const ea=C.ents[m.a],isA=t=>t&&(ea.my?(t.mine&&t.tid===ea.my):(!t.mine&&t.def.name===ea.cpu.name)),aH=isA(G.home)?true:isA(G.away)?false:M.aHome;
+    const sh=G.score[0],sa=G.score[1],scA=aH?sh:sa,scB=aH?sa:sh;m.sa=scA;m.sb=scB;
     let aw=scA>scB;if(scA===scB){m.lot=true;aw=Math.random()<.5}
     m.w=aw?m.a:m.b;const W=C.ents[m.w],L=C.ents[aw?m.b:m.a];
     out={lot:!!m.lot,wName:tEntName(W,d.teams),lName:tEntName(L,d.teams),wMy:!!W.my,lMy:!!L.my,final:M.ri===C.rounds.length-1,stage:C.stage,next:M.ri<C.rounds.length-1?tRoundName(C.rounds.length,M.ri+1):null};

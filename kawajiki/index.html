@@ -183,7 +183,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261110012736';
+const BUILD='20261110014822';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 // スマホの壁紙（?wallpaper）は歯車を隠す。PCの壁紙（?wallpaper=1 など）は歯車を出して設定できるようにする
@@ -1066,9 +1066,10 @@ async function playGrounder(tx,tz,d,batter,opt={}){
   const b=G.ball,fb=fielder('1B');
   const pp=fielder('P'),pd=dist(pp,tx,tz);
   const f=opt.f||((pd<2.6&&Math.abs(tx)<4)?pp:nearest(tx,tz,['C','P']));f.distracted=false;
-  const e1=1-sk(f,'fld')/100,pt=.13*e1,ptn=.17*e1*(knows(f,'tunnel')?.3:1),pw=.14*(1-sk(f,'thr')/100);
+  const e1=1-sk(f,'fld')/100,pt=.09*e1,ptn=.11*e1*(knows(f,'tunnel')?.3:1),pbo=.14*e1,pw=.14*(1-sk(f,'thr')/100);
   const r=Math.random();
-  let ev=r<pt?'trip':r<pt+ptn?'tunnel':r<pt+ptn+pw?'wild':'out';
+  // はじく（すぐ近くにこぼれる）・つまずく・トンネル（うしろへ抜ける）・悪送球
+  let ev=r<pt?'trip':r<pt+ptn?'tunnel':r<pt+ptn+pbo?'bobble':r<pt+ptn+pbo+pw?'wild':'out';
   if(f===fb&&ev==='wild')ev='out';
   if(opt.dive&&ev!=='wild')ev='dive';
   const ftime=dist(f,tx,tz)/5;
@@ -1079,7 +1080,7 @@ async function playGrounder(tx,tz,d,batter,opt={}){
   {const a=Math.atan2(tx,tz),bx=tx+Math.sin(a)*4.5,bz=tz+Math.cos(a)*4.5;
     const bk=G.field.kids.filter(k=>k!==f&&k!==fb&&k.role!=='C'&&k.role!=='P'&&!(G.b0&&false)).sort((a,z)=>dist(a,bx,bz)-dist(z,bx,bz))[0];
     if(bk&&dist(bk,bx,bz)<14&&!(['2B','SS'].includes(bk.role)&&Math.abs(bk.tx)<1.5&&bk.tz>30)){bk.distracted=false;(async()=>{await sleep(reactT(bk)+.1);if(G.inPlay&&!b.holder)bk.walkTo(bx,bz,runSpd(bk)*.9)})()}}
-  const ext=[tx*1.65,tz*1.65];
+  const rr0=Math.hypot(tx,tz)||1,ext=ev==='trip'?[tx*(1+Math.min(.4,8/rr0)),tz*(1+Math.min(.4,8/rr0))]:[tx*(1+Math.min(.65,14/rr0)),tz*(1+Math.min(.65,14/rr0))];
   let runs;
   if(ev==='out'||ev==='dive'){runs=runnersOnOut()}
   else if(ev==='wild')runs=liveRun(batter);
@@ -1103,6 +1104,17 @@ async function playGrounder(tx,tz,d,batter,opt={}){
     await bp;
   }
   G.btok=(G.btok||0)+1;
+  if(ev==='bobble'){
+    // はじいたボールはすぐ近くにこぼれる：自分で拾い直して、間に合う塁へ投げる（間に合わなければ投げない）
+    G.btok=(G.btok||0)+1;const a=rnd(0,Math.PI*2),dd=rnd(1.2,2.8),px=tx+Math.cos(a)*dd,pz=tz+Math.sin(a)*dd;
+    f.setPose('squat',.5);oops(f,'bobble',2);markErr(f);
+    await b.flyTo(px,pz,.45,.5,.6,.05,true);
+    await f.goto(px,pz,runSpd(f));b.holder=f;f.setPose('ready',.3);await sleep(.15);
+    await relayOrThrow(f);
+    await runs;
+    say(pick(G.field.kids),pick(['ドンマイドンマイ!','ドンマイ!','切りかえていこー!']),1);
+    return G.bases.includes(batter)?'E':'O';
+  }
   if(ev==='trip'||ev==='tunnel'||ev==='through'){
     if(ev==='tunnel'){f.setPose('squat',.8);oops(f,'tunnel',2);mistake(f,'tunnel',true)}
     if(ev!=='through')markErr(f);

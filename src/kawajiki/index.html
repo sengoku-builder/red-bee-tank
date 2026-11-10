@@ -2815,7 +2815,8 @@ function tOut(C,idx){return C.rounds.some(R=>R.some(m=>m.w!=null&&!m.bye&&(m.a==
 function tEntName(e,teams){if(!e)return'';if(e.my){const t=teams.find(x=>x.id===e.my);return t?t.name:'マイチーム'}return e.cpu.name}
 
 // 河川敷で行う大会の進め方（野球場側だけで使う）
-function tourOn(){return!!(DB&&DB.tour&&DB.tour.on)}
+// 壁紙とアプリは別々の画面なので、大会を始めた・やめたはいつも保存された記録から読む
+function tourOn(){try{const d=JSON.parse(localStorage.getItem(DKEY)||'null');return!!(d&&d.tour&&d.tour.on)}catch(e){return!!(DB&&DB.tour&&DB.tour.on)}}
 function tSim(C,m){const la=C.ents[m.a].cpu?C.ents[m.a].cpu.lv:60,lb=C.ents[m.b].cpu?C.ents[m.b].cpu.lv:60,p=1/(1+Math.exp(-(la-lb)/9)),aw=Math.random()<p;
   const w=2+Math.floor(Math.random()*9),l=Math.floor(Math.random()*w);m.sa=aw?w:l;m.sb=aw?l:w;m.w=aw?m.a:m.b}
 function tFinish(d){const T=d.tour,C=T.cur;let champ=null;if(C){const f=C.rounds[C.rounds.length-1][0];if(f&&f.w!=null)champ={stage:C.stage,name:tEntName(C.ents[f.w],d.teams)}}
@@ -2899,7 +2900,7 @@ async function tourInterlude(){
 }
 
 function pickMatch(){
-  G.tourM=null;
+  G.tourM=null;DB=loadD();
   if(tourOn()&&!G.forceOpp){const m=tourPick();if(m)return m}
   const me=buildMine(0,-1);me.first=true;
   const fo=G.forceOpp;G.forceOpp=null;

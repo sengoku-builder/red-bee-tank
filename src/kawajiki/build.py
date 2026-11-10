@@ -1,5 +1,5 @@
 """河川敷の少年野球: 公開用ファイルを dist/ に作る。
-python3 src/kawajiki/build.py → dist/index.html・version.json・sokuho.html を gh-pages ブランチの kawajiki/ に置く。"""
+python3 src/kawajiki/build.py → dist/index.html・version.json・sokuho.html・taikai.html を gh-pages ブランチの kawajiki/ に置く。"""
 import os, json, datetime
 here = os.path.dirname(os.path.abspath(__file__))
 build = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).strftime('%Y%m%d%H%M%S')
@@ -12,4 +12,6 @@ open(os.path.join(out, 'index.html'), 'w', encoding='utf-8').write(html)
 json.dump({'build': build}, open(os.path.join(out, 'version.json'), 'w'))
 # 一球速報（記録して野球場で再生する）ページ
 open(os.path.join(out, 'sokuho.html'), 'w', encoding='utf-8').write(open(os.path.join(here, 'sokuho.html'), encoding='utf-8').read())
+# 大会（トーナメント表）ページ
+open(os.path.join(out, 'taikai.html'), 'w', encoding='utf-8').write(open(os.path.join(here, 'taikai.html'), encoding='utf-8').read())
 print('build', build)

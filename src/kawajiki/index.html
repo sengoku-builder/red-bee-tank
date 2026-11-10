@@ -1083,7 +1083,7 @@ async function playGrounder(tx,tz,d,batter,opt={}){
   {const a=Math.atan2(tx,tz),bx=tx+Math.sin(a)*4.5,bz=tz+Math.cos(a)*4.5;
     const bk=G.field.kids.filter(k=>k!==f&&k!==fb&&k.role!=='C'&&k.role!=='P'&&!(G.b0&&false)).sort((a,z)=>dist(a,bx,bz)-dist(z,bx,bz))[0];
     if(bk&&dist(bk,bx,bz)<14&&!(['2B','SS'].includes(bk.role)&&Math.abs(bk.tx)<1.5&&bk.tz>30)){bk.distracted=false;(async()=>{await sleep(reactT(bk)+.1);if(G.inPlay&&!b.holder)bk.walkTo(bx,bz,runSpd(bk)*.9)})()}}
-  const rr0=Math.hypot(tx,tz)||1,ext=ev==='trip'?[tx*(1+Math.min(.4,8/rr0)),tz*(1+Math.min(.4,8/rr0))]:[tx*(1+Math.min(.65,14/rr0)),tz*(1+Math.min(.65,14/rr0))];
+  const rr0=Math.hypot(tx,tz)||1,ext=ev==='trip'?[tx*(1+Math.min(.15,4/rr0)),tz*(1+Math.min(.15,4/rr0))]:[tx*(1+Math.min(.5,10/rr0)),tz*(1+Math.min(.5,10/rr0))];
   let runs;
   if(ev==='out'||ev==='dive'){runs=runnersOnOut()}
   else if(ev==='wild')runs=liveRun(batter);
@@ -1121,8 +1121,9 @@ async function playGrounder(tx,tz,d,batter,opt={}){
   if(ev==='trip'||ev==='tunnel'||ev==='through'){
     if(ev==='tunnel'){f.setPose('squat',.8);oops(f,'tunnel',2);mistake(f,'tunnel',true)}
     if(ev!=='through')markErr(f);
-    // 抜けたボールは一番近い子が拾う（うしろにいたショートやセカンドが拾えば内野で止まる）
-    const of=G.field.kids.filter(k=>k!==f&&k.role!=='C'&&k.role!=='1B').sort((a,z)=>dist(a,ext[0],ext[1])-dist(z,ext[0],ext[1]))[0];of.distracted=false;
+    // 一番早く追いつける子が拾う：失敗した本人（起き上がり・振り向き）、うしろのバックアップ、外野手の順に早さで比べる
+    const tArr=k=>(k===f?(ev==='trip'?1.6:.8):reactT(k)+(['LF','CF','RF'].includes(k.role)?.35:.15))+dist(k,ext[0],ext[1])/runSpd(k);
+    const of=G.field.kids.filter(k=>k.role!=='C'&&(k.role!=='1B'||k===f)).sort((a,z)=>tArr(a)-tArr(z))[0];of.distracted=false;
     of.walkTo(ext[0],ext[1],runSpd(of));if(['LF','CF','RF'].includes(of.role))prepRelay(ext[0],ext[1]);
     await b.flyTo(ext[0],ext[1],1.8,.2,.15,.05,true);
     await of.goto(ext[0],ext[1],4.6);b.holder=of;

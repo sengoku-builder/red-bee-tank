@@ -49,6 +49,8 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
 .tval{font-variant-numeric:tabular-nums;width:44px;text-align:right}
 .note{font-size:12px;color:var(--muted);line-height:1.5;margin:0}
 .wp #gear{display:none}
+#bSkipCpu{pointer-events:auto;position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:20;border:0;border-radius:999px;padding:9px 16px;font:inherit;font-size:14px;font-weight:700;background:rgba(36,65,138,.9);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2);cursor:pointer}
+.wp #bSkipCpu{display:none}
 [hidden]{display:none!important}
 #vbar{position:absolute;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;z-index:30;width:max-content;max-width:calc(100% - 20px)}
 #vbar button{font:700 13px 'Zen Maru Gothic',sans-serif;color:#fff;background:rgba(30,40,60,.72);border:0;border-radius:999px;padding:8px 12px;min-height:36px}
@@ -120,6 +122,7 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
       </div>
     </div>
     <div class="phase" id="phase" hidden></div>
+    <button id="bSkipCpu" hidden>この試合を飛ばす ⏭</button>
     <button id="gear" aria-label="設定" aria-expanded="false">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="#fffcf3"/><circle cx="15" cy="12" r="2" fill="#fffcf3"/><circle cx="8" cy="18" r="2" fill="#fffcf3"/></svg>
     </button>
@@ -183,7 +186,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261110014822';
+const BUILD='20261110020709';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 // スマホの壁紙（?wallpaper）は歯車を隠す。PCの壁紙（?wallpaper=1 など）は歯車を出して設定できるようにする
@@ -2807,7 +2810,7 @@ function tNewStage(T,st,myIds,teams){
   const rounds=[r0];for(let m=pairs/2;m>=1;m/=2)rounds.push(Array.from({length:m},()=>({a:null,b:null,w:null})));
   const C={stage:st,ents,rounds,ri:0,show:false};tProp(C);return C;
 }
-function tStart(d,n){d.tour={on:true,n:Math.max(4,Math.min(64,Math.round(n)||16)),no:1,cur:null,log:[],hist:[]};d.tour.cur=tNewStage(d.tour,0,d.teams.map(t=>t.id),d.teams);return d.tour}
+function tStart(d,n){d.tour={on:true,n:Math.max(4,Math.min(200,Math.round(n)||16)),no:1,cur:null,log:[],hist:[]};d.tour.cur=tNewStage(d.tour,0,d.teams.map(t=>t.id),d.teams);return d.tour}
 function tOut(C,idx){return C.rounds.some(R=>R.some(m=>m.w!=null&&!m.bye&&(m.a===idx||m.b===idx)&&m.w!==idx))}
 function tEntName(e,teams){if(!e)return'';if(e.my){const t=teams.find(x=>x.id===e.my);return t?t.name:'マイチーム'}return e.cpu.name}
 
@@ -2831,7 +2834,7 @@ function tourNext(d){const T=d.tour;if(!T||!T.on)return null;
     const alive=C.ents.some((e,idx)=>e.my&&!tOut(C,idx));
     if(!alive){open.forEach(x=>tSim(C,x.m));continue}
     const cpu=open.filter(x=>!isMy(x)),my=open.filter(isMy);
-    if(C.show&&cpu.length){C.show=false;return{...tPick(cpu),ri:C.ri}}
+    if(C.show&&cpu.length&&T.watchCpu){C.show=false;return{...tPick(cpu),ri:C.ri}}
     if(my.length)return{...my[0],ri:C.ri};
     cpu.forEach(x=>tSim(C,x.m));
   }
@@ -3789,6 +3792,11 @@ $('#bRestart').addEventListener('click',()=>{const b=$('#bRestart');
   if(Date.now()-rsConfirm>4000){rsConfirm=Date.now();b.textContent='本当にやり直す（もう一度押す）';setTimeout(()=>{if(Date.now()-rsConfirm>=4000)b.textContent='試合を最初からやり直す'},4100);return}
   rsConfirm=0;b.textContent='試合を最初からやり直す';try{localStorage.setItem(RSKEY,String(Date.now()))}catch(e){}
   restartGame();setPanel(false)});
+// 大会でほかのチームどうしの試合を見ているときだけ「飛ばす」ボタンを出す
+setInterval(()=>{const b=$('#bSkipCpu');if(!b)return;b.hidden=!(phaseName==='game'&&G.tourM&&G.home&&G.away&&!G.home.mine&&!G.away.mine&&!G.over&&!G.rp)},800);
+$('#bSkipCpu').addEventListener('click',()=>{const M=G.tourM;if(!M||!G.home||!G.away||G.home.mine||G.away.mine||G.over)return;
+  editD(d=>{const T=d.tour,C=T&&T.cur;if(C&&T.no===M.no&&C.stage===M.stage){const m=C.rounds[M.ri]&&C.rounds[M.ri][M.mi];if(m&&m.w==null){tSim(C,m);tProp(C)}}});
+  clearResume();G.tourM=null;G.next=null;$('#bSkipCpu').hidden=true;if(phaseName==='game')startPhase('game')});
 $('#bRpStop').addEventListener('click',()=>{rpDrop();try{localStorage.setItem(RSKEY,String(Date.now()))}catch(e){}clearResume();G.rp=null;G.forceOpp=null;G.next=null;if(phaseName==='game')startPhase('game');setPanel(false)});
 $('#bTeams').addEventListener('click',()=>{setPanel(false);sheet.hidden=false;shConfirm=false;renderSheet()});
 $('#shClose').addEventListener('click',()=>{sheet.hidden=true});

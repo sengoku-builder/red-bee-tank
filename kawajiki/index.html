@@ -71,7 +71,12 @@ body{height:100%;margin:0;background:#9cc7e6;color:var(--ink);font-family:var(--
 .sw button[aria-pressed="true"]{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy)}
 .sw .dot{width:16px;height:16px}
 .roster{display:flex;flex-direction:column;gap:6px}
-.prow{display:grid;grid-template-columns:34px 1fr 84px 92px;gap:6px;align-items:center}
+.prow{display:grid;grid-template-columns:34px 1fr 82px 88px 26px;gap:5px;align-items:center}
+.prow .num{border:1px solid var(--line);border-radius:8px;background:#fff;font:inherit;font-weight:700;padding:6px 0;cursor:pointer;color:var(--ink)}
+.prow .num.oshi{background:#fff6d6;border-color:#e2b23a}
+.prow .rm{border:none;background:none;font-size:18px;color:var(--muted);cursor:pointer;padding:0}
+.rosterAct{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.rosterAct button{border:1px dashed var(--line);background:#fff;border-radius:10px;padding:8px 12px;font:inherit;cursor:pointer}
 .num{font-variant-numeric:tabular-nums;font-weight:700;text-align:center;background:var(--chip);border-radius:6px;padding:6px 0;font-size:13px}
 .prow input{font-family:var(--font);font-size:15px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);min-width:0;width:100%;box-sizing:border-box}
 .prow select{font-family:var(--font);font-size:12px;padding:6px 2px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);min-width:0;width:100%}
@@ -176,7 +181,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261109120034';
+const BUILD='20261110003441';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 // スマホの壁紙（?wallpaper）は歯車を隠す。PCの壁紙（?wallpaper=1 など）は歯車を出して設定できるようにする
@@ -334,7 +339,9 @@ function ensureSkills(v){let ch=false;if(!v.start){v.start=Date.now();ch=true}
   return ch}
 function loadD(){try{const v=JSON.parse(localStorage.getItem(DKEY)||'null');if(v&&v.teams&&v.teams.length===3){v.st=v.st||{p:{},t:{}};v.st.p=v.st.p||{};v.st.t=v.st.t||{};v.log=v.log||[];if(ensureSkills(v))saveD(v);return v}}catch(e){}
   const d=defaultData();ensureSkills(d);saveD(d);return d}
-function isOshi(p,d){return !!(d&&d.teams&&d.teams.some(t=>t.oshi&&t.oshi===p.id))}
+// 推し選手は1チーム2人まで（古いデータの oshi 1人も読む）
+function oshiList(t){return Array.isArray(t.oshis)?t.oshis:(t.oshi?[t.oshi]:[])}
+function isOshi(p,d){return !!(d&&d.teams&&d.teams.some(t=>oshiList(t).includes(p.id)))}
 function progOf(p,d){const days=(Date.now()-(d.start||Date.now()))/864e5,g=((d.st.p[p.id]||{}).g)||0;return clamp((.75*days/30+.25*Math.min(1,g/30))*(isOshi(p,d)?1.2:1),0,1)}
 // 投打: [左打ち, 左投げ, 両打ち]
 const BTS={RR:[0,0,0],RL:[1,0,0],LL:[1,1,0],LR:[0,1,0],RS:[0,0,1]},BTL={RR:'右投右打',RL:'右投左打',LL:'左投左打',LR:'左投右打',RS:'右投両打'};
@@ -372,8 +379,8 @@ function finishTeam(def,side,kids,subs,mine,tid){
 function buildMine(ti,side){
   const t=DB.teams[ti],def=teamDef(t);
   const ranked=t.players.map(p=>({p,g:((DB.st.p[p.id]||{}).g||0)+Math.random()*1.2})).sort((a,b)=>a.g-b.g);
-  const ks=ranked.map(({p})=>{const e=effSk(p,DB);return new Ent({sk:e,learned:{...(p.learned||{})},praise:[...(p.praise||[])],spd:3.6+1.6*e.run/100+rnd(-.15,.15),name:p.name||`${p.num}ばん`,girl:!!p.girl,num:p.num,pid:p.id,...btOf(p),oshi:t.oshi===p.id,team:def,size:rnd(.88,1.08)})});
-  {const oi=ks.findIndex(k=>k.oshi);if(oi>=9){const o=ks.splice(oi,1)[0];ks.splice(Math.floor(Math.random()*9),0,o)}}
+  const ks=ranked.map(({p})=>{const e=effSk(p,DB);return new Ent({sk:e,learned:{...(p.learned||{})},praise:[...(p.praise||[])],spd:3.6+1.6*e.run/100+rnd(-.15,.15),name:p.name||`${p.num}ばん`,girl:!!p.girl,num:p.num,pid:p.id,...btOf(p),oshi:oshiList(t).includes(p.id),team:def,size:rnd(.88,1.08)})});
+  {const os=ks.filter(k=>k.oshi),rest=ks.filter(k=>!k.oshi);ks.length=0;ks.push(...os,...rest)}
   const tm=finishTeam(def,side,shuffle(ks.slice(0,9)),ks.slice(9),true,t.id);
   tm.chem=Math.min(1,(((DB.st.t[t.id]||{}).g)||0)/25);return tm;
 }
@@ -384,7 +391,9 @@ function buildCpu(def,side){
   const tm=finishTeam(def,side,ks.slice(0,9),ks.slice(9),false,null);tm.chem=def.lv/100;return tm;
 }
 function benchPos(t,k){const i=Math.max(0,t.all.indexOf(k));
-  if(i<5)return[t.side*(10.9+i*1.45),-3.5];if(i<9)return[t.side*(11.4+(i-5)*1.5),-1.6];return[t.side*(12+(i-9)*1.5),.4]}
+  const n=t.all.length;if(n<=13){if(i<5)return[t.side*(10.9+i*1.45),-3.5];if(i<9)return[t.side*(11.4+(i-5)*1.5),-1.6];return[t.side*(12+(i-9)*1.5),.4]}
+  // 人数が多いときは3列に詰めて並ぶ
+  const per=Math.ceil(n/3),r=Math.floor(i/per),c=i%per,sp=Math.min(1.45,7.2/Math.max(1,per-1));return[t.side*(10.7+r*.4+c*sp),[-3.5,-1.7,.1][r]]}
 function benchIdle(t,k){const i=t.all.indexOf(k);k.role=null;k.helmet=false;k.carry=null;k.distracted=false;k.idlePose=i<5?'sit':'stand';k.idleFace=t.side<0?'r':'l'}
 function cancelRun(k){k.rb=(k.rb||0)+1;k.chain=(k.chain||0)+1}
 function sendToBench(t,k){cancelRun(k);k.toPos=false;const i=G.bases?G.bases.indexOf(k):-1;if(i>=0)G.bases[i]=null;const [x,z]=benchPos(t,k);benchIdle(t,k);k.walkTo(x,z,k.speed>2.4?3.2:2.2)}
@@ -684,7 +693,15 @@ function prepRelay(tx,tz){
   const er=knows(cut,'relay')?.5:(1-sk(cut,'iq')/100)*6;
   const ox=rnd(-er,er),oz=rnd(-er,er);
   cut.walkTo(bx+(tx-bx)*.55+ox,bz+(tz-bz)*.55+oz,4.5);
-  if(Math.hypot(ox,oz)>2.4)(async()=>{await sleep(1.4);mistake(cut,'relay')})();else didRight(cut,'relay');
+  // 監督の「線の上」はやめて、送球先のベースにいる子がカットマンに声をかける
+  const off=Math.hypot(ox,oz)>2.4;if(off)mistake(cut,'relay',true);else didRight(cut,'relay');
+  (async()=>{await sleep(.9);if(!G.inPlay||!G.relay)return;
+    const rv=tgt===0?c:tgt===3?fielder('3B'):(cut.role==='SS'?fielder('2B'):fielder('SS'));if(!rv||rv===cut)return;
+    say(rv,pick(['カット!','カット入って!','カットー!']),1);
+    if(off){await sleep(.7);if(!G.inPlay||G.ball.holder===cut)return;
+      const lx=tx-bx,lz=tz-bz,ll=Math.hypot(lx,lz)||1,vx=cut.x-bx,vz=cut.z-bz,cr=(lx*vz-lz*vx)/ll,al=(lx*vx+lz*vz)/ll;
+      const msg=Math.abs(cr)>1.8?(cr>0?'カットもっと右!':'カットもっと左!'):(al>ll*.62?'もうちょい前!':'もうちょい下がって!');
+      say(rv,msg,1);if(chance(.5+.4*sk(cut,'iq')/100)){await sleep(.4);cut.walkTo(bx+(tx-bx)*.55,bz+(tz-bz)*.55,4.2)}}})();
   G.relay={tgt,cut,word,said:false};
 }
 async function relayOrThrow(of){G.relayBusy=(G.relayBusy||0)+1;try{return await relayOrThrow0(of)}finally{G.relayBusy--}}
@@ -732,11 +749,13 @@ async function relayOrThrow0(of){
     if(G.ball.holder!==h)break;
     const d=decideThrow(h);
     if(!d){ // 間に合う塁がない：外野からは中継へ、内野ならそこで止める
-      if(Math.hypot(h.x,h.z)>34){const c=cutoffFor(h.x);if(c&&c!==h){c.walkTo(h.x*.55,h.z*.55,4.4);await sleep(.2);await throwTo(h,c,thrSpd(h));h=c;continue}}
+      if(Math.hypot(h.x,h.z)>34){const c=cutoffFor(h.x);if(c&&c!==h){c.walkTo(h.x*.55,h.z*.55,4.4);say(fielder('C'),pick(['カット!','カット!ボール止めて!']),1);await sleep(.2);await throwTo(h,c,thrSpd(h));h=c;continue}}
       break}
     if(!said){said=true;say(fielder('C'),BWORD[d.b],1);await sleep(.2)}
-    if(d.via){d.via.walkTo(h.x*.55,h.z*.55,4.6);await throwTo(h,d.via,thrSpd(h));h=d.via;await sleep(reactT(h)*.6);continue}
+    const far=Math.hypot(h.x,h.z)>34;
+    if(d.via){if(far)say(baseRecv(d.b,d.via)||fielder('C'),pick(['カット!','カット!カット!','中継!']),1);d.via.walkTo(h.x*.55,h.z*.55,4.6);await throwTo(h,d.via,thrSpd(h));h=d.via;await sleep(reactT(h)*.6);continue}
     const recv=baseRecv(d.b,h);if(!recv)break;const[bx,bz]=bpos(d.b);
+    if(far&&G.relay&&G.relay.cut&&G.relay.cut!==recv)say(recv,pick(['一本!','ノーカット!','そのまま!']),1);
     if(recv!==h){recv.walkTo(bx+(d.b===1?-.3:.3),bz-.3,5);await sleep(.12);
       if(chance(.03+.12*(1-sk(h,'thr')/100))){const wx=recv.x+rnd(-4,4),wz=recv.z+rnd(-4,3);await throwTo(h,recv,thrSpd(h),G.ball,[wx,wz]);oops(recv,'recv');oops(h,'thr',0);markErr(h);await recv.goto(wx,wz,4.4);G.ball.holder=recv;h=recv;continue}
       await throwTo(h,recv,thrSpd(h))}
@@ -3606,10 +3625,10 @@ function renderSheet(){
     <div class="field"><label class="lbl" for="tName">チーム名</label><input type="text" id="tName" maxlength="10" value="${esc(t.name)}"></div>
     <div><div class="lbl">帽子・ライン</div><div class="sw" id="swCap">${CAPS.map(c=>`<button data-cap="${c.k}" aria-pressed="${t.cap===c.k}"><span class="dot" style="background:${c.c}"></span>${c.l}</button>`).join('')}</div></div>
     <div><div class="lbl">ユニフォーム</div><div class="sw" id="swBody">${BODIES.map(c=>`<button data-body="${c.k}" aria-pressed="${t.body===c.k}"><span class="dot" style="background:${c.c}"></span>${c.l}</button>`).join('')}</div></div>
-    <div><div class="lbl">選手（13人）</div><div class="roster">${t.players.map((p,i)=>`<div class="prow"><span class="num${t.oshi===p.id?' oshi':''}">${t.oshi===p.id?'★':''}${p.num}</span><input type="text" id="pn${i}" data-p="${i}" maxlength="8" value="${esc(p.name)}" aria-label="背番号${p.num}の名前"><select data-bt="${i}" aria-label="背番号${p.num}の投打"><option value=""${BTS[p.bt]?'':' selected'}>おまかせ</option>${Object.keys(BTL).map(k=>`<option value="${k}"${p.bt===k?' selected':''}>${BTL[k]}</option>`).join('')}</select><div class="gseg" data-g="${i}"><button data-v="0" aria-pressed="${!p.girl}">男の子</button><button data-v="1" aria-pressed="${!!p.girl}">女の子</button></div></div>`).join('')}</div></div>
+    <div><div class="lbl">選手（${t.players.length}人・9〜20人）　背番号をタップで★推し（2人まで）</div><div class="roster">${t.players.map((p,i)=>`<div class="prow"><button class="num${oshiList(t).includes(p.id)?' oshi':''}" data-oshi="${i}" aria-label="背番号${p.num}を推しにする">${oshiList(t).includes(p.id)?'★':''}${p.num}</button><input type="text" id="pn${i}" data-p="${i}" maxlength="8" value="${esc(p.name)}" aria-label="背番号${p.num}の名前"><select data-bt="${i}" aria-label="背番号${p.num}の投打"><option value=""${BTS[p.bt]?'':' selected'}>おまかせ</option>${Object.keys(BTL).map(k=>`<option value="${k}"${p.bt===k?' selected':''}>${BTL[k]}</option>`).join('')}</select><div class="gseg" data-g="${i}"><button data-v="0" aria-pressed="${!p.girl}">男の子</button><button data-v="1" aria-pressed="${!!p.girl}">女の子</button></div>${t.players.length>9?`<button class="rm" data-rm="${i}" aria-label="背番号${p.num}を外す">×</button>`:'<span></span>'}</div>`).join('')}</div>
+      <div class="rosterAct">${t.players.length<20?'<button data-add="1">＋ 選手を追加</button>':''}${(t.ob||[]).length&&t.players.length<20?(t.ob||[]).map((p,j)=>`<button data-rs="${j}">↩ ${p.num} ${esc(p.name)} を戻す</button>`).join(''):''}</div>${shNote&&shNote.oshiMax?'<p class="note" style="color:#c0392b">推しは2人までです</p>':''}</div>
     <div class="field"><label class="lbl" for="tCapt">キャプテン（試合前のじゃんけんをします）</label><select id="tCapt">${t.players.map(p=>`<option value="${p.id}"${(t.captain?t.captain===p.id:p.num===10)?' selected':''}>${p.num} ${esc(p.name)}</option>`).join('')}</select></div>
-    <div class="field"><label class="lbl" for="tOshi">★推し選手（いつも先発・交代なし・少し早く成長）</label><select id="tOshi"><option value="">なし</option>${t.players.map(p=>`<option value="${p.id}"${t.oshi===p.id?' selected':''}>★ ${p.num} ${esc(p.name)}</option>`).join('')}</select></div>
-    <p class="note">変更は次の試合から反映されます。投打を「おまかせ」にした子は自動で決まります。先発の9人・守備位置・打順は、出場の少ない子から公平にランダムで決まります。</p>`;
+    <p class="note">★推し選手はいつも先発・交代なし・少し早く成長します。変更は次の試合から反映されます。外した子の記録は残り、「戻す」で続きから使えます。投打を「おまかせ」にした子は自動で決まります。先発の9人・守備位置・打順は、出場の少ない子から公平にランダムで決まります。</p>`;
   }else{
     const ts=DB.teams.map(x=>({x,s:DB.st.t[x.id]||{g:0,w:0,l:0,d:0,rf:0,ra:0,vs:{}}}));
     const s=(DB.st.t[t.id]||{vs:{}});
@@ -3643,6 +3662,12 @@ shBody.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   if(b.dataset.note){shNote=b.dataset.note;renderSheet();shBody.scrollTop=0;return}
   if(b.dataset.back){shNote=null;renderSheet();return}
+  if(b.dataset.oshi!=null){const i=+b.dataset.oshi;let over=false;editD(d=>{const t=d.teams[shTeam],id=t.players[i].id;let l=oshiList(t).slice();if(l.includes(id))l=l.filter(x=>x!==id);else if(l.length<2)l.push(id);else over=true;t.oshis=l;delete t.oshi});shNote=over?{oshiMax:true}:null;renderSheet();return}
+  if(b.dataset.rm!=null){shNote=null;editD(d=>{const t=d.teams[shTeam];if(t.players.length<=9)return;const p=t.players.splice(+b.dataset.rm,1)[0];t.ob=(t.ob||[]).concat(p);t.oshis=oshiList(t).filter(x=>x!==p.id);delete t.oshi;if(t.captain===p.id)delete t.captain});renderSheet();return}
+  if(b.dataset.rs!=null){shNote=null;editD(d=>{const t=d.teams[shTeam];if(t.players.length>=20)return;const p=(t.ob||[]).splice(+b.dataset.rs,1)[0];if(p)t.players.push(p)});renderSheet();return}
+  if(b.dataset.add){shNote=null;editD(d=>{const t=d.teams[shTeam];if(t.players.length>=20)return;const all=t.players.concat(t.ob||[]),nums=new Set(all.map(p=>p.num));let n=1;while(nums.has(n))n++;
+    const used=new Set(d.teams.flatMap(x=>x.players.concat(x.ob||[]).map(p=>p.name)));const girl=chance(.1),pool=girl?GIRL_NAMES:BOY_NAMES;let nm=pick(pool);for(let k=0;k<30&&used.has(nm);k++)nm=pick(pool);
+    t.players.push({id:'p'+uid(),num:n,name:nm,girl})});renderSheet();return}
   if(b.dataset.team!=null){shTeam=+b.dataset.team;renderSheet();return}
   if(b.dataset.cap){editD(d=>{d.teams[shTeam].cap=b.dataset.cap});renderSheet();return}
   if(b.dataset.body){editD(d=>{d.teams[shTeam].body=b.dataset.body});renderSheet();return}
@@ -3650,7 +3675,6 @@ shBody.addEventListener('click',e=>{
   if(b.id==='resetSt'){if(!shConfirm){shConfirm=true;renderSheet();return}editD(d=>{d.st={p:{},t:{}};d.log=[]});shConfirm=false;renderSheet()}
 });
 shBody.addEventListener('change',e=>{if(e.target.id==='tCapt')editD(d=>{d.teams[shTeam].captain=e.target.value});
-  if(e.target.id==='tOshi'){const v=e.target.value||null;editD(d=>{d.teams[shTeam].oshi=v});const ps=DB.teams[shTeam].players;shBody.querySelectorAll('.prow .num').forEach((el,i)=>{const o=ps[i]&&ps[i].id===v;el.classList.toggle('oshi',o);el.textContent=(o?'★':'')+ps[i].num})}
   if(e.target.dataset&&e.target.dataset.bt!=null){const i=+e.target.dataset.bt,v=e.target.value;editD(d=>{const p=d.teams[shTeam].players[i];if(v)p.bt=v;else delete p.bt})}});
 shBody.addEventListener('input',e=>{const el=e.target;
   if(el.id==='tName')editD(d=>{d.teams[shTeam].name=el.value.trim()});

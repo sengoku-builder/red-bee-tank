@@ -1,6 +1,6 @@
 # 仲間の鳥（季節ごとの写真）から鳥だけ切り抜いて、その季節の森（エサ台・巣材）に重ねる
 #   python3 friends_cut.py <季節名>   （images フォルダで実行）
-import sys,numpy as np,cv2
+import sys,os,numpy as np,cv2
 from PIL import Image
 from scipy import ndimage as nd
 se=sys.argv[1]
@@ -13,7 +13,9 @@ CFG={'autumn':{'hull':{'yamagara','shijukara','gojukara'},'rect':{},'beak':{}},
 cfg=CFG.get(se,CFG['spring']);R.update(cfg['rect']);HULL=cfg['hull']
 ref=G(L('seasons/winter_arch_empty.jpg'))[740:900]
 for n,(x0,y0,x1,y1) in R.items():
-    raw=f'friends/{se}_{n}_raw.jpg';src=L(raw)
+    raw=f'friends/{se}_{n}_raw.jpg'
+    if not os.path.exists(raw):print(se,n,'まだ写真なし');continue
+    src=L(raw)
     g2=G(src)[740:900];c=np.corrcoef(ref.ravel(),g2.ravel())[0,1]
     img=cv2.resize(cv2.imread(raw),(768,1376));mask=np.zeros(img.shape[:2],np.uint8)
     cv2.grabCut(img,mask,(x0,y0,x1-x0,y1-y0),np.zeros((1,65)),np.zeros((1,65)),8,cv2.GC_INIT_WITH_RECT)

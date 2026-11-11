@@ -1,0 +1,143 @@
+<title>新エンジン 土台チェック</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<style>
+/* 野球場の土と芝の色。上にまとめ、下にテスト結果と場面の再生 */
+:root{--bg:#f3f5ef;--panel:#ffffff;--fg:#1d2a1f;--mute:#5d6b5f;--line:#d6ddd2;--grass:#5f9a52;--grass2:#4f8744;--dirt:#c79a63;--chalk:#ffffff;
+  --ok:#2f7d3a;--ng:#c0392b;--warn:#b7791f;--field:#7aa86b;--fielder:#1f4e9c;--runner:#d0392b;
+  --head:'Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',system-ui,sans-serif;--body:'Hiragino Sans','Noto Sans JP',system-ui,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141a15;--panel:#1c241d;--fg:#e4eadf;--mute:#9aa898;--line:#2f3a30;--grass:#3f6b37;--grass2:#365e2f;--dirt:#8a6a44;--chalk:#e9eee6;--ok:#6cc27a;--ng:#ff7a6b;--warn:#e8b45a;--field:#4c7643;--fielder:#7fb0ff;--runner:#ff8a7a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141a15;--panel:#1c241d;--fg:#e4eadf;--mute:#9aa898;--line:#2f3a30;--grass:#3f6b37;--grass2:#365e2f;--dirt:#8a6a44;--chalk:#e9eee6;--ok:#6cc27a;--ng:#ff7a6b;--warn:#e8b45a;--field:#4c7643;--fielder:#7fb0ff;--runner:#ff8a7a;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.6}
+.wrap{max-width:860px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px}
+h1{font-family:var(--head);font-size:1.45rem;margin:0;text-wrap:balance}
+h2{font-family:var(--head);font-size:1.08rem;margin:0 0 8px}
+.lead{color:var(--mute);margin:4px 0 0;font-size:.92rem}
+.sum{display:flex;flex-wrap:wrap;gap:10px}
+.pill{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 14px;font-weight:700;font-variant-numeric:tabular-nums}
+.pill.ok{color:var(--ok);border-color:var(--ok)}.pill.ng{color:var(--ng);border-color:var(--ng)}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+canvas{width:100%;max-width:100%;aspect-ratio:1/0.82;display:block;border-radius:8px;background:var(--field)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--grass)}button:focus-visible{outline:2px solid var(--grass);outline-offset:2px}
+button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
+.info{font-size:.88rem;color:var(--mute);min-height:1.4em;font-variant-numeric:tabular-nums}
+.log{font-size:.85rem;display:flex;flex-wrap:wrap;gap:4px 10px;font-variant-numeric:tabular-nums}
+.log span b{font-weight:700}
+.grp{display:flex;flex-direction:column;gap:2px}
+.grp h3{font-family:var(--head);font-size:.95rem;margin:10px 0 4px;color:var(--mute);letter-spacing:.04em}
+.row{display:grid;grid-template-columns:1.6em 1fr auto;gap:8px;align-items:start;padding:7px 0;border-top:1px solid var(--line)}
+.row .m{font-weight:700}.row .m.ok{color:var(--ok)}.row .m.ng{color:var(--ng)}
+.row .n{min-width:0}.row .d{display:block;color:var(--mute);font-size:.82rem;word-break:break-word}
+.row button{padding:3px 10px;font-size:.8rem}
+.stress{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kv{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.kv .k{font-size:.78rem;color:var(--mute)}.kv .v{font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums}
+.note{font-size:.85rem;color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div class="wrap">
+  <header>
+    <h1>河川敷の少年野球　新しい試合エンジン　第1段「土台」</h1>
+    <p class="lead">ボールの飛び方・選手の動き・審判の判定を、台本なしの計算で動かす土台です。今の壁紙とは別に動いています。下の結果は、このページを開いたときにその場で計算しています。</p>
+  </header>
+  <div class="sum" id="sum"><span class="pill">計算中…</span></div>
+
+  <section class="stage">
+    <h2>野球場（上から見たところ）</h2>
+    <canvas id="cv" width="760" height="624"></canvas>
+    <div class="btns" id="hits">
+      <button data-k="goro">ゴロ</button><button data-k="liner">ライナー</button><button data-k="fly">外野フライ</button>
+      <button data-k="pop">ポップフライ</button><button data-k="hr">ホームラン</button><button data-k="foul">ファウル</button><button data-k="rand">ランダム</button>
+    </div>
+    <div class="info" id="info">ボタンを押すと打球を飛ばします。下の「再生」で審判のテスト場面も見られます。</div>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section>
+    <h2>自動チェックの結果</h2>
+    <div id="tests"></div>
+  </section>
+
+  <section class="stage">
+    <h2>たくさんの打球を流して調べる</h2>
+    <p class="note">いろいろな速さ・角度・回転の打球を、かんたんな仮の守備で流します。審判の決まりの違反は0件でないといけません。仮の守備の動きは第2段で作り直すので、ここでの気になる点は参考です。</p>
+    <div class="btns"><button id="runStress">1000球流す</button></div>
+    <div class="stress" id="stress"></div>
+  </section>
+</div>
+<script>
+/*ENGINE*/
+</script>
+<script>
+/*TESTS*/
+</script>
+<script>
+(function(){
+const $=s=>document.querySelector(s),cv=$('#cv'),ctx=cv.getContext('2d');
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const W=cv.width,H=cv.height,S=W/96,X=x=>W/2+x*S,Z=z=>H-10*S-z*S*0.98;
+const OUTJ={force:'フォース',tag:'タッチ',fly:'フライ',appeal:'リタッチ'};
+function evText(e){switch(e.type){case'out':return`<b>アウト</b>（${OUTJ[e.outType]||e.outType}）${e.name||''}`;
+  case'safe':return`セーフ${e.close?'（きわどい）':''}`;case'home':return`ホームイン ${e.name||''}`;case'fair':return'フェア';case'foul':return'ファウル';
+  case'hr':return'<b>ホームラン</b>';case'groundRule':return'エンタイトル二塁打';case'runVoid':return'得点取り消し';case'flyCatch':return'フライ捕球';
+  case'retouch':return'元の塁に戻った';case'playEnd':return`プレー終わり（${({time:'ボールが戻った',foul:'ファウル',threeOuts:'3アウト',hr:'ホームラン',groundRule:'エンタイトル'})[e.why]||e.why}）`;default:return e.type}}
+function field(){
+  ctx.fillStyle=css('--field');ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=css('--grass');ctx.beginPath();ctx.moveTo(X(0),Z(0));ctx.arc(X(0),Z(0),60*S,-Math.PI/4-Math.PI/2,-Math.PI/4);ctx.closePath();ctx.fill();
+  ctx.fillStyle=css('--dirt');ctx.beginPath();ctx.moveTo(X(0),Z(0));ctx.arc(X(0),Z(0),29*S,-Math.PI/4-Math.PI/2,-Math.PI/4);ctx.closePath();ctx.fill();
+  ctx.fillStyle=css('--grass2');ctx.beginPath();[[0,4],[12.3,16.3],[0,28.6],[-12.3,16.3]].forEach(([x,z],i)=>i?ctx.lineTo(X(x),Z(z)):ctx.moveTo(X(x),Z(z)));ctx.fill();
+  ctx.strokeStyle=css('--chalk');ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(X(-44),Z(44));ctx.lineTo(X(0),Z(0));ctx.lineTo(X(44),Z(44));ctx.stroke();
+  ctx.lineWidth=3;ctx.strokeStyle=css('--fg');ctx.globalAlpha=.5;ctx.beginPath();ctx.arc(X(0),Z(0),60*S,-Math.PI/4-Math.PI/2,-Math.PI/4);ctx.stroke();ctx.globalAlpha=1;
+  ctx.fillStyle=css('--chalk');KE.FIELD.bases.forEach(([x,z])=>{ctx.save();ctx.translate(X(x),Z(z));ctx.rotate(Math.PI/4);ctx.fillRect(-4,-4,8,8);ctx.restore()});
+  ctx.fillStyle=css('--chalk');ctx.globalAlpha=.8;ctx.font=`${11}px ${css('--body')}`;ctx.fillText('60m',X(0)-10,Z(60)+14);ctx.globalAlpha=1;
+}
+function dot(x,z,r,c,label){ctx.fillStyle=c;ctx.beginPath();ctx.arc(X(x),Z(z),r,0,7);ctx.fill();if(label){ctx.fillStyle=css('--chalk');ctx.font=`bold 10px ${css('--body')}`;ctx.fillText(label,X(x)+r+2,Z(z)+3)}}
+function ball(x,z,h){ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(X(x),Z(z),4,2.5,0,0,7);ctx.fill();
+  ctx.fillStyle='#fff';ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.beginPath();ctx.arc(X(x),Z(z)-h*S*0.55,4,0,7);ctx.fill();ctx.stroke()}
+let anim=null;
+function play(frames,trail,done){cancelAnimationFrame(anim);let i=0,t0=performance.now();const T=frames[frames.length-1].t;
+  const tick=now=>{const t=(now-t0)/1000;while(i<frames.length-1&&frames[i+1].t<=t)i++;field();
+    if(trail){ctx.strokeStyle=css('--chalk');ctx.globalAlpha=.55;ctx.setLineDash([3,4]);ctx.beginPath();trail.forEach((q,j)=>{if(q[0]>t)return;j?ctx.lineTo(X(q[1]),Z(q[2])-q[3]*S*.55):ctx.moveTo(X(q[1]),Z(q[2])-q[3]*S*.55)});ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1}
+    const f=frames[i];(f.f||[]).forEach(p=>dot(p[0],p[1],6,css('--fielder'),p[2]));(f.r||[]).forEach(p=>dot(p[0],p[1],6,p[2]?css('--mute'):css('--runner'),p[3]));
+    if(f.b)ball(...f.b);if(done)done(t);if(t<T+0.6)anim=requestAnimationFrame(tick)};anim=requestAnimationFrame(tick)}
+const KIND={goro:()=>[r(20,32),r(-14,-4),r(-40,40),r(-1500,-300),r(-500,500)],liner:()=>[r(28,36),r(5,12),r(-35,35),r(500,1500),r(-500,500)],
+  fly:()=>[r(22,28),r(26,36),r(-38,38),r(1500,2400),r(-600,600)],pop:()=>[r(18,26),r(65,80),r(-30,30),r(1500,2500),r(-400,400)],
+  hr:()=>[r(39,43),r(26,32),r(-35,35),r(1800,2500),r(-300,300)],foul:()=>[r(20,30),r(10,35),(Math.random()<.5?-1:1)*r(47,60),r(800,2000),r(-500,500)],
+  rand:()=>[r(8,40),r(-15,60),r(-55,55),r(-1000,2500),r(-900,900)]};
+function r(a,b){return a+Math.random()*(b-a)}
+function hit(k){const[v,va,ang,back,side]=KIND[k]();const h=KT.hitVec(v,va,ang,back,side);const b=new KE.Ball();b.launch(h.p,h.v,h.w);
+  const pr=KE.predict(b,10,1/30);const frames=pr.map(q=>({t:q[0],b:[q[1],q[2],q[3]]}));
+  let landT=null,landD=0,peak=0;for(const q of pr){peak=Math.max(peak,q[3]);if(landT==null&&q[5]>0){landT=q[0];landD=Math.hypot(q[1],q[2])}}
+  const last=pr[pr.length-1],over=last[4]==='out';
+  const fair=KE.isFair(last[1],last[2]);
+  $('#info').textContent=`打球 ${Math.round(v*3.6)}km/h・上下${Math.round(va)}度・${ang>0?'一塁側':'三塁側'}${Math.abs(Math.round(ang))}度　→　${over?(fair?'フェンス越え（ホームラン）':'場外ファウル'):landT!=null?`${landD.toFixed(0)}m先に落下（滞空${landT.toFixed(1)}秒・最高${peak.toFixed(1)}m）、${Math.hypot(last[1],last[2]).toFixed(0)}mで止まる`:'転がって止まる'}`;
+  $('#log').innerHTML='';play(frames,pr)}
+$('#hits').addEventListener('click',e=>{const k=e.target.dataset&&e.target.dataset.k;if(k)hit(k)});
+field();
+function renderTests(res){
+  const T=res.tests,ok=T.filter(t=>t.ok).length,ng=T.length-ok;
+  $('#sum').innerHTML=`<span class="pill ${ng?'ng':'ok'}">テスト ${ok}／${T.length} 合格</span>`+(ng?`<span class="pill ng">不合格 ${ng}</span>`:'');
+  const groups=[...new Set(T.map(t=>t.group))];
+  $('#tests').innerHTML=groups.map(g=>`<div class="grp"><h3>${g}</h3>${T.map((t,i)=>t.group!==g?'':`<div class="row"><span class="m ${t.ok?'ok':'ng'}">${t.ok?'○':'×'}</span><span class="n">${t.name}${t.detail?`<span class="d">${t.detail}</span>`:''}</span>${t.frames&&t.frames.length?`<button data-i="${i}">再生</button>`:'<span></span>'}</div>`).join('')}</div>`).join('');
+  $('#tests').onclick=e=>{const i=e.target.dataset&&e.target.dataset.i;if(i==null)return;const t=T[+i];
+    $('#info').textContent='再生中：'+t.name;window.scrollTo({top:cv.getBoundingClientRect().top+scrollY-20,behavior:'smooth'});
+    const shown=new Set();$('#log').innerHTML='';
+    play(t.frames,null,tt=>{(t.log||[]).forEach((e,j)=>{if(e.t<=tt&&!shown.has(j)){shown.add(j);$('#log').insertAdjacentHTML('beforeend',`<span>${e.t.toFixed(1)}秒 ${evText(e)}</span>`)}})})};
+  return{ok,ng};
+}
+let base=null;
+setTimeout(()=>{const res=KT.runAll(KE,{});base=renderTests(res)},30);
+$('#runStress').onclick=()=>{const btn=$('#runStress');btn.disabled=true;const N=1000,step=50;let acc=null,done=0;
+  const merge=(a,b)=>{if(!a)return b;for(const k of['plays','fair','foul','hr','gr','runs','crash','time'])a[k]+=b[k];for(const m of['codes','outs','ends'])for(const k in b[m])a[m][k]=(a[m][k]||0)+b[m][k];a.viol=a.viol.concat(b.viol).slice(0,20);return a};
+  const go=()=>{acc=merge(acc,KT.stress(KE,step,5000+done));done+=step;show(acc,done<N);if(done<N)setTimeout(go,0);else btn.disabled=false};go()};
+function show(s,running){
+  const rule=Object.entries(s.codes).filter(([k])=>!KT.AI_CODES.includes(k)).reduce((a,[,v])=>a+v,0)+s.crash;
+  const ai=Object.entries(s.codes).filter(([k])=>KT.AI_CODES.includes(k)).reduce((a,[,v])=>a+v,0);
+  const kv=(k,v)=>`<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  $('#stress').innerHTML=kv('流した打球',`${s.plays}${running?'…':''}`)+kv('審判の決まりの違反',`<span style="color:var(${rule?'--ng':'--ok'})">${rule}件</span>`)+kv('仮の守備の気になる点',`${ai}件`)+
+    kv('アウトの内訳',Object.entries(s.outs).map(([k,v])=>`${k}${v}`).join('・')||'—')+kv('フェア／ファウル',`${s.fair}／${s.foul}`)+kv('ホームラン・エンタイトル',`${s.hr}・${s.gr}`)+kv('1プレーの平均',`${(s.time/s.plays).toFixed(1)}秒`);
+}
+})();
+</script>

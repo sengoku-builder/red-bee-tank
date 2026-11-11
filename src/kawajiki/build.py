@@ -15,3 +15,13 @@ open(os.path.join(out, 'sokuho.html'), 'w', encoding='utf-8').write(open(os.path
 # 大会（トーナメント表）ページ
 open(os.path.join(out, 'taikai.html'), 'w', encoding='utf-8').write(open(os.path.join(here, 'taikai.html'), encoding='utf-8').read())
 print('build', build)
+# 新しい試合エンジンの確認ページ（engine.js と engine-tests.js を中に入れた1ファイル）
+def engine_page():
+    p = open(os.path.join(here, 'engine-test.html'), encoding='utf-8').read()
+    p = p.replace('/*ENGINE*/', open(os.path.join(here, 'engine.js'), encoding='utf-8').read())
+    p = p.replace('/*TESTS*/', open(os.path.join(here, 'engine-tests.js'), encoding='utf-8').read())
+    return p
+ep = engine_page()
+open(os.path.join(out, 'engine-test.html'), 'w', encoding='utf-8').write(
+    '<!doctype html>\n<html lang="ja"><head><meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n' + ep + '\n</html>\n')
+open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(here))), 'kawajiki-engine', 'engine-test.html'), 'w', encoding='utf-8').write(ep)

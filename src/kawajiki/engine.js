@@ -43,6 +43,7 @@ const PROF={
   armErr:s=>0.010+0.075*Y(s),     // 送球の向きのずれ（ラジアン、1σ）
 };
 KE.Y=Y;KE.sk=sk;KE.PROF=PROF;
+KE.reachH=f=>2.0+0.4*sk(f,'fld')/100;   // 手が届く高さ（ジャンプ込み）
 
 /* ---------- ボール ----------
    状態：held（誰かが持つ）・air（飛んでいる／はねている）・ground（転がる）・rest（止まった）・out（場外） */
@@ -92,7 +93,8 @@ class Ball{
   walls(emit){
     const r=this.r;
     if(r>=FIELD.fence&&this.z>-2){
-      if(this.h>FIELD.fenceH+BR){this.over={fair:isFair(this.x,this.z),bounced:this.bounces>0};this.state='out';emit&&emit('overFence',{...this.over,x:this.x,z:this.z});return}
+      const vo=this.vx*this.x+this.vz*this.z>0;
+      if(vo&&this.h>FIELD.fenceH+BR){this.over={fair:isFair(this.x,this.z),bounced:this.bounces>0};this.state='out';emit&&emit('overFence',{...this.over,x:this.x,z:this.z});return}
       const nx=this.x/r,nz=this.z/r,vr=this.vx*nx+this.vz*nz;
       if(vr>0){const tx=this.vx-vr*nx,tz=this.vz-vr*nz;this.vx=tx*0.7-vr*0.3*nx;this.vz=tz*0.7-vr*0.3*nz;
         this.x=nx*(FIELD.fence-0.05);this.z=nz*(FIELD.fence-0.05);this.wall=true;emit&&emit('wall',{x:this.x,z:this.z})}
@@ -151,25 +153,32 @@ class Player{
   get speed(){return hyp(this.vx,this.vz)}
   dist(x,z){return hyp(x-this.x,z-this.z)}
   // 目的地へ。react=true なら反応の遅れのあと動き出す
-  goTo(x,z,o={}){const was=this.tx!=null||this.speed>0.3;this.tx=x;this.tz=z;this.frac=o.frac||1;if(o.react&&!was)this.wait=Math.max(this.wait,this.react)}
+  // 反応の遅れはそのプレーで最初の一回だけ（awake）
+  goTo(x,z,o={}){this.tx=x;this.tz=z;this.frac=o.frac||1;if(o.react&&!this.awake){this.wait=Math.max(this.wait,this.react)}if(o.react)this.awake=true}
   stop(){this.tx=this.tz=null}
   step(dt){
     if(this.wait>0){this.wait-=dt;return}
     let dvx=0,dvz=0;
     if(this.tx!=null){const dx=this.tx-this.x,dz=this.tz-this.z,d=hyp(dx,dz);
       if(d<0.03&&this.speed<0.5){this.x=this.tx;this.z=this.tz;this.vx=this.vz=0;this.tx=this.tz=null;return}
-      const want=Math.min(this.vmax,Math.sqrt(2*this.dec*d));dvx=dx/d*want;dvz=dz/d*want}
-    let ax=dvx-this.vx,az=dvz-this.vz;const a=hyp(ax,az),lim=(hyp(dvx,dvz)<this.speed-0.05?this.dec:this.acc)*dt;
+      if(d>1e-4){const want=Math.min(this.vmax,Math.sqrt(2*this.dec*d));dvx=dx/d*want;dvz=dz/d*want}}
+    let ax=dvx-this.vx,az=dvz-this.vz;const sp2=this.vx*this.vx+this.vz*this.vz,a=hyp(ax,az),lim=(dvx*this.vx+dvz*this.vz<sp2-0.05?this.dec:this.acc)*dt;   // 止まる・向きを変えるときは強くブレーキ
     if(a>lim){ax*=lim/a;az*=lim/a}
     this.vx+=ax;this.vz+=az;this.x+=this.vx*dt;this.z+=this.vz*dt;
     if(this.speed>0.2)this.face=Math.atan2(this.vx,this.vz);
   }
   // そこに着くまでの見込み時間（止まった状態からなら反応も足す）
-  eta(x,z,frac=1){const d=this.dist(x,z),V=PROF.runV(sk(this,'run'))*frac;if(d<0.05)return 0;
-    const u=d>0?Math.max(0,(this.vx*(x-this.x)+(this.vz*(z-this.z)))/d):0,re=this.speed<0.3?Math.max(this.wait,this.react):Math.max(0,this.wait);
-    return re+d/V+Math.max(0,V-u)*Math.max(0,V-u)/(2*this.acc*V)+V/(2*this.dec)}
+  eta(x,z,frac=1,reach=0){const d=Math.max(0,this.dist(x,z)-reach),V=PROF.runV(sk(this,'run'))*frac;if(d<0.05)return Math.max(0,this.wait);
+    const dx=x-this.x,dz=z-this.z,dd=hyp(dx,dz)||1,u=clamp((this.vx*dx+this.vz*dz)/dd,0,V),a=this.acc,de=this.dec;
+    const re=this.wait>0?this.wait:(!this.awake&&this.speed<0.3?this.react:0);
+    const need=(V*V-u*u)/(2*a)+V*V/(2*de);
+    if(d>=need)return re+(V-u)/a+V/de+(d-need)/V;
+    const vp=Math.max(u,Math.sqrt((2*d+u*u/a)/(1/a+1/de)));return re+(vp-u)/a+vp/de}
 }
 KE.Player=Player;
+// 止まった状態から d m 先に着くまで（反応のあと加速・減速）
+KE.etaRest=function(f,d,re){const V=PROF.runV(sk(f,'run')),a=PROF.runA(sk(f,'run')),de=a*2.5;if(d<=0)return re;
+  const need=V*V/(2*a)+V*V/(2*de);if(d>=need)return re+V/a+V/de+(d-need)/V;const vp=Math.sqrt(2*d/(1/a+1/de));return re+vp/a+vp/de};
 
 /* ---------- 共通の状況 ---------- */
 class World{
@@ -199,12 +208,13 @@ class World{
   // 投げた直後の本人は捕れない（手から離れたばかり）
   canCatch(f){const b=this.ball;return b.state!=='held'&&b.state!=='out'&&!(b.from===f&&this.t-b.relT<0.5)}
   throwTo(k,to,quality=1){
+    for(const r of this.liveRunners)r.rb.throwBase=this.umpire.legalBase(r);
     const from=[k.x,k.z,1.6],aim=KE.aimThrow(from,to,PROF.armV(sk(k,'thr')));
     const tv=KE.throwVec(aim,k,this.rng,quality);this.release(from,tv.v,tv.w,'throw');return aim;
   }
   step(){
     const dt=this.dt;
-    for(const p of this.fielders)p.step(dt);
+    for(const p of this.fielders){p.step(dt);const r=hyp(p.x,p.z);if(r>FIELD.fence-0.4){p.x*=(FIELD.fence-0.4)/r;p.z*=(FIELD.fence-0.4)/r}}
     for(const p of this.runners)if(!p.rb.out)p.step(dt);
     this.ball.step(dt,(type,d)=>this.emit(type,d));
     this.t+=dt;
@@ -259,7 +269,7 @@ class Umpire{
   }
   // 打球に野手が触れた（捕った・はじいた）
   onTouch(k,inAir){
-    const p=this.play;if(!p||p.dead)return;
+    const p=this.play;if(!p||p.dead||this.ended)return;
     if(p.firstTouchT==null)p.firstTouchT=this.w.t;
     if(p.batted&&p.fly&&inAir){
       // フライを直接捕った：フェアでもファウルでも打者アウト。走者は元の塁に戻ってから進む
@@ -268,14 +278,14 @@ class Umpire{
       const bat=this.w.liveRunners.find(r=>r.rb.isBatter);if(bat)this.out(bat,'fly',{by:k.id});
       if(!p.fair)this.w.emit('foulFlyOut',{});
       for(const r of this.w.liveRunners){if(r.rb.isBatter)continue;const[bx,bz]=basePos(r.rb.start);
-        if(hyp(r.x-bx,r.z-bz)>=ON_R||r.rb.base!==r.rb.start){r.rb.mustRetouch=true;r.rb.base=r.rb.start;this.w.emit('mustRetouch',{who:r.id})}}
+        if(hyp(r.x-bx,r.z-bz)>=ON_R||r.rb.base!==r.rb.start){r.rb.mustRetouch=true;r.rb.base=r.rb.start;r.rb.near={};this.w.emit('mustRetouch',{who:r.id})}}
       return;
     }
     p.fly=false;
     if(p.batted&&p.fair==null)this.decideFair(k.x,k.z,'touch');
   }
   // はじいた：フライはまだ捕れる。フェアかどうかは触れた場所で決まる（塁より手前・塁より先どちらも）
-  onDeflect(k){const p=this.play;if(!p||p.dead)return;if(p.firstTouchT==null)p.firstTouchT=this.w.t;if(p.batted&&p.fair==null&&(this.w.ball.bounces>0||hyp(k.x,k.z)>FIELD.bd||!p.fly))this.decideFair(k.x,k.z,'touch')}
+  onDeflect(k){const p=this.play;if(!p||p.dead||this.ended)return;if(p.firstTouchT==null)p.firstTouchT=this.w.t;if(p.batted&&p.fair==null&&(this.w.ball.bounces>0||hyp(k.x,k.z)>FIELD.bd||!p.fly))this.decideFair(k.x,k.z,'touch')}
   decideFair(x,z,why){const p=this.play;if(p.fair!=null)return;p.fair=isFair(x,z);
     this.w.emit(p.fair?'fair':'foul',{x,z,why});
     if(!p.fair){p.dead=true;this.endPlay('foul')}}
@@ -307,7 +317,10 @@ class Umpire{
         else if(L&&L[2]>FIELD.bd)this.decideFair(L[0],L[1],'land');
         else if((L||b.state!=='air')&&b.r>FIELD.bd)this.decideFair(b.x,b.z,'pass');
         else if(b.state==='rest')this.decideFair(b.x,b.z,'stop')}
-    }else if(p.batted&&p.fair===true&&b.state==='out'&&b.over&&!p.award&&!p.dead)this.award(b.over.bounced?2:4,b.over.bounced?'groundRule':'hr');
+    }else if(p.batted&&p.fair===true&&b.state==='out'&&b.over&&!p.award&&!p.dead){
+      // 打球ならホームラン・エンタイトル。送球が外へ出たら、投げたときの塁から2つ
+      if(b.src==='bat'||b.src==='deflect'&&p.firstTouchT==null)this.award(b.over.bounced?2:4,b.over.bounced?'groundRule':'hr');
+      else this.award(2,'overthrow')}
     if(p.dead&&!p.award)return;
     // 塁に触れたか（打者走者が二塁へ向かいかけたら、一塁の駆け抜けの守りはなくなる）
     for(const r of w.liveRunners)if(r.rb.isBatter&&r.rb.base===1&&r.z>r.x+1.2&&hyp(r.x-16.3,r.z-16.3)>0.6)r.rb.turned=true;
@@ -346,7 +359,7 @@ class Umpire{
   etaTo(r,k){const[bx,bz]=FIELD.bases[k],d=hyp(r.x-bx,r.z-bz);if(d<ON_R)return 0;
     const sp=(r.vx*(bx-r.x)+r.vz*(bz-r.z))/d;return sp>0.3?(d-ON_R)/sp:9}
   award(n,why){const p=this.play;p.award={n,why};p.dead=true;
-    for(const r of this.w.liveRunners){r.rb.awardTo=Math.min(4,(r.rb.isBatter?0:r.rb.start)+n)}
+    for(const r of this.w.liveRunners){const from=why==='overthrow'?(r.rb.throwBase??this.legalBase(r)):(r.rb.isBatter?0:r.rb.start);r.rb.awardTo=Math.min(4,from+n);r.rb.mustRetouch=false;if(r.rb.base>r.rb.awardTo)r.rb.awardTo=r.rb.base}
     this.w.emit(why,{n})}
   finishAward(){if(this.w.liveRunners.every(r=>r.rb.base>=r.rb.awardTo))this.endPlay(this.play.award.why)}
   endHalf(ev){
@@ -368,20 +381,21 @@ KE.Umpire=Umpire;KE.RULE={ON_R,BASE_F,TAG_R,CLOSE};
 class Checker{
   constructor(w,o={}){this.w=w;this.ai=o.ai!==false;this.v=[];this.touch=new Map();this.free=null;this.holdT=null;this.stillT=null;this.bounced=0;
     w.checkers.push(this);
-    w.on('out',e=>this.onOut(e));w.on('loose',()=>this.snapFree());w.on('playStart',()=>{this.bounced=0;this.snapFree();this.t0=w.t;this.voidRuns=0;this.homes=new Set()});
+    w.on('out',e=>this.onOut(e));w.on('loose',e=>{this.src=e.src;this.snapFree()});w.on('playStart',()=>{this.bounced=0;this.snapFree();this.t0=w.t;this.voidRuns=0;this.homes=new Set();this.score0=[...w.score]});
     w.on('bounce',()=>this.bounced++);w.on('wall',()=>this.bounced++);
     w.on('catch',e=>this.onPick(e));w.on('pickup',e=>this.onPick(e));
     w.on('home',e=>this.homes.add(e.who));w.on('runVoid',()=>this.voidRuns++);
-    w.on('playEnd',e=>this.onEnd(e));this.score0=[...w.score];
+    w.on('playEnd',e=>this.onEnd(e));this.score0=[...w.score];w.on('error',()=>this.snapFree());
   }
   bad(code,msg,ex={}){const e={t:+this.w.t.toFixed(2),code,msg,...ex};this.v.push(e);this.w.emit('violation',e)}
-  snapFree(){this.free={t:this.w.t,pos:new Map(this.w.fielders.map(f=>[f,[f.x,f.z,f.react]]))}}
+  snapFree(){this.path=[];this.free={t:this.w.t,pos:new Map(this.w.fielders.map(f=>[f,[f.x,f.z,Math.max(f.react,f.wait)]]))}}
   onPick(e){
-    // 遠い子が拾っていないか：ボールが離れたときの位置から、拾った場所までの時間をくらべる
-    if(!this.free||!this.ai)return;const k=this.w.fielders.find(f=>f.id===e.who);if(!k)return;
-    const est=f=>{const p=this.free.pos.get(f);return p?p[2]+hyp(e.x-p[0],e.z-p[1])/PROF.runV(sk(f,'run')):99};
-    const me=est(k),best=this.w.fielders.filter(f=>f!==k).sort((a,b)=>est(a)-est(b))[0];
-    if(best&&est(best)<me-1.2)this.bad('farPick',`遠い子が拾った（${k.role}。${best.role}の方が${(me-est(best)).toFixed(1)}秒早い）`);
+    // 遠い子が拾っていないか：ボールが離れてからの実際の通り道で、ほかの子が先に追いつけたかをくらべる
+    if(!this.free||!this.ai||!this.w.umpire.play||this.w.umpire.ended||this.src==='throw'||this.src==='pitch')return;const w=this.w,k=w.fielders.find(f=>f.id===e.who);if(!k)return;
+    const first=f=>{const p=this.free.pos.get(f);if(!p)return Infinity;const V=PROF.runV(sk(f,'run'));
+      const rh=KE.reachH(f);for(const q of this.path){if(q[3]>rh)continue;const d=Math.max(0,hyp(q[1]-p[0],q[2]-p[1])-0.5);if(this.free.t+KE.etaRest(f,d,p[2])+0.15<=q[0])return q[0]}return Infinity};
+    const now=w.t,best=w.fielders.filter(f=>f!==k).map(f=>({f,t:first(f)})).sort((a,c)=>a.t-c.t)[0];
+    if(best&&best.t<now-1.2)this.bad('farPick',`遠い子が拾った（${k.role}。${best.f.role}の方が${(now-best.t).toFixed(1)}秒早い）`);
   }
   onOut(e){
     const w=this.w,r=w.runners.find(q=>q.id===e.who),h=w.ball.holder;
@@ -390,7 +404,8 @@ class Checker{
     if(!h){this.bad('noBall','ボールを持っていないのにアウト');return}
     if(e.outType==='tag'){const d=hyp(r.x-h.x,r.z-h.z);if(d>TAG_R+0.2)this.bad('farTag',`離れているのにタッチアウト（${d.toFixed(1)}m）`);
       const lb=w.umpire.legalBase(r)%4,ta=this.touch.get(r)&&this.touch.get(r)[lb],two=w.liveRunners.some(q=>q!==r&&q.rb.base===r.rb.base);
-      if(ta!=null&&w.t-ta>CLOSE+0.02&&!two&&!r.rb.mustRetouch)this.bad('tagOnBase','塁の上にいるのにタッチアウト')}
+      const[lx,lz]=FIELD.bases[lb],still=hyp(r.x-lx,r.z-lz)<ON_R;
+      if(still&&ta!=null&&w.t-ta>CLOSE+0.02&&!two&&!r.rb.mustRetouch)this.bad('tagOnBase','塁の上にいるのにタッチアウト')}
     else if(e.outType==='force'||e.outType==='appeal'){
       const[bx,bz]=basePos(e.base);if(hyp(h.x-bx,h.z-bz)>BASE_F+0.2)this.bad('offBase','塁を踏まずにフォースアウト');
       const ta=this.touch.get(r)&&this.touch.get(r)[e.base%4];
@@ -416,6 +431,7 @@ class Checker{
     const live=w.liveRunners.filter(r=>!r.rb.mustRetouch).sort((a,b)=>a.rb.start-b.rb.start);
     for(let i=1;i<live.length;i++)if(prog(live[i-1])>prog(live[i])+0.15&&!this.passed){this.passed=1;this.bad('pass','ランナーが前のランナーを追い越した')}
     // 持ったまま止まる・動かないボール
+    if(this.path&&w.ball.state!=='held'&&(w.fc%2===0||!w.record))this.path.push([t,w.ball.x,w.ball.z,w.ball.h]);
     if(!this.ai)return;const b=w.ball,moving=w.liveRunners.some(r=>r.speed>0.5);
     if(b.state==='held'&&b.holder&&b.holder.speed<0.2&&moving){this.holdT=this.holdT??t;if(t-this.holdT>4){this.bad('hold','ボールを持ったまま止まっている');this.holdT=t+1e9}}else this.holdT=null;
     if(b.state==='rest'&&!w.fielders.some(f=>f.tx!=null&&hyp(f.tx-b.x,f.tz-b.z)<3)){this.stillT=this.stillT??t;if(t-this.stillT>3){this.bad('still','止まったボールに誰も向かわない');this.stillT=t+1e9}}else this.stillT=null;

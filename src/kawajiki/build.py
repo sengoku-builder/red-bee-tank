@@ -19,6 +19,7 @@ print('build', build)
 def engine_page():
     p = open(os.path.join(here, 'engine-test.html'), encoding='utf-8').read()
     p = p.replace('/*ENGINE*/', open(os.path.join(here, 'engine.js'), encoding='utf-8').read())
+    p = p.replace('/*PLAY*/', open(os.path.join(here, 'engine-play.js'), encoding='utf-8').read())
     p = p.replace('/*TESTS*/', open(os.path.join(here, 'engine-tests.js'), encoding='utf-8').read())
     return p
 ep = engine_page()

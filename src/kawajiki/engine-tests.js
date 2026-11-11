@@ -189,7 +189,7 @@ function checker(KE,T){
   { const{w,ck}=W(),a=w.addRunner(mk(KE,'a','',50),2),b=w.addRunner(mk(KE,'b','',50),1);w.umpire.startPlay({});b.rb.base=2;b.x=0;b.z=32.6;w.umpire.endPlay('time');
     add('わざと「同じ塁に2人」を起こす→見つける',ck.v.some(v=>v.code==='twoOnBase'),ck.v.map(v=>v.msg).join(''));}
   { const{w,ck}=W(),ss=w.addFielder(mk(KE,'ss','SS',60)),lf=w.addFielder(mk(KE,'lf','LF',60));w.addRunner(mk(KE,'打者','',50,{at:[0.6,0]}),0,true);w.umpire.startPlay({});
-    w.ball.launch([-6,24,0.04],[0,0,0]);w.ball.state='rest';w.emit('loose',{});lf.x=-6.5;lf.z=24;w.give(lf,'pickup');
+    w.ball.launch([-6,24,0.04],[0,0,0]);w.ball.state='rest';w.emit('loose',{src:'bat'});w.run(4);lf.x=-6.5;lf.z=24;w.give(lf,'pickup');
     add('わざと「遠い子が拾う」を起こす→見つける',ck.v.some(v=>v.code==='farPick'),ck.v.map(v=>v.msg).join(''));}
   { const{w,ck}=W(),f=w.addFielder(mk(KE,'rf','RF',60)),r=w.addRunner(mk(KE,'走者','',30),1);w.umpire.startPlay({});w.give(f,'pickup');r.goTo(-30,40);w.run(6);
     add('わざと「ボールを持ったまま止まる」を起こす→見つける',ck.v.some(v=>v.code==='hold'),ck.v.map(v=>v.msg).join(''));}
@@ -252,9 +252,66 @@ st.avgT=st.time/Math.max(1,st.plays);
   return st;
 }
 
+
+/* ================= 第2段：打つ・捕る・投げる ================= */
+function batting(KE,T){
+  const add=(name,ok,detail)=>T.push({group:'打つ（投球と打撃の計算）',name,ok,detail});
+  const sample=(lv,n,seed)=>{const rng=KE.makeRng(seed),P={sk:{thr:lv,fld:lv,iq:lv}},B={sk:{bat:lv,iq:lv},lefty:false},c=[];let sw=0,miss=0,pa=0,K=0,BB=0;
+    while(c.length<n){const cnt={b:0,s:0};pa++;
+      while(true){const p=KE.makePitch(P,cnt,rng),r=KE.swing(B,p,cnt,rng);if(r.swing)sw++;
+        if(r.contact){const foul=!(Math.abs(r.ang)<=45);c.push({...r,foul});if(foul){if(cnt.s<2)cnt.s++;continue}break}
+        if(r.swing)miss++;
+        if(r.swing||KE.inZone(p.px,p.ph)){if(++cnt.s>=3){K++;break}}else if(++cnt.b>=4){BB++;break}}}
+    const fair=c.filter(x=>!x.foul),m=a=>a.reduce((s,v)=>s+v,0)/a.length,sd=a=>{const mu=m(a);return Math.sqrt(m(a.map(v=>(v-mu)**2)))};
+    return{c,fair,sw,miss,pa,K,BB,v:m(fair.map(x=>x.v))*3.6,vaSD:sd(fair.map(x=>x.va)),foulR:(c.length-fair.length)/c.length,missR:miss/sw}};
+  const L=[30,60,90].map((lv,i)=>sample(lv,600,11+i));
+  { const c=L[1].c;let same=0;for(let i=1;i<c.length;i++){const a=c[i-1],b=c[i];if(Math.abs(a.v-b.v)<1&&Math.abs(a.va-b.va)<2&&Math.abs(a.ang-b.ang)<3)same++}
+    add('同じような打球が続かない（600球で、ほぼ同じ打球が続いた割合）',same/c.length<0.02,`${(same/c.length*100).toFixed(1)}%`);}
+  add('打撃の能力が上がるほど打球が強い',L[0].v<L[1].v&&L[1].v<L[2].v,L.map((x,i)=>`能力${[30,60,90][i]}：平均${x.v.toFixed(0)}km/h`).join('、'));
+  add('能力が低いほど打球の角度がばらつく',L[0].vaSD>L[2].vaSD,L.map((x,i)=>`能力${[30,60,90][i]}：${x.vaSD.toFixed(0)}度`).join('、'));
+  add('ファウルと空振りも同じ計算から生まれる',L.every(x=>x.foulR>0.12&&x.missR>0.08),L.map((x,i)=>`能力${[30,60,90][i]}：ファウル${(x.foulR*100).toFixed(0)}%・空振り${(x.missR*100).toFixed(0)}%`).join('、'));
+  add('能力が低い投手ほどフォアボールが多い',L[0].BB/L[0].pa>L[2].BB/L[2].pa+0.05,L.map((x,i)=>`能力${[30,60,90][i]}：四球${(x.BB/x.pa*100).toFixed(0)}%・三振${(x.K/x.pa*100).toFixed(0)}%`).join('、'));
+}
+function fieldScene(KE,o){
+  const lv=o.lv||70,w=new KE.World({seed:o.seed||1,record:true}),ck=new KE.Checker(w),rng=KE.makeRng(o.seed||1),T=KE.mkTeam('守',lv,rng);
+  w.fielders=T.players.map(p=>{const f=new KE.Player({id:p.id,name:p.pos,role:p.pos,sk:p.sk});[f.x,f.z]=KE.FIELD.pos[p.pos];f.side='F';return f});
+  const def=new KE.Defense(w),run=new KE.Running(w,def);w.outs=o.outs||0;
+  for(const b of(o.on||[]))w.addRunner(new KE.Player({id:`走${b}`,name:`${b}塁走者`,sk:{run:o.run||50,iq:60}}),b);
+  const B=new KE.Player({id:'打者',name:'打者',sk:{run:o.run||50,iq:60}});B.x=-0.95;w.addRunner(B,0,true);
+  w.umpire.startPlay({batted:true});const h=hitVec(...o.hit);w.release(h.p,h.v,h.w,'bat');
+  let n=0;while(!w.umpire.ended&&n++<60*40){def.tick();run.tick();w.step()}
+  return{w,ck,outs:w.log.filter(e=>e.type==='out'),log:w.log};
+}
+function fielding(KE,T){
+  const add=(name,ok,detail,S)=>T.push({group:'捕る・投げる（守備）',name,ok,detail:detail+(S&&S.ck.v.length?` ／チェック:${S.ck.v.map(v=>v.msg).join('、')}`:''),frames:S&&S.w.frames,log:S&&S.w.log.filter(e=>/^(out|safe|home|playEnd|fair|foul|error|throwTarget|catch|pickup|dive)$/.test(e.type))});
+  { let home=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:70,seed:40+i,on:[1,2,3],hit:[13,-8,3,-600]}),o=S.outs[0];if(o&&o.base===4)home++;if(!last||o&&o.base===4)last=S}
+    add('満塁でピッチャーゴロ→ホームでアウト（156の件）',home>=N*0.8,`${N}回中${home}回ホームでアウト（ほかは投げる塁をまちがえた・エラー）`,last);}
+  { let dp=0,N=12,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:90,seed:20+i,on:[1],run:40,hit:[21,-6,-18,-900]});if(S.outs.length===2&&S.outs[0].base===2&&S.outs[1].base===1)dp++;last=S}
+    add('一塁ランナーありのショートゴロ→二塁→一塁のゲッツー（S級）',dp>=N*0.6,`${N}回中${dp}回ゲッツー`,last);}
+  { let dp=0,N=12;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:30,seed:20+i,on:[1],run:40,hit:[21,-6,-18,-900]});if(S.outs.length===2)dp++}
+    add('同じ打球でも能力30ではゲッツーがとりにくい',dp<=N*0.5,`${N}回中${dp}回ゲッツー`);}
+  { const S=fieldScene(KE,{lv:70,hit:[27,12,2,1200]}),pk=S.log.find(e=>e.type==='pickup'||e.type==='catch'),th=S.log.find(e=>e.type==='throw'&&pk&&e.t>=pk.t);
+    add('センター前のヒットはセンターが拾って、すぐ内野へ返す',pk&&pk.role==='CF'&&th&&th.t-pk.t<1.5&&!S.ck.v.length,pk?`${pk.role}が拾い、${th?(th.t-pk.t).toFixed(1)+'秒で返球':'返球なし'}`:'',S);}
+  { const S=fieldScene(KE,{lv:70,hit:[28,16,38,1500,-300]}),pk=S.log.find(e=>e.type==='pickup'||e.type==='catch');
+    add('ライト線の打球はライトが拾う（内野手が外野まで行かない）',pk&&pk.role==='RF',pk?pk.role:'',S);}
+  { const S=fieldScene(KE,{lv:70,on:[2],hit:[25,8,-30,800]}),pk=S.log.find(e=>e.type==='pickup'||e.type==='catch'),thr=S.log.filter(e=>e.type==='throwTarget');
+    add('二塁ランナーがいるレフト前：レフトが拾って、持ったまま止まらずに投げる',pk&&pk.role==='LF'&&thr.length>0&&!S.ck.v.length,thr.map(e=>e.base?`${e.base===4?'ホーム':e.base+'塁'}へ`:'中継・内野へ').join('→'),S);}
+  { const err=lv=>{let e=0,ch=0;for(let i=0;i<40;i++){const S=fieldScene(KE,{lv,seed:100+i,hit:[18+(i%5)*3,-6+(i%3)*2,-40+(i*7)%80,-600]});e+=S.log.filter(x=>x.type==='error').length;ch++}return e/ch};
+    const a=err(30),b=err(90);add('エラーは能力が低いほど多く、S級ではほとんど出ない',a>b*3&&b<0.08,`同じ40本のゴロで、能力30：1本あたり${a.toFixed(2)}回、能力90：${b.toFixed(2)}回`);}
+}
+function games(KE,T,N){
+  const add=(name,ok,detail)=>T.push({group:'試合を通して',name,ok,detail});
+  for(const lv of[30,60,90]){const agg={runs:0,H:0,E:0,K:0,BB:0,HR:0},codes={};
+    for(let g=0;g<N;g++){const rng=KE.makeRng(500+g);const s=new KE.Game({seed:500+g,teams:[KE.mkTeam('赤',lv,rng),KE.mkTeam('青',lv,rng)]}).run();
+      for(const k in agg)agg[k]+=s[k][0]+s[k][1];for(const v of s.viol)codes[v.code]=(codes[v.code]||0)+1}
+    const per=k=>(agg[k]/N/2).toFixed(1),nv=Object.values(codes).reduce((a,b)=>a+b,0);
+    add(`能力${lv}どうしで${N}試合：おかしな場面0件`,nv===0,`1チーム1試合あたり 得点${per('runs')}・安打${per('H')}・エラー${per('E')}・三振${per('K')}・四球${per('BB')}・本塁打${per('HR')}`+(nv?` ／${Object.entries(codes).map(([k,v])=>k+':'+v).join('、')}`:''));}
+}
+
 KT.AI_CODES=['farPick','hold','still','stall45','stall'];
-KT.runAll=function(KE,o={}){KE_=KE;const T=[];physics(KE,T);movement(KE,T);umpire(KE,T);checker(KE,T);
+KT.runPlay=function(KE,o={}){KE_=KE;const T=[];batting(KE,T);fielding(KE,T);if(o.games!==0)games(KE,T,o.games||4);return T};
+KT.runAll=function(KE,o={}){KE_=KE;const T=[];physics(KE,T);movement(KE,T);umpire(KE,T);checker(KE,T);if(KE.Game&&!o.base){T.push(...KT.runPlay(KE,o))}
   const s=o.stress?stress(KE,o.stress):null;return{tests:T,stress:s}};
-KT.stress=(KE,N,s0,tr)=>{KE_=KE;return stress(KE,N,s0,tr)};KT.hitVec=hitVec;KT.mk=mk;
+KT.fieldScene=(KE,o)=>{KE_=KE;return fieldScene(KE,o)};KT.stress=(KE,N,s0,tr)=>{KE_=KE;return stress(KE,N,s0,tr)};KT.hitVec=hitVec;KT.mk=mk;
 if(typeof module!=='undefined'&&module.exports)module.exports=KT;else root.KT=KT;
 })(typeof window!=='undefined'?window:globalThis);

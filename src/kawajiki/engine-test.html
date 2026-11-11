@@ -1,4 +1,4 @@
-<title>新エンジン 土台チェック</title>
+<title>新エンジン チェック</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
 <style>
@@ -34,13 +34,17 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
 .stress{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .kv{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 .kv .k{font-size:.78rem;color:var(--mute)}.kv .v{font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums}
-.note{font-size:.85rem;color:var(--mute)}
+.note{font-size:.85rem;color:var(--mute);margin:0}
+.plays{max-height:420px;overflow-y:auto;border-top:1px solid var(--line)}
+.pl{display:grid;grid-template-columns:3.4em 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:.88rem;font-variant-numeric:tabular-nums}
+.pl .inn{color:var(--mute)}.pl .tx{min-width:0}.pl button{padding:3px 10px;font-size:.8rem}
+.pl.hd{font-weight:700;color:var(--fg);background:var(--bg);position:sticky;top:0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 <div class="wrap">
   <header>
-    <h1>河川敷の少年野球　新しい試合エンジン　第1段「土台」</h1>
-    <p class="lead">ボールの飛び方・選手の動き・審判の判定を、台本なしの計算で動かす土台です。今の壁紙とは別に動いています。下の結果は、このページを開いたときにその場で計算しています。</p>
+    <h1>河川敷の少年野球　新しい試合エンジン</h1>
+    <p class="lead">第1段「土台」（ボール・選手の動き・審判）と第2段「打つ・捕る・投げる」（投球と打撃の計算・守備・試合の進行）。台本なしの計算だけで試合が進みます。今の壁紙とは別に動いています。下の結果は、このページを開いたときにその場で計算しています。</p>
   </header>
   <div class="sum" id="sum"><span class="pill">計算中…</span></div>
 
@@ -53,6 +57,14 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
     </div>
     <div class="info" id="info">ボタンを押すと打球を飛ばします。下の「再生」で審判のテスト場面も見られます。</div>
     <div class="log" id="log"></div>
+  </section>
+
+  <section class="stage">
+    <h2>試合を見る</h2>
+    <p class="note">両チーム同じ能力で1試合（7回）を計算します。プレーを押すと上の野球場で再生します。走塁はまだ仮のかんたんな判断で、盗塁・バント・ワイルドピッチは第3〜4段で入ります。</p>
+    <div class="btns" id="lvs"><button data-lv="30">能力30</button><button data-lv="60">能力60</button><button data-lv="90">S級（能力90）</button></div>
+    <div class="info" id="gsum">ボタンを押すと試合を計算します（数秒かかります）。</div>
+    <div class="plays" id="plays"></div>
   </section>
 
   <section>
@@ -71,6 +83,9 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
 /*ENGINE*/
 </script>
 <script>
+/*PLAY*/
+</script>
+<script>
 /*TESTS*/
 </script>
 <script>
@@ -78,11 +93,12 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
 const $=s=>document.querySelector(s),cv=$('#cv'),ctx=cv.getContext('2d');
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const W=cv.width,H=cv.height,S=W/96,X=x=>W/2+x*S,Z=z=>H-10*S-z*S*0.98;
-const OUTJ={force:'フォース',tag:'タッチ',fly:'フライ',appeal:'リタッチ'};
+const OUTJ={force:'フォース',tag:'タッチ',fly:'フライ',appeal:'リタッチ',strike:'三振'};
 function evText(e){switch(e.type){case'out':return`<b>アウト</b>（${OUTJ[e.outType]||e.outType}）${e.name||''}`;
   case'safe':return`セーフ${e.close?'（きわどい）':''}`;case'home':return`ホームイン ${e.name||''}`;case'fair':return'フェア';case'foul':return'ファウル';
   case'hr':return'<b>ホームラン</b>';case'groundRule':return'エンタイトル二塁打';case'runVoid':return'得点取り消し';case'flyCatch':return'フライ捕球';
-  case'retouch':return'元の塁に戻った';case'playEnd':return`プレー終わり（${({time:'ボールが戻った',foul:'ファウル',threeOuts:'3アウト',hr:'ホームラン',groundRule:'エンタイトル'})[e.why]||e.why}）`;default:return e.type}}
+  case'retouch':return'元の塁に戻った';case'error':return`<b>エラー</b>（${({bobble:'はじいた',through:'トンネル',drop:'落とした'})[e.kind]||e.kind}）`;
+  case'dive':return'飛びついた';case'diveCatch':return'ダイビングキャッチ';case'misjudge':return'投げる塁をまちがえた';case'contact':return`打球 ${e.v}km/h・${e.va}度`;case'overthrow':return'送球が外へ（2つ進塁）';case'playEnd':return`プレー終わり（${({time:'ボールが戻った',foul:'ファウル',threeOuts:'3アウト',hr:'ホームラン',groundRule:'エンタイトル'})[e.why]||e.why}）`;default:return e.type}}
 function field(){
   ctx.fillStyle=css('--field');ctx.fillRect(0,0,W,H);
   ctx.fillStyle=css('--grass');ctx.beginPath();ctx.moveTo(X(0),Z(0));ctx.arc(X(0),Z(0),60*S,-Math.PI/4-Math.PI/2,-Math.PI/4);ctx.closePath();ctx.fill();
@@ -93,9 +109,10 @@ function field(){
   ctx.fillStyle=css('--chalk');KE.FIELD.bases.forEach(([x,z])=>{ctx.save();ctx.translate(X(x),Z(z));ctx.rotate(Math.PI/4);ctx.fillRect(-4,-4,8,8);ctx.restore()});
   ctx.fillStyle=css('--chalk');ctx.globalAlpha=.8;ctx.font=`${11}px ${css('--body')}`;ctx.fillText('60m',X(0)-10,Z(60)+14);ctx.globalAlpha=1;
 }
-function dot(x,z,r,c,label){ctx.fillStyle=c;ctx.beginPath();ctx.arc(X(x),Z(z),r,0,7);ctx.fill();if(label){ctx.fillStyle=css('--chalk');ctx.font=`bold 10px ${css('--body')}`;ctx.fillText(label,X(x)+r+2,Z(z)+3)}}
+const JP={P:'投',C:'捕','1B':'一','2B':'二','3B':'三',SS:'遊',LF:'左',CF:'中',RF:'右'};
+function dot(x,z,r,c,label){r*=1.6;ctx.fillStyle=c;ctx.beginPath();ctx.arc(X(x),Z(z),r,0,7);ctx.fill();if(label){ctx.fillStyle=css('--chalk');ctx.font=`bold 20px ${css('--body')}`;ctx.fillText(JP[label]||String(label).replace(/^\D+/,''),X(x)+r+3,Z(z)+7)}}
 function ball(x,z,h){ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(X(x),Z(z),4,2.5,0,0,7);ctx.fill();
-  ctx.fillStyle='#fff';ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.beginPath();ctx.arc(X(x),Z(z)-h*S*0.55,4,0,7);ctx.fill();ctx.stroke()}
+  ctx.fillStyle='#fff';ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.beginPath();ctx.arc(X(x),Z(z)-h*S*0.55,6,0,7);ctx.fill();ctx.stroke()}
 let anim=null;
 function play(frames,trail,done){cancelAnimationFrame(anim);let i=0,t0=performance.now();const T=frames[frames.length-1].t;
   const tick=now=>{const t=(now-t0)/1000;while(i<frames.length-1&&frames[i+1].t<=t)i++;field();
@@ -127,8 +144,25 @@ function renderTests(res){
     play(t.frames,null,tt=>{(t.log||[]).forEach((e,j)=>{if(e.t<=tt&&!shown.has(j)){shown.add(j);$('#log').insertAdjacentHTML('beforeend',`<span>${e.t.toFixed(1)}秒 ${evText(e)}</span>`)}})})};
   return{ok,ng};
 }
-let base=null;
-setTimeout(()=>{const res=KT.runAll(KE,{});base=renderTests(res)},30);
+let base=null,allT=[];
+setTimeout(()=>{allT=KT.runAll(KE,{base:true}).tests;base=renderTests({tests:allT});
+  $('#sum').insertAdjacentHTML('beforeend','<span class="pill" id="more">第2段のチェック計算中…</span>');
+  setTimeout(()=>{allT=allT.concat(KT.runPlay(KE,{games:2}));renderTests({tests:allT})},60)},30);
+// 試合
+const SHOWN=/^(out|safe|home|fair|foul|hr|groundRule|runVoid|error|dive|diveCatch|misjudge|contact|overthrow|playEnd)$/;
+$('#lvs').addEventListener('click',e=>{const lv=e.target.dataset&&e.target.dataset.lv;if(!lv)return;
+  [...$('#lvs').children].forEach(b=>b.classList.toggle('on',b===e.target));$('#gsum').textContent='計算中…';
+  setTimeout(()=>{const seed=(Date.now()%100000)|0,rng=KE.makeRng(seed),g=new KE.Game({seed,record:true,teams:[KE.mkTeam('赤',+lv,rng),KE.mkTeam('青',+lv,rng)]}),s=g.run();
+    const bad=s.viol.length;
+    $('#gsum').innerHTML=`赤 ${s.runs[0]} − ${s.runs[1]} 青（${s.innings}回）　安打 ${s.H[0]}・${s.H[1]}　エラー ${s.E[0]}・${s.E[1]}　三振 ${s.K[0]}・${s.K[1]}　四球 ${s.BB[0]}・${s.BB[1]}　<span style="color:var(${bad?'--ng':'--ok'})">おかしな場面 ${bad}件</span>`;
+    const fr=g.w.frames;
+    $('#plays').innerHTML='<div class="pl hd"><span>回</span><span>打者と結果</span><span></span></div>'+g.plays.map((p,i)=>`<div class="pl"><span class="inn">${p.inn}回${p.half?'裏':'表'}</span><span class="tx">${p.half?'青':'赤'}${p.who.replace(/^\D+/,'')}番　${p.txt}　<span style="color:var(--mute)">${p.outs}アウト ${p.score.join('-')}</span></span>${p.f1>p.f0?`<button data-p="${i}">再生</button>`:'<span></span>'}</div>`).join('');
+    $('#plays').onclick=ev=>{const i=ev.target.dataset&&ev.target.dataset.p;if(i==null)return;const p=g.plays[+i],t0=p.t0;
+      const frames=fr.slice(p.f0,p.f1).map(f=>({...f,t:f.t-t0}));
+      $('#info').textContent=`再生中：${p.inn}回${p.half?'裏':'表'} ${p.txt}`;window.scrollTo({top:cv.getBoundingClientRect().top+scrollY-20,behavior:'smooth'});
+      const ev2=(p.ev||[]).filter(e=>SHOWN.test(e.type)),shown=new Set();$('#log').innerHTML='';
+      play(frames,null,tt=>ev2.forEach((e,j)=>{if(e.t-t0<=tt&&!shown.has(j)){shown.add(j);$('#log').insertAdjacentHTML('beforeend',`<span>${(e.t-t0).toFixed(1)}秒 ${evText(e)}</span>`)}}))};
+  },30)});
 $('#runStress').onclick=()=>{const btn=$('#runStress');btn.disabled=true;const N=1000,step=50;let acc=null,done=0;
   const merge=(a,b)=>{if(!a)return b;for(const k of['plays','fair','foul','hr','gr','runs','crash','time'])a[k]+=b[k];for(const m of['codes','outs','ends'])for(const k in b[m])a[m][k]=(a[m][k]||0)+b[m][k];a.viol=a.viol.concat(b.viol).slice(0,20);return a};
   const go=()=>{acc=merge(acc,KT.stress(KE,step,5000+done));done+=step;show(acc,done<N);if(done<N)setTimeout(go,0);else btn.disabled=false};go()};

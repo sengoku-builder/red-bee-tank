@@ -19,6 +19,10 @@ h2{font-family:var(--head);font-size:1.08rem;margin:0 0 8px}
 .sum{display:flex;flex-wrap:wrap;gap:10px}
 .pill{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 14px;font-weight:700;font-variant-numeric:tabular-nums}
 .pill.ok{color:var(--ok);border-color:var(--ok)}.pill.ng{color:var(--ng);border-color:var(--ng)}
+.pin{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:6px 8px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line)}
+.pin canvas{max-height:46vh;width:auto;max-width:100%;margin:0 auto}
+.pin .log{max-height:3.2em;overflow-y:auto}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
 .stage{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
 canvas{width:100%;max-width:100%;aspect-ratio:1/0.82;display:block;border-radius:8px;background:var(--field)}
 .btns{display:flex;flex-wrap:wrap;gap:8px}
@@ -52,15 +56,17 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
   </header>
   <div class="sum" id="sum"><span class="pill">計算中…</span></div>
 
-  <section class="stage">
-    <h2>野球場（上から見たところ）</h2>
+  <div class="pin" id="pin">
     <canvas id="cv" width="760" height="624"></canvas>
+    <div class="info" id="info">ボタンを押すと打球を飛ばします。下の「再生」で審判のテスト場面も見られます。</div>
+    <div class="log" id="log"></div>
+  </div>
+  <section class="stage">
+    <h2>打球を飛ばしてみる</h2>
     <div class="btns" id="hits">
       <button data-k="goro">ゴロ</button><button data-k="liner">ライナー</button><button data-k="fly">外野フライ</button>
       <button data-k="pop">ポップフライ</button><button data-k="hr">ホームラン</button><button data-k="foul">ファウル</button><button data-k="rand">ランダム</button>
     </div>
-    <div class="info" id="info">ボタンを押すと打球を飛ばします。下の「再生」で審判のテスト場面も見られます。</div>
-    <div class="log" id="log"></div>
   </section>
 
   <section class="stage">
@@ -1425,7 +1431,7 @@ function renderTests(res){
   const groups=[...new Set(T.map(t=>t.group))];
   $('#tests').innerHTML=groups.map(g=>`<div class="grp"><h3>${g}</h3>${T.map((t,i)=>t.group!==g?'':`<div class="row"><span class="m ${t.ok?'ok':'ng'}">${t.ok?'○':'×'}</span><span class="n">${t.name}${t.detail?`<span class="d">${t.detail}</span>`:''}</span>${t.frames&&t.frames.length?`<button data-i="${i}">再生</button>`:'<span></span>'}</div>`).join('')}</div>`).join('');
   $('#tests').onclick=e=>{const i=e.target.dataset&&e.target.dataset.i;if(i==null)return;const t=T[+i];
-    $('#info').textContent='再生中：'+t.name;window.scrollTo({top:cv.getBoundingClientRect().top+scrollY-20,behavior:'smooth'});
+    $('#info').textContent='再生中：'+t.name;
     const shown=new Set();$('#log').innerHTML='';
     play(t.frames,null,tt=>{(t.log||[]).forEach((e,j)=>{if(e.t<=tt&&!shown.has(j)){shown.add(j);$('#log').insertAdjacentHTML('beforeend',`<span>${e.t.toFixed(1)}秒 ${evText(e)}</span>`)}})})};
   return{ok,ng};
@@ -1446,13 +1452,13 @@ $('#lvs').addEventListener('click',e=>{const lv=e.target.dataset&&e.target.datas
     let seq=0;
     const rows=()=>[...$('#plays').querySelectorAll('.pl:not(.hd)')];
     const show=(i,id)=>{if(id!==seq)return;if(i>=g.plays.length){$('#info').textContent='試合終了';return}
-      const p=g.plays[i],t0=p.t0,r=rows();r.forEach((el,k)=>el.classList.toggle('cur',k===i));r[i]&&r[i].scrollIntoView({block:'nearest'});
+      const p=g.plays[i],t0=p.t0,r=rows();r.forEach((el,k)=>el.classList.toggle('cur',k===i));const box=$('#plays');if(r[i])box.scrollTop=r[i].offsetTop-box.offsetTop-box.clientHeight/3;
       const head=`${p.inn}回${p.half?'裏':'表'} ${p.half?'青':'赤'}${p.who.replace(/^\D+/,'')}番　${p.txt}（${p.outs}アウト ${p.score.join('-')}）`;
       if(!(p.f1>p.f0)){$('#info').textContent=head;$('#log').innerHTML='';setTimeout(()=>show(i+1,id),1100);return}
       const frames=fr.slice(p.f0,p.f1).map(f=>({...f,t:f.t-t0}));$('#info').textContent='再生中：'+head;
       const ev2=(p.ev||[]).filter(e=>SHOWN.test(e.type)),shown=new Set();$('#log').innerHTML='';
       play(frames,null,tt=>ev2.forEach((e,j)=>{if(e.t-t0<=tt&&!shown.has(j)){shown.add(j);$('#log').insertAdjacentHTML('beforeend',`<span>${(e.t-t0).toFixed(1)}秒 ${evText(e)}</span>`)}}),()=>setTimeout(()=>show(i+1,id),700))};
-    const start=i=>{seq++;window.scrollTo({top:cv.getBoundingClientRect().top+scrollY-20,behavior:'smooth'});show(i,seq)};
+    const start=i=>{seq++;show(i,seq)};
     $('#plays').onclick=ev=>{const i=ev.target.dataset&&ev.target.dataset.p;if(i!=null)start(+i)};
     $('#playAll').onclick=()=>start(0);
     $('#stopAll').onclick=()=>{seq++;cancelAnimationFrame(anim);$('#info').textContent='止めました'};

@@ -59,6 +59,14 @@ for se, fx in (('spring', 'glow'), ('summer', 'sun'), ('autumn', 'leaf')):
     ASSETS[f'{se}_flock_lv3'] = (p + 'flock_lv3.jpg', 1.0, pick(range(5), 0), fx)
     ASSETS[f'{se}_flock5'] = (p + 'flock5.jpg', 1.0, pick(range(5), 0), fx)
 
+# ---- 森の仲間（ひまわりの種のエサ台・群れにまじる）。季節×道具の段階ごと ----
+FB = {'arch': {'kogera': [390,535,785,60,4], 'yamagara': [390,585,775,55,4], 'shijukara': [395,585,770,60,4], 'gojukara': [405,595,770,70,4]},
+      'winter': {'kogera': [336,576,735,90,4], 'yamagara': [378,571,713,55,4], 'shijukara': [370,569,742,70,4], 'gojukara': [386,594,748,75,4]}}
+for se, fx in (('spring', 'glow'), ('summer', 'sun'), ('autumn', 'leaf'), ('winter', 'snow')):
+    for n in ('kogera', 'yamagara', 'shijukara', 'gojukara'):
+        for lv in ((1, 2, 3, 4) if se == 'winter' else (1, 2, 3)):
+            ASSETS[f'f_{se}_{n}_lv{lv}'] = (f'friends/{se}_{n}_lv{lv}.jpg', 1.0, [FB['winter' if se == 'winter' else 'arch'][n]], fx)
+
 out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'dist')
 img_dir = os.path.join(out_dir, 'img')
 shutil.rmtree(img_dir, ignore_errors=True); os.makedirs(img_dir, exist_ok=True)

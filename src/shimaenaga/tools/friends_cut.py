@@ -28,6 +28,6 @@ for n,(x0,y0,x1,y1) in R.items():
     if n in HULL and up.any():
         hull=cv2.convexHull(np.argwhere(up)[:,::-1].astype(np.int32));H=np.zeros(m.shape,np.uint8);cv2.fillPoly(H,[hull],1);m=m|(H>0)
     m=nd.binary_erosion(m,iterations=1);a=np.clip(nd.gaussian_filter(m.astype(float),1.3),0,1)[...,None]
-    for base,tag in ((f'seasons/{se}_lv1_feeder.jpg','lv1'),(f'seasons/{se}_lv3_nest.jpg','lv3')):
+    for base,tag in ((f'seasons/{se}_lv1_feeder.jpg','lv1'),(f'seasons/{se}_lv2_water.jpg','lv2'),(f'seasons/{se}_lv3_nest.jpg','lv3')):
         b=L(base);Image.fromarray(np.uint8(np.clip(src*a+b*(1-a),0,255))).save(f'friends/{se}_{n}_{tag}.jpg',quality=92)
     print(se,n,'branch match',round(c,3),'bird px',int(m.sum()))

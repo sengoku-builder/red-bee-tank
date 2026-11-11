@@ -17,6 +17,6 @@ for n in ['kogera','yamagara','shijukara','gojukara']:
     # 枝の上に出ている部分と足だけ（雪のはがれた枝は使わない）
     ys,xs=np.where(m);foot=ys.max()
     a=np.clip(nd.gaussian_filter(m.astype(float),1.3),0,1)[...,None]
-    for base,tag in (('scenes/lv1_winter_feeder.jpg','lv1'),('scenes/lv3_winter_nest_material.jpg','lv3'),('scenes/lv4_winter_icicles.jpg','lv4')):
+    for base,tag in (('scenes/lv1_winter_feeder.jpg','lv1'),('scenes/lv2_winter_feeder_water.jpg','lv2'),('scenes/lv3_winter_nest_material.jpg','lv3'),('scenes/lv4_winter_icicles.jpg','lv4')):
         b=L(base);Image.fromarray(np.uint8(np.clip(src*a+b*(1-a),0,255))).save(f'friends/winter_{n}_{tag}.jpg',quality=92)
     print(n,'bbox',xs.min(),xs.max(),ys.min(),foot,'px',int(m.sum()))

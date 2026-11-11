@@ -38,6 +38,7 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
 .plays{max-height:420px;overflow-y:auto;border-top:1px solid var(--line)}
 .pl{display:grid;grid-template-columns:3.4em 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:.88rem;font-variant-numeric:tabular-nums}
 .pl .inn{color:var(--mute)}.pl .tx{min-width:0}.pl button{padding:3px 10px;font-size:.8rem}
+.pl.cur{background:color-mix(in srgb,var(--grass) 18%,transparent)}
 .pl.hd{font-weight:700;color:var(--fg);background:var(--bg);position:sticky;top:0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -64,6 +65,8 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
     <p class="note">両チーム同じ能力で1試合（7回）を計算します。プレーを押すと上の野球場で再生します。盗塁・バント・ワイルドピッチ・牽制は第4段で入ります。</p>
     <div class="btns" id="lvs"><button data-lv="30">能力30</button><button data-lv="60">能力60</button><button data-lv="90">S級（能力90）</button></div>
     <div class="info" id="gsum">ボタンを押すと試合を計算します（数秒かかります）。</div>
+    <div class="btns" id="ctl" hidden><button id="playAll">最初から続けて見る</button><button id="stopAll">止める</button></div>
+    <p class="note" id="ctlNote" hidden>プレーの「再生」を押すと、そこから最後まで続けて再生します。三振や四球は文字だけ出して次へ進みます。</p>
     <div class="plays" id="plays"></div>
   </section>
 
@@ -114,11 +117,11 @@ function dot(x,z,r,c,label){r*=1.6;ctx.fillStyle=c;ctx.beginPath();ctx.arc(X(x),
 function ball(x,z,h){ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(X(x),Z(z),4,2.5,0,0,7);ctx.fill();
   ctx.fillStyle='#fff';ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.beginPath();ctx.arc(X(x),Z(z)-h*S*0.55,6,0,7);ctx.fill();ctx.stroke()}
 let anim=null;
-function play(frames,trail,done){cancelAnimationFrame(anim);let i=0,t0=performance.now();const T=frames[frames.length-1].t;
+function play(frames,trail,done,end){cancelAnimationFrame(anim);let i=0,t0=performance.now();const T=frames[frames.length-1].t;
   const tick=now=>{const t=(now-t0)/1000;while(i<frames.length-1&&frames[i+1].t<=t)i++;field();
     if(trail){ctx.strokeStyle=css('--chalk');ctx.globalAlpha=.55;ctx.setLineDash([3,4]);ctx.beginPath();trail.forEach((q,j)=>{if(q[0]>t)return;j?ctx.lineTo(X(q[1]),Z(q[2])-q[3]*S*.55):ctx.moveTo(X(q[1]),Z(q[2])-q[3]*S*.55)});ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1}
     const f=frames[i];(f.f||[]).forEach(p=>dot(p[0],p[1],6,css('--fielder'),p[2]));(f.r||[]).forEach(p=>dot(p[0],p[1],6,p[2]?css('--mute'):css('--runner'),p[3]));
-    if(f.b)ball(...f.b);if(done)done(t);if(t<T+0.6)anim=requestAnimationFrame(tick)};anim=requestAnimationFrame(tick)}
+    if(f.b)ball(...f.b);if(done)done(t);if(t<T+0.6)anim=requestAnimationFrame(tick);else if(end)end()};anim=requestAnimationFrame(tick)}
 const KIND={goro:()=>[r(20,32),r(-14,-4),r(-40,40),r(-1500,-300),r(-500,500)],liner:()=>[r(28,36),r(5,12),r(-35,35),r(500,1500),r(-500,500)],
   fly:()=>[r(22,28),r(26,36),r(-38,38),r(1500,2400),r(-600,600)],pop:()=>[r(18,26),r(65,80),r(-30,30),r(1500,2500),r(-400,400)],
   hr:()=>[r(39,43),r(26,32),r(-35,35),r(1800,2500),r(-300,300)],foul:()=>[r(20,30),r(10,35),(Math.random()<.5?-1:1)*r(47,60),r(800,2000),r(-500,500)],
@@ -157,11 +160,20 @@ $('#lvs').addEventListener('click',e=>{const lv=e.target.dataset&&e.target.datas
     $('#gsum').innerHTML=`赤 ${s.runs[0]} − ${s.runs[1]} 青（${s.innings}回）　安打 ${s.H[0]}・${s.H[1]}　エラー ${s.E[0]}・${s.E[1]}　三振 ${s.K[0]}・${s.K[1]}　四球 ${s.BB[0]}・${s.BB[1]}　<span style="color:var(${bad?'--ng':'--ok'})">おかしな場面 ${bad}件</span>`;
     const fr=g.w.frames;
     $('#plays').innerHTML='<div class="pl hd"><span>回</span><span>打者と結果</span><span></span></div>'+g.plays.map((p,i)=>`<div class="pl"><span class="inn">${p.inn}回${p.half?'裏':'表'}</span><span class="tx">${p.half?'青':'赤'}${p.who.replace(/^\D+/,'')}番　${p.txt}　<span style="color:var(--mute)">${p.outs}アウト ${p.score.join('-')}</span></span>${p.f1>p.f0?`<button data-p="${i}">再生</button>`:'<span></span>'}</div>`).join('');
-    $('#plays').onclick=ev=>{const i=ev.target.dataset&&ev.target.dataset.p;if(i==null)return;const p=g.plays[+i],t0=p.t0;
-      const frames=fr.slice(p.f0,p.f1).map(f=>({...f,t:f.t-t0}));
-      $('#info').textContent=`再生中：${p.inn}回${p.half?'裏':'表'} ${p.txt}`;window.scrollTo({top:cv.getBoundingClientRect().top+scrollY-20,behavior:'smooth'});
+    let seq=0;
+    const rows=()=>[...$('#plays').querySelectorAll('.pl:not(.hd)')];
+    const show=(i,id)=>{if(id!==seq)return;if(i>=g.plays.length){$('#info').textContent='試合終了';return}
+      const p=g.plays[i],t0=p.t0,r=rows();r.forEach((el,k)=>el.classList.toggle('cur',k===i));r[i]&&r[i].scrollIntoView({block:'nearest'});
+      const head=`${p.inn}回${p.half?'裏':'表'} ${p.half?'青':'赤'}${p.who.replace(/^\D+/,'')}番　${p.txt}（${p.outs}アウト ${p.score.join('-')}）`;
+      if(!(p.f1>p.f0)){$('#info').textContent=head;$('#log').innerHTML='';setTimeout(()=>show(i+1,id),1100);return}
+      const frames=fr.slice(p.f0,p.f1).map(f=>({...f,t:f.t-t0}));$('#info').textContent='再生中：'+head;
       const ev2=(p.ev||[]).filter(e=>SHOWN.test(e.type)),shown=new Set();$('#log').innerHTML='';
-      play(frames,null,tt=>ev2.forEach((e,j)=>{if(e.t-t0<=tt&&!shown.has(j)){shown.add(j);$('#log').insertAdjacentHTML('beforeend',`<span>${(e.t-t0).toFixed(1)}秒 ${evText(e)}</span>`)}}))};
+      play(frames,null,tt=>ev2.forEach((e,j)=>{if(e.t-t0<=tt&&!shown.has(j)){shown.add(j);$('#log').insertAdjacentHTML('beforeend',`<span>${(e.t-t0).toFixed(1)}秒 ${evText(e)}</span>`)}}),()=>setTimeout(()=>show(i+1,id),700))};
+    const start=i=>{seq++;window.scrollTo({top:cv.getBoundingClientRect().top+scrollY-20,behavior:'smooth'});show(i,seq)};
+    $('#plays').onclick=ev=>{const i=ev.target.dataset&&ev.target.dataset.p;if(i!=null)start(+i)};
+    $('#playAll').onclick=()=>start(0);
+    $('#stopAll').onclick=()=>{seq++;cancelAnimationFrame(anim);$('#info').textContent='止めました'};
+    $('#ctl').hidden=false;$('#ctlNote').hidden=false;
   },30)});
 $('#runStress').onclick=()=>{const btn=$('#runStress');btn.disabled=true;const N=1000,step=50;let acc=null,done=0;
   const merge=(a,b)=>{if(!a)return b;for(const k of['plays','fair','foul','hr','gr','runs','crash','time'])a[k]+=b[k];for(const m of['codes','outs','ends'])for(const k in b[m])a[m][k]=(a[m][k]||0)+b[m][k];a.viol=a.viol.concat(b.viol).slice(0,20);return a};

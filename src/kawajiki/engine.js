@@ -37,9 +37,9 @@ const Y=s=>Math.pow(1-clamp(s,0,100)/100,1.4);
 const sk=(k,key)=>k&&k.sk&&k.sk[key]!=null?k.sk[key]:60;
 const PROF={
   runV:s=>4.6+2.7*s/100,          // 全力で走る速さ m/s（4.6〜7.3）
-  runA:s=>3.4+2.2*s/100,          // 加速 m/s²
-  react:s=>0.16+0.5*Y(s),         // 反応の遅れ 秒（野球の頭）
-  armV:s=>14+24*s/100,            // 送球の初速 m/s（50〜137km/h）
+  runA:s=>5+3*s/100,              // 加速 m/s²
+  react:s=>0.2+0.65*Y(s),          // 反応の遅れ 秒（野球の頭）
+  armV:s=>12+26*Math.pow(s/100,1.5),  // 送球の初速 m/s（能力30：59km/h・60：87km/h・90：123km/h）
   armErr:s=>0.010+0.075*Y(s),     // 送球の向きのずれ（ラジアン、1σ）
 };
 KE.Y=Y;KE.sk=sk;KE.PROF=PROF;
@@ -101,7 +101,7 @@ class Ball{
     }
     if(this.z<=FIELD.backstopZ&&this.vz<0){
       if(this.h>FIELD.backstopH){this.state='out';this.over={fair:false,bounced:this.bounces>0};emit&&emit('overFence',{fair:false});return}
-      this.vz=-this.vz*0.35;this.vx*=0.7;this.z=FIELD.backstopZ+0.01;emit&&emit('wall',{x:this.x,z:this.z,backstop:true});
+      this.vz=-this.vz*0.35;this.vx*=0.7;this.z=FIELD.backstopZ+0.01;this.wall=true;emit&&emit('wall',{x:this.x,z:this.z,backstop:true});
     }
   }
 }
@@ -154,14 +154,17 @@ class Player{
   dist(x,z){return hyp(x-this.x,z-this.z)}
   // 目的地へ。react=true なら反応の遅れのあと動き出す
   // 反応の遅れはそのプレーで最初の一回だけ（awake）
-  goTo(x,z,o={}){this.tx=x;this.tz=z;this.frac=o.frac||1;if(o.react&&!this.awake){this.wait=Math.max(this.wait,this.react)}if(o.react)this.awake=true}
+  // thru=true：止まらずに駆け抜ける（塁を回る・一塁を駆け抜ける）
+  goTo(x,z,o={}){this.tx=x;this.tz=z;this.frac=o.frac||1;this.thru=!!o.thru;if(o.react&&!this.awake){this.wait=Math.max(this.wait,this.react)}if(o.react)this.awake=true}
   stop(){this.tx=this.tz=null}
   step(dt){
     if(this.wait>0){this.wait-=dt;return}
     let dvx=0,dvz=0;
     if(this.tx!=null){const dx=this.tx-this.x,dz=this.tz-this.z,d=hyp(dx,dz);
-      if(d<0.03&&this.speed<0.5){this.x=this.tx;this.z=this.tz;this.vx=this.vz=0;this.tx=this.tz=null;return}
-      if(d>1e-4){const want=Math.min(this.vmax,Math.sqrt(2*this.dec*d));dvx=dx/d*want;dvz=dz/d*want}}
+      if(this.thru&&d<0.35){this.tx=this.tz=null;this.thru=false}
+      else if(d<0.03&&this.speed<0.5){this.x=this.tx;this.z=this.tz;this.vx=this.vz=0;this.tx=this.tz=null;return}
+      else
+      if(d>1e-4){const want=this.thru?this.vmax:Math.min(this.vmax,Math.sqrt(2*this.dec*d));dvx=dx/d*want;dvz=dz/d*want}}
     let ax=dvx-this.vx,az=dvz-this.vz;const sp2=this.vx*this.vx+this.vz*this.vz,a=hyp(ax,az),lim=(dvx*this.vx+dvz*this.vz<sp2-0.05?this.dec:this.acc)*dt;   // 止まる・向きを変えるときは強くブレーキ
     if(a>lim){ax*=lim/a;az*=lim/a}
     this.vx+=ax;this.vz+=az;this.x+=this.vx*dt;this.z+=this.vz*dt;

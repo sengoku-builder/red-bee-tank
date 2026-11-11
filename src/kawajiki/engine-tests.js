@@ -78,7 +78,7 @@ function movement(KE,T){
     p.goTo(p.x+d*0.6,p.z-d*0.8,{react:true});let t=0;while(t<12&&(p.tx!=null)){w.step();t+=w.dt}worst=Math.max(worst,Math.abs(t-e))}
   add('「何秒で着くか」の見込みが実際と合う',worst<0.35,`いちばん大きいずれ ${worst.toFixed(2)}秒`);
   const re=[20,60,95].map(s=>KE.PROF.react(s));
-  add('野球の頭が良いほど反応が速い',re[0]>re[1]&&re[1]>re[2]&&re[2]<0.2,re.map(v=>v.toFixed(2)+'秒').join('→'));
+  add('野球の頭が良いほど反応が速い',re[0]>re[1]&&re[1]>re[2]&&re[2]<0.25,re.map(v=>v.toFixed(2)+'秒').join('→'));
 }
 
 /* ================= 審判役 ================= */
@@ -276,7 +276,7 @@ function fieldScene(KE,o){
   const lv=o.lv||70,w=new KE.World({seed:o.seed||1,record:true}),ck=new KE.Checker(w),rng=KE.makeRng(o.seed||1),T=KE.mkTeam('守',lv,rng);
   w.fielders=T.players.map(p=>{const f=new KE.Player({id:p.id,name:p.pos,role:p.pos,sk:p.sk});[f.x,f.z]=KE.FIELD.pos[p.pos];f.side='F';return f});
   const def=new KE.Defense(w),run=new KE.Running(w,def);w.outs=o.outs||0;
-  for(const b of(o.on||[]))w.addRunner(new KE.Player({id:`走${b}`,name:`${b}塁走者`,sk:{run:o.run||50,iq:60}}),b);
+  for(const b of(o.on||[]))w.addRunner(new KE.Player({id:`走${b}`,name:`${b}塁走者`,sk:{run:o.run||50,iq:o.iq||o.run||60}}),b);
   const B=new KE.Player({id:'打者',name:'打者',sk:{run:o.run||50,iq:60}});B.x=-0.95;w.addRunner(B,0,true);
   w.umpire.startPlay({batted:true});const h=hitVec(...o.hit);w.release(h.p,h.v,h.w,'bat');
   let n=0;while(!w.umpire.ended&&n++<60*40){def.tick();run.tick();w.step()}
@@ -308,10 +308,46 @@ function games(KE,T,N){
     add(`能力${lv}どうしで${N}試合：おかしな場面0件`,nv===0,`1チーム1試合あたり 得点${per('runs')}・安打${per('H')}・エラー${per('E')}・三振${per('K')}・四球${per('BB')}・本塁打${per('HR')}`+(nv?` ／${Object.entries(codes).map(([k,v])=>k+':'+v).join('、')}`:''));}
 }
 
+
+/* ================= 第3段：走る ================= */
+function liveScene(KE,o){
+  const lv=o.lv||60,w=new KE.World({seed:o.seed||1,record:true}),ck=new KE.Checker(w),rng=KE.makeRng(o.seed||1),T=KE.mkTeam('守',lv,rng);
+  w.fielders=T.players.map(p=>{const f=new KE.Player({id:p.id,name:p.pos,role:p.pos,sk:p.sk});[f.x,f.z]=KE.FIELD.pos[p.pos];f.side='F';return f});
+  const F={};w.fielders.forEach(f=>F[f.role]=f);const def=new KE.Defense(w),run=new KE.Running(w,def);
+  o.setup(w,F,KE);let n=0;while(!w.umpire.ended&&n++<60*30){def.tick();run.tick();w.step()}
+  return{w,ck,log:w.log,outs:w.log.filter(e=>e.type==='out')};
+}
+function running(KE,T){
+  const add=(name,ok,detail,S)=>T.push({group:'走る（ランナーの判断）',name,ok,detail:detail+(S&&S.ck.v.length?` ／チェック:${S.ck.v.map(v=>v.msg).join('、')}`:''),frames:S&&S.w.frames,log:S&&S.w.log.filter(e=>/^(out|safe|home|playEnd|fair|foul|error|catch|pickup|rundown|retreat|couldHaveGone|rash|flyCatch|retouch)$/.test(e.type))});
+  // 167：一三塁で三塁ランナーが挟まれたら、一塁ランナーは二塁へ
+  { let adv=0,end=0,N=10,last,bad=0;
+    for(let i=0;i<N;i++){const S=liveScene(KE,{lv:60,seed:60+i,setup:(w,F,KE)=>{
+        const r3=w.addRunner(new KE.Player({id:'走3',name:'三塁走者',sk:{run:50,iq:50}}),3),r1=w.addRunner(new KE.Player({id:'走1',name:'一塁走者',sk:{run:50,iq:60}}),1);
+        w.umpire.startPlay({});r3.x=-9.6;r3.z=9.6;r3.plan=4;r3.rd=true;r3.rdT=0;r3.goTo(0,0);F.C.x=0.6;F.C.z=-0.4;F['3B'].x=-15.8;F['3B'].z=15.8;w.give(F.C,'pickup')}});
+      const r1=S.w.runners.find(r=>r.id==='走1'),r3=S.w.runners.find(r=>r.id==='走3');if(r1.rb.base>=2)adv++;if(S.w.umpire.ended)end++;bad+=S.ck.v.length;if(!last||S.log.some(e=>e.type==='rundown'))last=S}
+    add('一三塁で三塁ランナーが挟まれたら、そのあいだに一塁ランナーが二塁へ進む（167の件）',adv>=N*0.8&&end===N&&bad===0,`${N}回中、二塁へ進んだ${adv}回・挟殺が終わった${end}回`,last);}
+  { let tagged=0,thru=0,safe=0,N=16,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:40,run:80,seed:70+i,hit:[10+(i%4)*3,-8,-30+(i%5)*12,-800]});const B=S.w.runners.find(r=>r.id==='打者');
+      if(S.outs.some(e=>e.who==='打者'&&e.outType==='tag'&&B.rb.base===1))tagged++;if(B.rb.out)continue;safe++;if(S.w.frames.some(f=>f.r.some(q=>q[3]==='打者'&&q[0]>17.5))){thru++;last=S}}
+    add('内野ゴロでは一塁を駆け抜け、戻るときにタッチされない',tagged===0&&safe>0&&thru>=safe*0.6,`一塁セーフ${safe}回のうち駆け抜け${thru}回・駆け抜け後のタッチアウト${tagged}回`,last);}
+  { let sc=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:60,seed:80+i,on:[3],hit:[26,36,-4,2200]});const r=S.w.runners.find(r=>r.id==='走3');
+      const caught=S.log.some(e=>e.type==='flyCatch');if(caught&&r.rb.scored)sc++;if(caught&&!last)last=S}
+    add('深い外野フライ：三塁ランナーは捕ったのを見てからタッチアップでホームイン',sc>=N*0.4,`${N}回中${sc}回ホームイン`,last);}
+  { let ok=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:60,seed:90+i,on:[1],hit:[19,48,8,1800]});const r=S.w.runners.find(r=>r.id==='走1');
+      if(S.log.some(e=>e.type==='flyCatch')&&!r.rb.out)ok++;last=S}
+    add('浅いフライ：一塁ランナーは飛び出しすぎず、捕られたら戻ってセーフ',ok>=N*0.8,`${N}回中${ok}回戻ってセーフ`,last);}
+  { let two=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:50,run:70,seed:100+i,hit:[30,16,-40+i%2,800]});const B=S.w.runners.find(r=>r.id==='打者');
+      if(!B.rb.out&&B.rb.base>=2)two++;if(B.rb.base>=2&&!last)last=S}
+    add('三塁手の頭を越えてレフト線へ転がる当たりでは、打者は一塁を回って二塁をねらう',two>=N*0.3,`${N}回中${two}回二塁打以上`,last);}
+  { const cnt=lv=>{let hes=0,rash=0;for(let i=0;i<40;i++){const S=fieldScene(KE,{lv,run:lv,seed:400+i,on:[1,2],hit:[24+(i%5)*2,4+(i%4)*4,-40+(i*13)%80,900]});
+      hes+=S.log.filter(e=>e.type==='couldHaveGone').length;rash+=S.log.filter(e=>e.type==='rash').length}return{hes,rash}};
+    const a=cnt(30),b=cnt(90);
+    add('判断ミスは「行けたのに行かない」が多く「飛び出し」は少ない。S級ではどちらも少ない',a.hes>a.rash&&b.hes+b.rash<a.hes+a.rash,`同じ40プレーで、能力30：行けたのに${a.hes}回・飛び出し${a.rash}回／S級：行けたのに${b.hes}回・飛び出し${b.rash}回`);}
+}
+
 KT.AI_CODES=['farPick','hold','still','stall45','stall'];
-KT.runPlay=function(KE,o={}){KE_=KE;const T=[];batting(KE,T);fielding(KE,T);if(o.games!==0)games(KE,T,o.games||4);return T};
+KT.runPlay=function(KE,o={}){KE_=KE;const T=[];batting(KE,T);fielding(KE,T);running(KE,T);if(o.games!==0)games(KE,T,o.games||4);return T};
 KT.runAll=function(KE,o={}){KE_=KE;const T=[];physics(KE,T);movement(KE,T);umpire(KE,T);checker(KE,T);if(KE.Game&&!o.base){T.push(...KT.runPlay(KE,o))}
   const s=o.stress?stress(KE,o.stress):null;return{tests:T,stress:s}};
-KT.fieldScene=(KE,o)=>{KE_=KE;return fieldScene(KE,o)};KT.stress=(KE,N,s0,tr)=>{KE_=KE;return stress(KE,N,s0,tr)};KT.hitVec=hitVec;KT.mk=mk;
+KT.fieldScene=(KE,o)=>{KE_=KE;return fieldScene(KE,o)};KT.liveScene=(KE,o)=>{KE_=KE;return liveScene(KE,o)};KT.stress=(KE,N,s0,tr)=>{KE_=KE;return stress(KE,N,s0,tr)};KT.hitVec=hitVec;KT.mk=mk;
 if(typeof module!=='undefined'&&module.exports)module.exports=KT;else root.KT=KT;
 })(typeof window!=='undefined'?window:globalThis);

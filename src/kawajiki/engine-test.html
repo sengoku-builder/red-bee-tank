@@ -44,7 +44,7 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
 <div class="wrap">
   <header>
     <h1>河川敷の少年野球　新しい試合エンジン</h1>
-    <p class="lead">第1段「土台」（ボール・選手の動き・審判）と第2段「打つ・捕る・投げる」（投球と打撃の計算・守備・試合の進行）。台本なしの計算だけで試合が進みます。今の壁紙とは別に動いています。下の結果は、このページを開いたときにその場で計算しています。</p>
+    <p class="lead">第1段「土台」（ボール・選手の動き・審判）・第2段「打つ・捕る・投げる」（投球と打撃の計算・守備・試合の進行）・第3段「走る」（ランナーの判断・タッチアップ・挟殺）。台本なしの計算だけで試合が進みます。今の壁紙とは別に動いています。下の結果は、このページを開いたときにその場で計算しています。</p>
   </header>
   <div class="sum" id="sum"><span class="pill">計算中…</span></div>
 
@@ -61,7 +61,7 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
 
   <section class="stage">
     <h2>試合を見る</h2>
-    <p class="note">両チーム同じ能力で1試合（7回）を計算します。プレーを押すと上の野球場で再生します。走塁はまだ仮のかんたんな判断で、盗塁・バント・ワイルドピッチは第3〜4段で入ります。</p>
+    <p class="note">両チーム同じ能力で1試合（7回）を計算します。プレーを押すと上の野球場で再生します。盗塁・バント・ワイルドピッチ・牽制は第4段で入ります。</p>
     <div class="btns" id="lvs"><button data-lv="30">能力30</button><button data-lv="60">能力60</button><button data-lv="90">S級（能力90）</button></div>
     <div class="info" id="gsum">ボタンを押すと試合を計算します（数秒かかります）。</div>
     <div class="plays" id="plays"></div>
@@ -98,7 +98,7 @@ function evText(e){switch(e.type){case'out':return`<b>アウト</b>（${OUTJ[e.o
   case'safe':return`セーフ${e.close?'（きわどい）':''}`;case'home':return`ホームイン ${e.name||''}`;case'fair':return'フェア';case'foul':return'ファウル';
   case'hr':return'<b>ホームラン</b>';case'groundRule':return'エンタイトル二塁打';case'runVoid':return'得点取り消し';case'flyCatch':return'フライ捕球';
   case'retouch':return'元の塁に戻った';case'error':return`<b>エラー</b>（${({bobble:'はじいた',through:'トンネル',drop:'落とした'})[e.kind]||e.kind}）`;
-  case'dive':return'飛びついた';case'diveCatch':return'ダイビングキャッチ';case'misjudge':return'投げる塁をまちがえた';case'contact':return`打球 ${e.v}km/h・${e.va}度`;case'overthrow':return'送球が外へ（2つ進塁）';case'playEnd':return`プレー終わり（${({time:'ボールが戻った',foul:'ファウル',threeOuts:'3アウト',hr:'ホームラン',groundRule:'エンタイトル'})[e.why]||e.why}）`;default:return e.type}}
+  case'dive':return'飛びついた';case'diveCatch':return'ダイビングキャッチ';case'misjudge':return'投げる塁をまちがえた';case'contact':return`打球 ${e.v}km/h・${e.va}度`;case'overthrow':return'送球が外へ（2つ進塁）';case'rundown':return`<b>挟まれた</b> ${e.name||''}`;case'retreat':return'戻った';case'couldHaveGone':return`今のは行けたぞー!（${e.name||''}）`;case'rash':return`飛び出した（${e.name||''}）`;case'flyCatch':return'フライ捕球';case'playEnd':return`プレー終わり（${({time:'ボールが戻った',foul:'ファウル',threeOuts:'3アウト',hr:'ホームラン',groundRule:'エンタイトル'})[e.why]||e.why}）`;default:return e.type}}
 function field(){
   ctx.fillStyle=css('--field');ctx.fillRect(0,0,W,H);
   ctx.fillStyle=css('--grass');ctx.beginPath();ctx.moveTo(X(0),Z(0));ctx.arc(X(0),Z(0),60*S,-Math.PI/4-Math.PI/2,-Math.PI/4);ctx.closePath();ctx.fill();
@@ -149,7 +149,7 @@ setTimeout(()=>{allT=KT.runAll(KE,{base:true}).tests;base=renderTests({tests:all
   $('#sum').insertAdjacentHTML('beforeend','<span class="pill" id="more">第2段のチェック計算中…</span>');
   setTimeout(()=>{allT=allT.concat(KT.runPlay(KE,{games:2}));renderTests({tests:allT})},60)},30);
 // 試合
-const SHOWN=/^(out|safe|home|fair|foul|hr|groundRule|runVoid|error|dive|diveCatch|misjudge|contact|overthrow|playEnd)$/;
+const SHOWN=/^(out|safe|home|fair|foul|hr|groundRule|runVoid|error|dive|diveCatch|misjudge|contact|overthrow|playEnd|rundown|retreat|couldHaveGone|rash|flyCatch)$/;
 $('#lvs').addEventListener('click',e=>{const lv=e.target.dataset&&e.target.dataset.lv;if(!lv)return;
   [...$('#lvs').children].forEach(b=>b.classList.toggle('on',b===e.target));$('#gsum').textContent='計算中…';
   setTimeout(()=>{const seed=(Date.now()%100000)|0,rng=KE.makeRng(seed),g=new KE.Game({seed,record:true,teams:[KE.mkTeam('赤',+lv,rng),KE.mkTeam('青',+lv,rng)]}),s=g.run();

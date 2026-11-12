@@ -55,7 +55,7 @@ body.layout .tray{display:flex}
 .ltool{display:none;position:absolute;left:50%;top:12px;transform:translateX(-50%);padding:7px;border-radius:13px;gap:6px}
 .ltool.show{display:flex}
 .ltool button{font-size:13px;padding:7px 10px;white-space:nowrap}
-@media(max-width:600px){.dock button{font-size:12px;padding:9px 2px;white-space:nowrap}.ltool{left:10px;right:10px;transform:none;justify-content:center}.lhint{max-width:none;right:10px}}
+@media(max-width:600px){.dock button{font-size:12px;padding:9px 2px;white-space:nowrap}.ltool{left:10px;right:10px;transform:none;justify-content:center;flex-wrap:wrap}.ltool button{font-size:12px;padding:7px 8px}.lhint{max-width:none;right:10px}}
 .lhint{display:none;position:absolute;left:12px;top:12px;font-size:12px;padding:7px 10px;border-radius:10px;max-width:60%}
 body.layout .lhint{display:block}
 .adv{border-top:1px solid #ffffff1c;padding:10px 0;display:flex;gap:9px}
@@ -111,7 +111,7 @@ body.layout .lhint{display:block}
  <div class="modal glass" id="mNote"><div class="tag">知識カード</div><h2 id="mnTitle"></h2><div class="body" id="mnBody"></div><button class="glass" id="bNoteOk">わかった</button></div>
  <div id="lay"></div>
  <div class="lhint glass" id="lhint">水草や石をドラッグして配置。上下に動かすと奥・手前に移動します。選んで「小さく」「大きく」（スマホは2本指でつまむ、PCはホイール）で大きさを変えられます。</div>
- <div class="ltool glass" id="ltool"><button class="glass" id="lSm">小さく</button><button class="glass" id="lBg">大きく</button><button class="glass" id="lFlip">左右反転</button><button class="glass" id="lTrim">トリミング</button><button class="glass" id="lBack">しまう</button><button class="glass" id="lBuy" style="display:none"></button><button class="glass" id="lCancel" style="display:none">やめる</button></div>
+ <div class="ltool glass" id="ltool"><button class="glass" id="lSm">小さく</button><button class="glass" id="lBg">大きく</button><button class="glass" id="lFlip">左右反転</button><button class="glass" id="lMoss">モスを巻く</button><button class="glass" id="lTrim">トリミング</button><button class="glass" id="lBack">しまう</button><button class="glass" id="lBuy" style="display:none"></button><button class="glass" id="lCancel" style="display:none">やめる</button></div>
  <div class="tray glass" id="tray"></div>
  <div class="debug" id="debug" hidden><button class="glass" data-skip="3600000">＋1時間</button><button class="glass" data-skip="86400000">＋1日</button><button class="glass" id="bAddShrimp">メス＋1</button><button class="glass" id="bAddMale">オス＋1</button><button class="glass" data-skip="864000000">＋10日</button><button class="glass" id="bRich">＋1万G</button></div>
 </div>
@@ -221,8 +221,10 @@ const NOTES={
  leggy:['徒長','光が足りないと、有茎草は光を求めて茎だけがひょろひょろと伸び、葉の間隔が広がります。これを「徒長」といいます。<br>照明を用意するか、もっと明るい照明にすると改善します。'],
  droop:['伸びすぎ','ロタラが水面まで伸びて、先が垂れてきました。トリミングの合図です。<br>レイアウト画面でロタラを選んで「トリミング」を押しましょう。'],
  light:['照明','照明は水草の光合成に欠かせません。点灯時間は1日8〜10時間程度が目安で、毎日同じ時刻に点け消しすることが大切です。長く点けすぎるとコケが増えます。<br>この水槽は9時〜19時に点灯します。'],
+ mosswrap:['ウィローモスを巻く','ウィローモスは石や流木に「活着」（根のような仮根でくっつく）する水草です。<br>実際には、モスを薄く広げて<b>木綿糸やテグス</b>でぐるぐる巻き付けます。木綿糸は数か月で溶けてなくなり、そのころにはしっかり活着しています。<br>活着までは2〜4週間ほど。厚く巻きすぎると下の方が光不足で茶色くなるので、<b>薄く・まんべんなく</b>がコツです。<br>モスはレッドビーの大好きな場所です。表面に付く微生物をツマツマ食べ、稚エビの隠れ家にもなります。'],
+ mosstrim:['モスのトリミング','モスが伸びすぎてもさもさになると、内側に光や水が届かず、茶色く枯れたりゴミがたまったりします。<br>ハサミで表面を短く刈り込むと、新しい芽が出て、きれいな緑のじゅうたんに戻ります。切ったモスは水面に浮かないよう、すぐに取り除きましょう。<br>刈ったモスは、別の石や流木に巻いて増やすこともできます。'],
  bact:['バクテリア剤','ろ過バクテリアを液体や粉にした商品で、立ち上げを早める目的でよく使われます。<br>ただし、入れたからといってすぐに安全な水になるわけではありません。バクテリアが住みつくには、エサになる有機物と時間が必要です。実際の飼育では、使ったうえで1〜2週間は様子を見るのが安心です。'],
- sponge:['熟成スポンジ（種スポンジ）','すでにエビが元気に暮らしている水槽で使い込んだフィルタースポンジには、ろ過バクテリアがびっしり住みついています。これを新しい水槽に入れると、バクテリアごと引っ越すので、立ち上げが一気に早くなります。<br>レッドビー仲間やショップから分けてもらう方法で、実際にも「種スポンジ」「種水」と呼ばれてよく使われます。<br>もらう相手の水槽が病気やコケだらけでないかは、必ず確かめましょう。'],
+ sponge:['熟成スポンジ（種スポンジ）','すでにエビが元気に暮らしている水槽で使い込んだフィルタースポンジには、ろ過バクテリアがびっしり住みついています。これを新しい水槽に入れると、バクテリアごと引っ越すので、立ち上げが一気に早くなります。<br>レッドビー仲間やショップから分けてもらう方法で、実際にも「種スポンジ」「種水」と呼ばれてよく使われます。<br>もらう相手の水槽が病気やコケだらけでないかは、必ず確かめましょう。<br>使い込んだスポンジは、汚れやバクテリアで茶色っぽく色づいています。この水槽のフィルターも、熟成スポンジに替えたので茶色になりました。'],
  ready:['水ができた','バクテリアが十分に増えて、エビを迎えられる水になりました。<br>実際の飼育でも、立ち上げから2週間〜1か月ほど待ってからエビを入れるのが一般的です。早く入れたくて焦ることが、レッドビー飼育でいちばん多い失敗の原因です。<br>ショップでエビを迎えられるようになりました。オスとメスがそろうと、繁殖が始まります。']
 };
 const queue=[];
@@ -342,6 +344,8 @@ function renderShop(){
     if(v.moss)unlock('moss');if(cat==='wood')unlock('wood');if(cat==='stone')unlock('stone');if(v.seiryu)unlock('seiryu');
     save();markDirty();render();renderShop();toast(v.n+'を買いました。「レイアウト」から配置できます');nextNote()},makeThumb(LAYOUT_IMG[itemImgKey(k)].img,v.n),tb);
   });
+  if(cat==='plant'){const n=S.mossPinch||0;
+   buyRow(box,'ウィローモス（ひとつまみ・巻き付け用）',(n?'持っている数：'+n+'。':'')+'「レイアウト」で石や流木を選び「モスを巻く」と、少しずつ活着して茂ります',MOSS_P,S.g<MOSS_P?'G不足':'購入',S.g>=MOSS_P,()=>{tick();if(S.g<MOSS_P)return;S.g-=MOSS_P;S.mossPinch=(S.mossPinch||0)+1;addLog('購入：ウィローモス（ひとつまみ）（'+G(MOSS_P)+'）');unlock('moss');save();markDirty();render();renderShop();toast('ウィローモスを買いました。「レイアウト」で石や流木を選んで「モスを巻く」');nextNote()},makeThumb(LAYOUT_IMG.mossdish.img,'ウィローモス'))}
  });
 }
 function buyEquip(e){tick();if(S.owned[e.id]||S.g<e.price)return;S.g-=e.price;S.owned[e.id]=now();addLog('購入：'+e.name+'（'+G(e.price)+'）');
@@ -482,6 +486,7 @@ function advise(){
  // 照明・水草
  if(!own('light')&&!own('light2')&&own('filter'))add(2,'照明があると水草が育ちます','照明がないと、ロタラなどの水草がひょろひょろと伸びます（徒長）。<b>クリップ式LED</b>は3,000Gです。'+untilG(3000));
  for(const o of S.layout)if(ITEMS[o.k]&&ITEMS[o.k].rot){const st=rotState(o);if(st==='droop'){add(1,'ロタラが伸びすぎています','「レイアウト」でロタラを選んで「トリミング」しましょう。こんもり茂ります。');break}if(st==='leggy'){add(2,'ロタラが徒長しています','光が足りません。照明を用意するか、明るい照明にすると改善します。');break}}
+ {const ov=S.layout.find(o=>mossStage(o)==='over');if(ov)add(1,'モスが伸びすぎています','「レイアウト」で'+ITEMS[ov.k].n+'を選んで「トリミング」しましょう。刈り込むと、きれいな緑に戻ります。')}
  if(!A.length)add(2,'順調です','今のところ心配はありません。水草のレイアウトを楽しんだり、グレードの高いエビを目指したりしてみましょう。');
  return A.sort((a,b)=>a.lv-b.lv);
 }
@@ -517,7 +522,7 @@ function view(ts){
 }
 const VS='attribute vec2 p;varying vec2 v;void main(){v=vec2((p.x+1.)/2.,(1.-p.y)/2.);gl_Position=vec4(p,0.,1.);}';
 const FS=`precision mediump float;
-uniform sampler2D tex,ftex,ttex,htex;uniform float t,clar,bright,night,filt,thermo,tlev,heat,hled;uniform vec4 vw,frect,trect,tcol,hrect,hledr;varying vec2 v;
+uniform sampler2D tex,ftex,ttex,htex;uniform float t,clar,bright,night,filt,sbrown,thermo,tlev,heat,hled;uniform vec4 vw,frect,trect,tcol,hrect,hledr;varying vec2 v;
 float segD(vec2 p,vec2 a,vec2 b){vec2 pa=p-a,ba=b-a;float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.);return length(pa-ba*h);}
 void main(){
  vec2 uv=vw.xy+v*vw.zw;
@@ -561,6 +566,10 @@ void main(){
   if(fu.x>0.&&fu.x<1.&&fu.y>0.&&fu.y<1.){
    vec4 f=texture2D(ftex,fu);
    vec3 fc=f.rgb*vec3(.86,.96,.93);
+   // 熟成スポンジ：使い込んだ茶色っぽいスポンジに
+   float spg=sbrown*smoothstep(.725,.745,fu.y)*(1.-smoothstep(.95,.962,fu.y));
+   float lu=dot(f.rgb,vec3(.3,.59,.11));
+   fc=mix(fc,vec3(.30,.20,.11)*(.55+lu*2.6)+vec3(.04,.03,.01),spg);
    fc=mix(fc,vec3(.5,.56,.53),.12);
    c=mix(c,fc,f.a);
   }
@@ -604,7 +613,7 @@ function initGL(img,fimg){
  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
  const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
  makeTex(0,img,gl.RGB);makeTex(1,fimg,gl.RGBA);makeTex(2,timg,gl.RGBA);makeTex(3,himg,gl.RGBA);
- ['t','clar','bright','night','filt','vw','tex','ftex','frect','ttex','thermo','tlev','trect','tcol','htex','heat','hled','hrect','hledr'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+ ['t','clar','bright','night','filt','sbrown','vw','tex','ftex','frect','ttex','thermo','tlev','trect','tcol','htex','heat','hled','hrect','hledr'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
  gl.uniform1i(U.tex,0);gl.uniform1i(U.ftex,1);gl.uniform4f(U.frect,FIL.rect[0],FIL.rect[1],FIL.rect[2],FIL.rect[3]);gl.uniform1i(U.ttex,2);gl.uniform1i(U.htex,3);gl.uniform4f(U.hrect,HTR.rect[0],HTR.rect[1],HTR.rect[2],HTR.rect[3]);gl.uniform4f(U.hledr,HTR.led[0],HTR.led[1],HTR.led[2],HTR.led[3]);gl.uniform4f(U.trect,THM.rect[0],THM.rect[1],THM.rect[2],THM.rect[3]);gl.uniform4f(U.tcol,THM.col[0],THM.col[1],THM.col[2],THM.col[3]);
 }
 
@@ -644,7 +653,9 @@ function drawBubbles(vw,L){
 const simgs=SHRS.map(o=>{const i=new Image();i.src=o.img;return i});
 const actors=[];
 const groundY=z=>700+z*88;
-function newActor(s){return{s,x:rnd(300,1400),z:Math.random(),dir:Math.random()<.5?-1:1,state:'rest',t:rnd(.5,2),ph:Math.random()*9,h:0,vx:0,tilt:0,tx:0,th:0}}
+// ㉘ 手前寄りで暮らす（ときどき奥へ）
+const frontZ=()=>.42+.58*Math.pow(Math.random(),.55),backZ=()=>rnd(.03,.32);
+function newActor(s){return{s,x:rnd(300,1400),z:frontZ(),zt:null,dir:Math.random()<.5?-1:1,state:'rest',t:rnd(.5,2),ph:Math.random()*9,h:0,vx:0,tilt:0,tx:0,th:0}}
 function syncActors(){
  const ids=new Set(S.shrimp.map(s=>s.id));
  for(let i=actors.length-1;i>=0;i--)if(!actors[i].trial&&!ids.has(actors[i].s.id))actors.splice(i,1);
@@ -657,23 +668,96 @@ function trialShrimp(gi){
  const s={id:'trial',sex:'F',bd:gday(now())-150,gr:gi,v:0,sz:1,life:9999,egg:null,dead:null};
  const a=newActor(s);a.trial=now()+60000;const vw=curView;a.x=(vw[0]+vw[2]/2)*IW;a.z=.85;actors.push(a);
 }
+/* 物の上の高さ（水槽画像の座標）。スプライトの列ごとのいちばん上の不透明位置を覚えておく */
+const TOPS={};
+function topsOf(key){
+ if(TOPS[key]!==undefined)return TOPS[key];const im=limgs[key];if(!im||!im.complete||!im.width)return null;
+ const N=64,c=document.createElement('canvas');c.width=N;c.height=200;const x=c.getContext('2d');x.drawImage(im,0,0,N,200);
+ const p=x.getImageData(0,0,N,200).data,r=[];
+ for(let i=0;i<N;i++){let f=null;for(let y=0;y<200;y++)if(p[(y*N+i)*4+3]>150){f=y/200;break}r.push(f)}
+ const q=r.slice();for(let i=0;i<N;i++)if(q[i]!=null&&(q[Math.max(0,i-1)]==null||q[Math.min(N-1,i+1)]==null))r[i]=null; // 端のちぎれは使わない
+ return TOPS[key]=r;
+}
+function surfY(o,xi){
+ const gm=objGeom(o);if(!gm)return null;let c=(xi-gm.x0)/gm.w;if(o.flip)c=1-c;if(c<.06||c>.94)return null;
+ const T=topsOf(gm.key);if(!T)return null;const f=T[Math.floor(c*63.99)];if(f==null)return null;
+ const srcH=gm.sp.h*(1-(gm.it.sink||0));let yy=f*gm.sp.h;
+ if(o.mo){const mk='mv_'+o.k+'_'+mossStage(o),T2=topsOf(mk),ms=LAYOUT_IMG[mk];if(T2&&ms){const f2=T2[Math.floor(c*63.99)];if(f2!=null)yy=Math.min(yy,f2*ms.h-ms.e)}}
+ return gm.y0+yy*gm.h/srcH;
+}
+const PERCH=k=>{const it=ITEMS[k];return it&&!it.rot}; // ロタラ以外（石・流木・モス・シダなど）
+const swimming=()=>actors.filter(a=>a.state==='rise'||a.state==='sink'||a.state==='swim').length;
 function pick(a){
- const juv=gday(now())-a.s.bd<ADULT,r=Math.random();
- if(r<.38){a.state='walk';a.t=rnd(2,6);a.vx=rnd(9,20)*(juv?.6:1);if(Math.random()<.35)a.dir*=-1}
- else if(r<.72){a.state='graze';a.t=rnd(3,9)}
- else if(r<.95||juv||a.s.egg!=null){a.state='rest';a.t=rnd(2,6)}
- else{a.state='swim';a.dir=Math.random()<.5?-1:1;a.tx=Math.min(1440,Math.max(260,a.x+a.dir*rnd(150,450)));a.dir=a.tx<a.x?-1:1;a.th=rnd(60,260);a.sx=a.x;a.t=Math.abs(a.tx-a.x)/rnd(45,75);a.T=a.t;a.z2=Math.random()}
+ const d=gday(now()),juv=d-a.s.bd<ADULT,berry=a.s.egg!=null,r=Math.random();
+ const night=lighting().night,cap=Math.max(1,Math.floor(alive().length/7)),canSwim=!berry&&!a.trial&&swimming()<cap;
+ const pRise=canSwim?(juv?.03:.07+night*.08):0,pPerch=canSwim&&!juv?.07:0,pSwim=canSwim?.03:0;
+ a.land=null;a.noland=false;a.on=null;
+ if(r<pRise){startRise(a,null);return}
+ if(r<pRise+pPerch){const os=S.layout.filter(o=>PERCH(o.k));if(os.length){startRise(a,os[Math.floor(Math.random()*os.length)]);return}}
+ const q=Math.random();
+ if(q<.38){a.state='walk';a.t=rnd(2,6);a.vx=rnd(9,20)*(juv?.6:1);if(Math.random()<.35)a.dir*=-1;a.zt=Math.random()<.12?backZ():(a.z<.38||Math.random()<.5?frontZ():null)}
+ else if(q<.72){a.state='graze';a.t=a.z<.38?rnd(2,4):rnd(3,9)}
+ else if(q<.97||juv||berry||!pSwim){a.state='rest';a.t=rnd(2,6)}
+ else{a.state='swim';a.dir=Math.random()<.5?-1:1;a.tx=Math.min(1440,Math.max(260,a.x+a.dir*rnd(150,450)));a.dir=a.tx<a.x?-1:1;a.th=rnd(60,260);a.sx=a.x;a.t=Math.abs(a.tx-a.x)/rnd(45,75);a.T=a.t;a.z2=frontZ()}
+}
+// ㉕ 足をばたつかせて底から上へ（目的の物があれば、その上へ向かう＝㉖）
+function startRise(a,o){
+ a.state='rise';a.vy=rnd(38,62);a.vxs=rnd(6,22);a.dir=Math.random()<.5?-1:1;a.land=null;a.noland=false;a.t=40;a.tryLand=undefined;
+ const free=()=>{a.ht=rnd(.45,.92)*(groundY(a.z)-170)};
+ if(!o){free();return}
+ const gm=objGeom(o);if(!gm){free();return}
+ let tx=null,sy=null;for(let i=0;i<10&&sy==null;i++){tx=o.x+(Math.random()-.5)*gm.w*.6;sy=surfY(o,tx)}
+ if(sy==null){free();return}
+ a.land=o;a.ltx=tx;a.lz=o.z+.004;a.ht=Math.max(40,groundY(a.lz)-sy+rnd(25,70));
+ a.dir=tx<a.x?-1:1;a.vxs=Math.min(60,Math.abs(tx-a.x)/Math.max(1,a.ht/a.vy)+3);
 }
 function stepShrimp(dt){
  for(const a of actors){
   if(!a.s)continue;
   if(a.trial&&now()>a.trial){a.gone=1;continue}
   if(a.s.dead){a.state='dead';a.h=Math.max(0,a.h-dt*60);continue}
-  a.t-=dt;a.ph+=dt*(a.state==='walk'?9:a.state==='swim'?16:a.state==='graze'?3:1.2);
-  if(a.state==='walk'){a.x+=a.dir*a.vx*dt;a.z=Math.min(1,Math.max(0,a.z+Math.sin(a.ph*.07)*dt*.03));if(a.x<250||a.x>1440){a.dir=a.x<250?1:-1}}
+  a.t-=dt;a.ph+=dt*({walk:9,swim:16,rise:24,sink:2.5,graze:3,perch:3}[a.state]||1.2);
+  if(a.state==='walk'){a.x+=a.dir*a.vx*dt;
+   if(a.zt!=null){a.z+=Math.sign(a.zt-a.z)*Math.min(Math.abs(a.zt-a.z),dt*.05);if(Math.abs(a.zt-a.z)<.01)a.zt=null}
+   else a.z=Math.min(1,Math.max(0,a.z+Math.sin(a.ph*.07)*dt*.03));
+   if(a.x<250||a.x>1440){a.dir=a.x<250?1:-1}}
   if(a.state==='swim'){const p=1-Math.max(0,a.t)/a.T;a.x=a.sx+(a.tx-a.sx)*p;a.h=Math.sin(p*Math.PI)*a.th;a.z+=(a.z2-a.z)*dt*.4;a.tilt=-Math.cos(p*Math.PI)*.18}
+  else if(a.state==='rise'){
+   const far=a.land&&Math.abs(a.ltx-a.x)>8;
+   if(!(far&&a.h>=a.ht))a.h+=a.vy*dt*(.75+.25*Math.sin(a.ph*.35));            // 目的の物の真上まで来るまでは高さを保って進む
+   if(a.land){a.z+=(a.lz-a.z)*Math.min(1,dt*.8);const dx=a.ltx-a.x;a.dir=dx<0?-1:1;a.x+=Math.sign(dx)*Math.min(Math.abs(dx),Math.max(a.vxs,a.h>=a.ht?30:0)*dt)}
+   else{a.x+=a.dir*a.vxs*dt+Math.sin(a.ph*.11)*dt*6;if(Math.random()<dt*.18)a.dir*=-1}   // ふらっと向きを変える
+   a.tilt+=((-.24+.05*Math.sin(a.ph*.2))-a.tilt)*Math.min(1,dt*3);
+   if(a.x<250||a.x>1440)a.dir=a.x<250?1:-1;
+   if((a.h>=a.ht&&!far)||a.t<=0){a.state='sink';a.vy=0;a.t=60}
+  }
+  else if(a.state==='sink'){
+   // 足を止めてゆっくり沈む（ときどき少しだけ漕ぐ）
+   a.vy=Math.min(27,a.vy+dt*14);const kick=Math.sin(a.ph*1.7)>.93;if(kick)a.ph+=dt*20;
+   const prevY=groundY(a.z)-a.h;a.h-=a.vy*dt*(kick?.3:1);
+   if(a.land){const dx=a.ltx-a.x;a.x+=Math.sign(dx)*Math.min(Math.abs(dx),dt*14)}else a.x+=a.dir*dt*5;
+   a.tilt+=(.04-a.tilt)*Math.min(1,dt*2);
+   // ㉖ 物の上に降りる（目的の物、またはたまたま真下にあった物）
+   if(!a.noland&&a.vy>0){
+    if(a.tryLand===undefined)a.tryLand=Math.random()<.4;
+    const cand=a.land?[a.land]:a.tryLand?S.layout.filter(o=>PERCH(o.k)&&Math.abs(o.z-a.z)<.3):[];
+    for(const o of cand){if(!S.layout.includes(o))continue;const sy=surfY(o,a.x);if(sy==null)continue;
+     const zz=o.z+.004,y=groundY(a.z)-a.h;
+     if(prevY<=sy+3&&y>=sy-3){a.z=zz;a.h=groundY(zz)-sy;a.state='perch';a.on=o;a.t=rnd(6,20);a.pv=Math.random()<.5?0:rnd(3,6);break}}
+   }
+   if(a.state==='sink'&&a.h<=0){a.h=0;a.tryLand=undefined;a.land=null;pick(a)}
+  }
+  else if(a.state==='perch'){
+   // 物の上でツマツマ（ゆっくり歩くことも）
+   a.tilt*=.9;const o=a.on,here=o&&S.layout.includes(o);
+   const sy=here?surfY(o,a.x+a.dir*a.pv*dt):null;
+   if(sy!=null){a.x+=a.dir*a.pv*dt;a.h=groundY(a.z)-sy}
+   else if(here&&a.pv&&surfY(o,a.x-a.dir*4)!=null)a.dir*=-1;
+   else{a.state='sink';a.noland=true;a.vy=-10;a.t=60}
+   if(a.state==='perch'&&a.t<=0){a.state='sink';a.noland=true;a.vy=-rnd(10,22);a.t=60}   // ぴょんと離れて底へ
+  }
   else{a.h=Math.max(0,a.h-dt*80);a.tilt*=.9}
-  if(a.t<=0)pick(a);
+  if(a.t<=0&&(a.state==='walk'||a.state==='graze'||a.state==='rest'||a.state==='swim'))pick(a);
  }
 }
 /* グレードごとの見た目（元画像の赤・白をピクセル単位で加工） */
@@ -735,12 +819,12 @@ function drawShrimpOne(a,vw,L,w,d,sx,sy){
   ctx.translate(X,Y-len*sx*.12);ctx.scale(-a.dir*k,-k);ctx.rotate(.12);ctx.translate(-SW/2,-SH*.5);
   ctx.drawImage(img,0,0);ctx.restore();return;
  }
- const bob=a.state==='walk'?Math.sin(a.ph*2)*.8:0,graze=a.state==='graze'?(.07+.04*Math.sin(a.ph*2.2)):0;
+ const bob=a.state==='walk'?Math.sin(a.ph*2)*.8:0,graze=a.state==='graze'||a.state==='perch'?(.07+.04*Math.sin(a.ph*2.2)):0;
  if(a.h<40){ctx.fillStyle='rgba(0,0,0,'+(.22*(1-a.h/40)*L.bright*juvA)+')';ctx.beginPath();ctx.ellipse(X,Y+a.h*sy+1,len*sx*.42,len*sx*.05,0,0,7);ctx.fill()}
  ctx.save();ctx.globalAlpha=juvA;ctx.translate(X,Y+bob);ctx.scale(-a.dir*k,k);ctx.rotate(-(a.tilt+graze));
  ctx.translate(-SW/2,-footY);
  ctx.drawImage(img,0,0,SW,legY,0,0,SW,legY);
- const amp=a.state==='walk'?.16:a.state==='swim'?.22:a.state==='graze'?.06:.02;
+ const amp=a.state==='walk'?.16:a.state==='swim'?.22:a.state==='rise'?.3:a.state==='sink'?.05:a.state==='graze'||a.state==='perch'?.06:.02;
  ctx.save();ctx.translate(0,legY);ctx.transform(1,0,Math.sin(a.ph)*amp,1,0,0);ctx.drawImage(img,0,legY,SW,SH-legY,0,0,SW,SH-legY);ctx.restore();
  const sw1=Math.sin(a.ph*.9+a.x*.01)*.08,sw2=Math.sin(a.ph*1.3+1)*.1,al=.4*(.55+.45*L.bright);
  ctx.lineCap='round';
@@ -761,6 +845,14 @@ function rotState(o,d=gday(now())){
  if(o.trim&&age<(L===2?10:15))return'bushy';
  return age<(L===2?20:30)?'straight':'droop';
 }
+/* ㉗ 石・流木に巻いたウィローモス：巻いたばかり→活着→こんもり→伸びすぎ */
+const MOSS_P=400;
+const canWrap=o=>{const it=ITEMS[o.k];return it&&(it.cat==='wood'||it.cat==='stone')&&LAYOUT_IMG['mv_'+o.k+'_wrap']};
+function mossStage(o,d=gday(now())){
+ if(!o.mo)return null;const r=S.owned.light2?1.3:S.owned.light?1:.5,age=(d-o.mo.at)*r;
+ return age<6?'wrap':age<20?'attach':age<45?'lush':'over';
+}
+const MOSS_NAME={wrap:'巻いたばかり',attach:'活着',lush:'こんもり',over:'伸びすぎ'};
 function objGeom(o){ // 水槽画像上の位置と大きさ
  const it=ITEMS[o.k];if(!it)return null;
  const st=it.rot?rotState(o):null,key=it.rot?ROT_SPR[st]:o.k,sp=LAYOUT_IMG[key];if(!sp)return null;
@@ -789,6 +881,9 @@ function drawObj(o,vw,L,w,t,sx,sy){
  }
  ctx.restore();
  if(o.trial){ctx.save();ctx.font='bold 12px system-ui,sans-serif';const tw=ctx.measureText('お試し中').width;ctx.fillStyle='rgba(255,217,160,.92)';ctx.fillRect(X+Wd/2-tw/2-6,Y-22,tw+12,18);ctx.fillStyle='#1a1408';ctx.fillText('お試し中',X+Wd/2-tw/2,Y-8);ctx.restore()}
+ if(o.mo){const st=mossStage(o),mk='mv_'+o.k+'_'+st,mi=limgs[mk],ms=LAYOUT_IMG[mk];
+  if(mi&&mi.complete&&mi.width){const ky=Hd/srcH,mim=tintOf('m'+mk+'_'+Math.round(o.z*3),mi,L,w,.05+(1-o.z)*.14);
+   ctx.drawImage(mim,0,0,gm.sp.w,ms.e+srcH,X,Y-ms.e*ky,Wd,(ms.e+srcH)*ky)}}
  if(LAY.on&&LAY.sel===o){ctx.save();ctx.strokeStyle='rgba(255,217,160,.9)';ctx.setLineDash([6,5]);ctx.lineWidth=1.5;ctx.strokeRect(X-3,Y-3,Wd+6,Hd+6);ctx.restore()}
 }
 function drawScene(vw,L,w,t){
@@ -831,7 +926,9 @@ function renderTray(){
 }
 function showTool(){const o=LAY.sel;$('ltool').classList.toggle('show',!!o);$('lhint').style.visibility=o?'hidden':'';
  if(!o)return;const tr=!!o.trial;
- $('lTrim').style.display=!tr&&ITEMS[o.k]&&ITEMS[o.k].rot?'':'none';$('lBack').style.display=tr?'none':'';
+ const ms=mossStage(o);
+ $('lTrim').style.display=!tr&&ITEMS[o.k]&&(ITEMS[o.k].rot||ms==='lush'||ms==='over')?'':'none';
+ $('lMoss').style.display=!tr&&canWrap(o)&&!o.mo?'':'none';$('lMoss').textContent=(S.mossPinch||0)>0?'モスを巻く（残り'+S.mossPinch+'）':'モスを巻く（ショップで購入）';$('lBack').style.display=tr?'none':'';
  $('lBuy').style.display=tr?'':'none';$('lCancel').style.display=tr?'':'none';
  if(tr){const p=ITEMS[o.k].p;$('lBuy').textContent='この位置で購入（'+G(p)+'）';$('lBuy').disabled=S.g<p}}
 function trialPlace(k){
@@ -857,8 +954,14 @@ function setSize(o,v,quiet){o.s=+Math.min(SMAX,Math.max(SMIN,v)).toFixed(3);if(!
 $('lSm').onclick=()=>{if(LAY.sel)setSize(LAY.sel,(LAY.sel.s||1)/1.15)};
 $('lBg').onclick=()=>{if(LAY.sel)setSize(LAY.sel,(LAY.sel.s||1)*1.15)};
 $('lFlip').onclick=()=>{if(LAY.sel){LAY.sel.flip=!LAY.sel.flip;save();markDirty()}};
-$('lTrim').onclick=()=>{const o=LAY.sel;if(!o)return;o.since=gday(now());o.trim=1;addLog('ロタラをトリミングしました');unlock('trim');save();markDirty();nextNote();toast('トリミングしました。脇芽が出てこんもり茂ります')};
-$('lBack').onclick=()=>{const o=LAY.sel;if(!o)return;S.layout=S.layout.filter(x=>x!==o);S.inv[o.k]=(S.inv[o.k]||0)+1;LAY.sel=null;save();markDirty();renderTray();showTool()};
+$('lMoss').onclick=()=>{const o=LAY.sel;if(!o||o.mo||!canWrap(o))return;
+ if(!(S.mossPinch>0)){toast('ショップの「水草」でウィローモス（ひとつまみ）を買ってください');return}
+ S.mossPinch--;o.mo={at:gday(now())};addLog('ウィローモスを'+ITEMS[o.k].n+'に巻きました');unlock('mosswrap');save();markDirty();showTool();nextNote();
+ toast('モスを巻きました。2日ほどで活着し、1週間ほどでこんもり茂ります（照明が明るいほど早く育ちます）')};
+$('lTrim').onclick=()=>{const o=LAY.sel;if(!o)return;
+ if(o.mo&&!ITEMS[o.k].rot){o.mo.at=gday(now())-8;addLog('ウィローモスをトリミングしました');unlock('mosstrim');save();markDirty();showTool();nextNote();toast('モスを短く刈りました。新しい芽がまたふわっと伸びてきます');return}
+ o.since=gday(now());o.trim=1;addLog('ロタラをトリミングしました');unlock('trim');save();markDirty();nextNote();toast('トリミングしました。脇芽が出てこんもり茂ります')};
+$('lBack').onclick=()=>{const o=LAY.sel;if(!o)return;if(o.mo&&!o.backArm){o.backArm=1;setTimeout(()=>{o.backArm=0},3000);toast('しまうとモスははがれてしまいます。もう一度押すとしまいます');return}S.layout=S.layout.filter(x=>x!==o);S.inv[o.k]=(S.inv[o.k]||0)+1;LAY.sel=null;save();markDirty();renderTray();showTool()};
 const lay=$('lay');
 const cap=ev=>{try{lay.setPointerCapture(ev.pointerId)}catch(e){}};const PTR=new Map();let PINCH=null;
 const pdist=()=>{const [a,b]=[...PTR.values()];return Math.hypot(a.x-b.x,a.y-b.y)};
@@ -912,7 +1015,7 @@ function frame(ts){
  if(gl&&prog){
   gl.viewport(0,0,W,H);
   gl.uniform1f(U.t,ts/1000);gl.uniform1f(U.clar,w.clar);gl.uniform1f(U.bright,L.bright);gl.uniform1f(U.night,L.night);
-  gl.uniform1f(U.filt,S.owned.filter?1:0);gl.uniform1f(U.thermo,0);gl.uniform1f(U.heat,S.owned.heater?1:0);gl.uniform1f(U.hled,heating()?1:0);gl.uniform1f(U.tlev,THM.y0-waterTemp()*THM.perDeg);gl.uniform4f(U.vw,vw[0],vw[1],vw[2],vw[3]);
+  gl.uniform1f(U.filt,S.owned.filter?1:0);gl.uniform1f(U.sbrown,S.owned.sponge?1:0);gl.uniform1f(U.thermo,0);gl.uniform1f(U.heat,S.owned.heater?1:0);gl.uniform1f(U.hled,heating()?1:0);gl.uniform1f(U.tlev,THM.y0-waterTemp()*THM.perDeg);gl.uniform4f(U.vw,vw[0],vw[1],vw[2],vw[3]);
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
  }
  ctx.clearRect(0,0,W,H);stepShrimp(dt);drawScene(vw,L,w,ts/1000);stepBubbles(dt);drawBubbles(vw,L);

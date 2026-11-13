@@ -353,7 +353,7 @@ class Umpire{
     for(const pd of this.pend)if(!pd.done&&t-pd.t>=CLOSE){pd.done=true;if(!pd.r.rb.out){pd.r.rb.judged[pd.b]=true;this.out(pd.r,pd.type,{base:pd.b,by:pd.by,margin:CLOSE})}}
     this.pend=this.pend.filter(q=>!q.done);
     // 区切り：内野でボールを持ち、全員が塁に止まっている
-    const calm=h&&hyp(h.x,h.z)<FIELD.infieldR+6&&w.liveRunners.every(r=>this.onBase(r)&&r.speed<0.3&&r.tx==null);
+    const calm=h&&hyp(h.x,h.z)<FIELD.infieldR+16&&w.liveRunners.every(r=>this.onBase(r)&&r.speed<0.3&&r.tx==null);
     if(calm){p.restT=p.restT==null?t:p.restT;if(t-p.restT>0.8)this.endPlay('time')}else p.restT=null;
   }
   tagCall(r,m,h){if(this.w.rng.chance(clamp(0.5+0.5*m/CLOSE,0,1)))this.out(r,'tag',{by:h.id,margin:m});else this.w.emit('safe',{who:r.id,margin:+m.toFixed(3),close:true,tag:true})}
@@ -388,7 +388,12 @@ class Checker{
     w.on('bounce',()=>this.bounced++);w.on('wall',()=>this.bounced++);
     w.on('catch',e=>this.onPick(e));w.on('pickup',e=>this.onPick(e));
     w.on('home',e=>this.homes.add(e.who));w.on('runVoid',()=>this.voidRuns++);
-    w.on('playEnd',e=>this.onEnd(e));this.score0=[...w.score];w.on('error',()=>this.snapFree());
+    w.on('playEnd',e=>this.onEnd(e));this.score0=[...w.score];
+    // 内野どうしの行ったり来たり：アウトもなく挟殺でもないのに送球が続く
+    w.on('playStart',()=>{this.thr=0;this.rdn=false;this.nocT=null;this.nocDone=false});w.on('out',()=>this.thr=0);w.on('rundown',()=>this.rdn=true);
+    w.on('error',()=>this.thr=0);
+    w.on('throwTarget',e=>{if(!this.ai||this.rdn)return;const rl=id=>(w.fielders.find(f=>f.id===id)||{}).role,inf=r=>['P','C','1B','2B','3B','SS'].includes(r);
+      if(!inf(rl(e.from))||!inf(rl(e.to))||e.kind!=='return'||e.rundown){this.thr=0;return}if(++this.thr===4)this.bad('pingPong','アウトを狙わない送球が内野で行ったり来たり')});w.on('error',()=>this.snapFree());
   }
   bad(code,msg,ex={}){const e={t:+this.w.t.toFixed(2),code,msg,...ex};this.v.push(e);this.w.emit('violation',e)}
   snapFree(){this.path=[];this.free={t:this.w.t,pos:new Map(this.w.fielders.map(f=>[f,[f.x,f.z,Math.max(f.react,f.wait)]]))}}
@@ -435,6 +440,10 @@ class Checker{
     for(let i=1;i<live.length;i++)if(prog(live[i-1])>prog(live[i])+0.15&&!this.passed){this.passed=1;this.bad('pass','ランナーが前のランナーを追い越した')}
     // 持ったまま止まる・動かないボール
     if(this.path&&w.ball.state!=='held'&&(w.fc%2===0||!w.record))this.path.push([t,w.ball.x,w.ball.z,w.ball.h]);
+    // 押し出しの塁に誰も向かっていない（ボールが転がっているあいだ1.5秒以上）
+    if(this.ai&&w.ball.state!=='held'&&w.ball.src==='bat'&&!this.nocDone){const U=w.umpire,miss=w.liveRunners.some(r=>{if(!U.forced(r))return false;const[bx,bz]=basePos(r.rb.forceBase);
+        return!w.fielders.some(f=>hyp(f.x-bx,f.z-bz)<2.5||f.tx!=null&&hyp(f.tx-bx,f.tz-bz)<1)});
+      if(miss){this.nocT=this.nocT??t;if(t-this.nocT>1.5){this.nocDone=true;this.bad('noCover','押し出しの塁に誰も入っていない')}}else this.nocT=null}
     if(!this.ai)return;const b=w.ball,moving=w.liveRunners.some(r=>r.speed>0.5);
     if(b.state==='held'&&b.holder&&b.holder.speed<0.2&&moving){this.holdT=this.holdT??t;if(t-this.holdT>4){this.bad('hold','ボールを持ったまま止まっている');this.holdT=t+1e9}}else this.holdT=null;
     if(b.state==='rest'&&!w.fielders.some(f=>f.tx!=null&&hyp(f.tx-b.x,f.tz-b.z)<3)){this.stillT=this.stillT??t;if(t-this.stillT>3){this.bad('still','止まったボールに誰も向かわない');this.stillT=t+1e9}}else this.stillT=null;

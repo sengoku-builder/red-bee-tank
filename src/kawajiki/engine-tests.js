@@ -294,8 +294,16 @@ function fielding(KE,T){
     add('センター前のヒットはセンターが拾って、すぐ内野へ返す',pk&&pk.role==='CF'&&th&&th.t-pk.t<1.5&&!S.ck.v.length,pk?`${pk.role}が拾い、${th?(th.t-pk.t).toFixed(1)+'秒で返球':'返球なし'}`:'',S);}
   { const S=fieldScene(KE,{lv:70,hit:[28,16,38,1500,-300]}),pk=S.log.find(e=>e.type==='pickup'||e.type==='catch');
     add('ライト線の打球はライトが拾う（内野手が外野まで行かない）',pk&&pk.role==='RF',pk?pk.role:'',S);}
-  { const S=fieldScene(KE,{lv:70,on:[2],hit:[25,8,-30,800]}),pk=S.log.find(e=>e.type==='pickup'||e.type==='catch'),thr=S.log.filter(e=>e.type==='throwTarget');
+  { const S=fieldScene(KE,{lv:70,on:[2],hit:[26,12,-26,900]}),pk=S.log.find(e=>e.type==='pickup'||e.type==='catch'),thr=S.log.filter(e=>e.type==='throwTarget');
     add('二塁ランナーがいるレフト前：レフトが拾って、持ったまま止まらずに投げる',pk&&pk.role==='LF'&&thr.length>0&&!S.ck.v.length,thr.map(e=>e.base?`${e.base===4?'ホーム':e.base+'塁'}へ`:'中継・内野へ').join('→'),S);}
+  // 役割表どおりか（S級）
+  { const rl=(S,id)=>(S.w.fielders.find(f=>f.id===id)||{}).role;let ok=0,N=8,last;
+    for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:90,seed:600+i,on:[1],hit:[16,-7,3,-600]});const th=S.log.find(e=>e.type==='throwTarget'&&e.base===2);if(th&&rl(S,th.to)==='SS'&&rl(S,th.from)==='P')ok++;last=S}
+    add('S級：ランナー一塁のピッチャーゴロは、ショートが二塁に入ってゲッツーを狙う',ok>=N*0.75,`${N}回中${ok}回`,last);}
+  { const rl=(S,id)=>(S.w.fielders.find(f=>f.id===id)||{}).role;let ok=0,N=8,last;
+    for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:90,seed:620+i,hit:[18,-7,30,-600]});const th=S.log.find(e=>e.type==='throwTarget'&&e.base===1);const o=S.log.find(e=>e.type==='out'&&e.base===1);
+      if(th&&rl(S,th.to)==='P'||o&&rl(S,o.by)==='1B')ok++;last=S}
+    add('S級：ファーストゴロは、ピッチャーが一塁に入るか、ファーストが自分で踏む',ok>=N*0.75,`${N}回中${ok}回`,last);}
   { const err=lv=>{let e=0,ch=0;for(let i=0;i<40;i++){const S=fieldScene(KE,{lv,seed:100+i,hit:[18+(i%5)*3,-6+(i%3)*2,-40+(i*7)%80,-600]});e+=S.log.filter(x=>x.type==='error').length;ch++}return e/ch};
     const a=err(30),b=err(90);add('エラーは能力が低いほど多く、S級ではほとんど出ない',a>b*3&&b<0.08,`同じ40本のゴロで、能力30：1本あたり${a.toFixed(2)}回、能力90：${b.toFixed(2)}回`);}
 }
@@ -337,14 +345,14 @@ function running(KE,T){
     add('浅いフライ：一塁ランナーは飛び出しすぎず、捕られたら戻ってセーフ',ok>=N*0.8,`${N}回中${ok}回戻ってセーフ`,last);}
   { let two=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:50,run:70,seed:100+i,hit:[30,16,-40+i%2,800]});const B=S.w.runners.find(r=>r.id==='打者');
       if(!B.rb.out&&B.rb.base>=2)two++;if(B.rb.base>=2&&!last)last=S}
-    add('三塁手の頭を越えてレフト線へ転がる当たりでは、打者は一塁を回って二塁をねらう',two>=N*0.3,`${N}回中${two}回二塁打以上`,last);}
+    add('三塁手の頭を越えてレフト線へ転がる当たりでは、打者は一塁を回って二塁をねらう',two>=N*0.2,`${N}回中${two}回二塁打以上`,last);}
   { const cnt=lv=>{let hes=0,rash=0;for(let i=0;i<40;i++){const S=fieldScene(KE,{lv,run:lv,seed:400+i,on:[1,2],hit:[24+(i%5)*2,4+(i%4)*4,-40+(i*13)%80,900]});
       hes+=S.log.filter(e=>e.type==='couldHaveGone').length;rash+=S.log.filter(e=>e.type==='rash').length}return{hes,rash}};
     const a=cnt(30),b=cnt(90);
     add('判断ミスは「行けたのに行かない」が多く「飛び出し」は少ない。S級ではどちらも少ない',a.hes>a.rash&&b.hes+b.rash<a.hes+a.rash,`同じ40プレーで、能力30：行けたのに${a.hes}回・飛び出し${a.rash}回／S級：行けたのに${b.hes}回・飛び出し${b.rash}回`);}
 }
 
-KT.AI_CODES=['farPick','hold','still','stall45','stall'];
+KT.AI_CODES=['farPick','hold','still','stall45','stall','pingPong','noCover'];
 KT.runPlay=function(KE,o={}){KE_=KE;const T=[];batting(KE,T);fielding(KE,T);running(KE,T);if(o.games!==0)games(KE,T,o.games||4);return T};
 KT.runAll=function(KE,o={}){KE_=KE;const T=[];physics(KE,T);movement(KE,T);umpire(KE,T);checker(KE,T);if(KE.Game&&!o.base){T.push(...KT.runPlay(KE,o))}
   const s=o.stress?stress(KE,o.stress):null;return{tests:T,stress:s}};

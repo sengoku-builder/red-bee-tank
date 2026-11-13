@@ -72,10 +72,10 @@ KE.throwTime=function(d,v){const k=Math.round(d)*1000+Math.round(v);let t=TT.get
 const ROLE_PREF={4:{C:0,P:2.5},1:{'1B':0,P:0.8,'2B':1.2},2:{SS:0,'2B':0,P:3},3:{'3B':0,SS:1.5,P:2.5}};
 const IF=['P','C','1B','2B','3B','SS'],OF=['LF','CF','RF'];
 class Defense{
-  constructor(w){this.w=w;this.F={};for(const f of w.fielders)this.F[f.role]=f;
+  constructor(w){this.w=w;this.F={};this.involved=new Set();for(const f of w.fielders)this.F[f.role]=f;
     this.chaser=null;this.cover={};this.relay=null;this.nextPlan=0;this.decideAt=null;this.dove=new Set();this.tried=new Map();this.target=null;
     w.on('loose',()=>{this.nextPlan=w.t;this.decideAt=null});w.on('wall',()=>this.nextPlan=w.t);}
-  reset(){this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
+  reset(){this.involved=new Set();this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
   setFielders(){this.F={};for(const f of this.w.fielders)this.F[f.role]=f;this.reset()}
   reachH(f){return KE.reachH(f)}
   // ボールに一番早く追いつける子を探す
@@ -97,24 +97,35 @@ class Defense{
     // ころころ変えない（0.25秒以上早い子がいたら交代）
     if(this.chaser&&this.chaser!==best.f){const cur=this.cur;if(cur&&cur.f===this.chaser&&cur.t<=best.t+0.25&&this.chaser.wait<=0){best=this.reEval(this.chaser,pr)||best}}
     if(this.chaser&&this.chaser!==best.f)this.chaser.stop();
-    this.chaser=best.f;this.cur=best;best.f.goTo(best.x,best.z,{react:true});
+    this.chaser=best.f;this.cur=best;best.f.goTo(best.x,best.z,{react:true});this.involved.add(best.f);
     this.assign(best,second);
   }
   reEval(f,pr){for(const q of pr){if(q[0]<0.08||q[3]>this.reachH(f))continue;if(f.eta(q[1],q[2],1,0.55)<=q[0]+0.02)return{f,t:q[0],x:q[1],z:q[2]}}return null}
-  // ベースカバー・中継・バックアップ
-  assign(best,second){
-    const w=this.w,F=this.F,busy=new Set([best.f]),cover={};
-    const deep=hyp(best.x,best.z)>FIELD.infieldR+5;
+  // 役割表（設計書「守備の役割表」）：打球の位置とランナーの状況から、ベースカバーと中継を決める
+  roleTable(px,pz,chaser,deep){
+    const F=this.F,used=new Set([chaser]),cover={},right=px>=-1;   // センターラインを含めて右
+    const take=(b,list)=>{for(const r of list){const f=F[r];if(f&&!used.has(f)){cover[b]=f;used.add(f);return f}}return null};
     let relay=null;
-    if(deep){const ss=F.SS,sb=F['2B'];relay=best.x<0?ss:sb;if(relay===best.f)relay=relay===ss?sb:ss;if(relay)busy.add(relay)}
-    const pairs=[];
-    for(const b of[4,1,2,3])for(const f of w.fielders){if(busy.has(f))continue;const pref=(ROLE_PREF[b]||{})[f.role];if(pref==null&&!(OF.includes(f.role)))continue;
-      const[bx,bz]=basePos(b);pairs.push({b,f,c:f.eta(bx,bz)*0.6+(pref??6)})}
-    pairs.sort((a,c)=>a.c-c.c);
-    for(const p of pairs){if(cover[p.b]||busy.has(p.f))continue;cover[p.b]=p.f;busy.add(p.f)}
+    if(deep){const tb=this.relayTarget();
+      if(tb===4&&px<-12)relay=F['3B'];                // レフトからの本塁：サード
+      else if(tb===4&&px>12)relay=F['1B'];            // ライトからの本塁：ファースト
+      else{const near=right?F['2B']:F.SS,far=right?F.SS:F['2B'];relay=this.involved.has(near)||near===chaser?far:near}  // 近いほうの二遊間。打球を追った子ならもう一人
+      if(relay===chaser)relay=null;if(relay)used.add(relay)}
+    take(4,['C','P']);
+    if(relay===F['1B'])take(1,['2B','P']);else take(1,['1B','P','2B']);
+    take(2,right?['SS','2B']:['2B','SS']);
+    take(3,['3B','SS','P']);
+    if(!cover[2])take(2,['P']);   // 二塁を空けない
+    return{cover,relay,used};
+  }
+  assign(best,second){
+    const w=this.w,F=this.F,deep=hyp(best.x,best.z)>40;   // 中継が要るのは外野の深いところだけ
+    const{cover,relay,used:busy}=this.roleTable(best.x,best.z,best.f,deep);
     this.cover=cover;this.relay=relay;
     for(const b in cover){const f=cover[b],[bx,bz]=basePos(+b);if(f!==w.ball.holder)f.goTo(bx,bz,{react:true})}
     if(relay){const tb=this.relayTarget(),[tx,tz]=basePos(tb),k=0.42;relay.goTo(best.x+(tx-best.x)*k,best.z+(tz-best.z)*k,{react:true})}
+    // バックアップ：ピッチャーゴロはセカンドが投手の後ろ、ファーストゴロはセカンドが一塁の手伝い
+    const sb=F['2B'];if(!deep&&sb&&!busy.has(sb)){if(best.f===F.P){sb.goTo(2,21,{react:true});busy.add(sb)}else if(best.f===F['1B']){sb.goTo(14,21,{react:true});busy.add(sb)}}
     // 外野の打球は隣の外野手がうしろへ回る
     if(deep&&second&&OF.includes(second.f.role)&&!busy.has(second.f)){const d=hyp(best.x,best.z)||1;second.f.goTo(best.x*(d+6)/d,best.z*(d+6)/d,{react:true,frac:0.9});busy.add(second.f)}
     // ほかの子は定位置近くで様子を見る
@@ -146,15 +157,19 @@ class Defense{
     const w=this.w,b=w.ball,t=w.t;if(b.state==='out')return;
     if(b.state!=='held')this.picked=b.state==='ground'||b.state==='rest';
     if(b.state!=='held'){
-      if(t>=this.nextPlan){this.nextPlan=t+0.3;this.plan()}
-      // 手の届く範囲に来た子が捕る（投げた本人・失敗した直後の子はのぞく）
+      // 送球が飛んでいるあいだは、受ける子を動かさない（それたら届かなかった後で追う）
+      const inFlight=b.src==='throw'&&this.lastThrow&&t<this.lastThrow.t1+0.15;
+      if(t>=this.nextPlan&&!inFlight){this.nextPlan=t+0.3;this.plan()}
+      // 手の届く範囲に来た子が捕る。ベースに入っている子は、踏んだまま体を伸ばして捕る（能力が高いほど遠くまで）
       for(const f of w.fielders){if(!w.canCatch(f))continue;const tr=this.tried.get(f);if(tr!=null&&t<tr)continue;
-        const d=hyp(b.x-f.x,b.z-f.z);if(d<0.75&&b.h<this.reachH(f)){this.tryCatch(f,false);return}}
+        if(inFlight&&this.lastThrow.to&&f!==this.lastThrow.to)continue;   // 送球は受ける子だけが捕る（となりの子が横取りしない）
+        const cb=b.src==='throw'?this.baseOf(f):null,on=cb!=null&&f.dist(...basePos(cb))<0.8,reach=on?0.75+0.9*sk(f,'fld')/100:0.75;
+        const d=hyp(b.x-f.x,b.z-f.z);if(d<reach&&b.h<this.reachH(f)+(on?0.2:0)){this.tryCatch(f,false);return}}
       // 飛びつき：追いかけている子の横を抜けそうなとき、一度だけ
       // 横を抜けていく打球には飛びつく（一度だけ）
       if(b.h<1.5&&b.src!=='throw')for(const c of w.fielders){if(this.dove.has(c)||c.wait>0||c.role==='C'||!w.canCatch(c))continue;const tr=this.tried.get(c);if(tr!=null&&t<tr)continue;
         const d=hyp(b.x-c.x,b.z-c.z),dn=hyp(b.x+b.vx*0.05-c.x,b.z+b.vz*0.05-c.z);
-        if(d<1.9&&d>=0.75&&dn>d){this.dove.add(c);c.x+=(b.x-c.x)*0.6;c.z+=(b.z-c.z)*0.6;w.emit('dive',{who:c.id});
+        if(d<1.9&&d>=0.75&&dn>d){this.dove.add(c);this.involved.add(c);c.x+=(b.x-c.x)*0.6;c.z+=(b.z-c.z)*0.6;w.emit('dive',{who:c.id});
           if(!this.tryCatch(c,true)){c.wait=Math.max(c.wait,1.1)}else c.wait=0.6;return}}
       return;
     }
@@ -168,14 +183,16 @@ class Defense{
   }
   flyOF(h){return OF.includes(h.role)}
   // ボールを持っているあいだのカバー（持った子以外）
-  assignHeld(h){const w=this.w,busy=new Set([h]),pairs=[];
-    for(const b of[4,1,2,3])for(const f of w.fielders){if(busy.has(f))continue;const pref=(ROLE_PREF[b]||{})[f.role];if(pref==null)continue;const[bx,bz]=basePos(b);pairs.push({b,f,c:f.eta(bx,bz)*0.6+pref})}
-    pairs.sort((a,c)=>a.c-c.c);const cover={};for(const p of pairs){if(cover[p.b]||busy.has(p.f))continue;cover[p.b]=p.f;busy.add(p.f)}
-    this.cover=cover;for(const b in cover){const[bx,bz]=basePos(+b);if(cover[b].dist(bx,bz)>0.3)cover[b].goTo(bx,bz)}
-    // 中継：外野の深いところから遠い塁へ
-    const d=hyp(h.x,h.z);this.relay=null;
-    if(d>FIELD.infieldR+5){const rf=h.x<0?this.F.SS:this.F['2B'];if(rf&&rf!==h&&!Object.values(cover).includes(rf)){this.relay=rf}}
+  assignHeld(h){
+    const deep=hyp(h.x,h.z)>40,{cover,relay}=this.roleTable(h.x,h.z,h,deep);
+    // 塁へ向かう途中で受けた子は、その塁を自分で受け持つ
+    for(let b=1;b<=4;b++){const[bx,bz]=basePos(b);if(h.dist(bx,bz)<6&&(h.tx!=null&&hyp(h.tx-bx,h.tz-bz)<0.6||h.dist(bx,bz)<1.5||cover[b]&&h.dist(bx,bz)<cover[b].dist(bx,bz))){const o=cover[b];cover[b]=h;if(o&&o!==h&&o.dist(bx,bz)<2){const[px,pz]=FIELD.pos[o.role];o.goTo(px,pz,{frac:0.6})}}}
+    this.cover=cover;this.relay=relay&&relay!==h?relay:null;
+    for(const b in cover){const f=cover[b];if(f===h)continue;const[bx,bz]=basePos(+b);if(f.dist(bx,bz)>0.3)f.goTo(bx,bz)}
   }
+  // 外野から直接投げてよい距離（S級でもおよそ40m、能力が低いほど短い）
+  directMax(h){return 22+18*sk(h,'thr')/100}
+  baseOf(f){for(const b in this.cover)if(this.cover[b]===f)return +b;return null}
   // 投げる時間の見込み
   throwT(h,x,z){const v=PROF.armV(sk(h,'thr')),d=hyp(x-h.x,z-h.z);return KE.throwTime(d,v)}
   armRange(h){const v=PROF.armV(sk(h,'thr'));return v*v/9.8*0.62}
@@ -205,8 +222,9 @@ class Defense{
       const rt=this.runnerT(r,b);
       const c=this.cover[b];
       let bt,how;
-      if(h.dist(bx,bz)<5||!c){bt=h.eta(bx,bz);how='run'}
-      else{bt=this.throwT(h,bx,bz);how='throw';if(c.eta(bx,bz)>bt)bt=c.eta(bx,bz)}
+      // 自分で走って踏むか、投げるか：早いほう（近くの子へ投げ返すより自分で踏むほうが早ければ走る）
+      const runT=h.eta(bx,bz),thrT=c&&c!==h&&c.dist(h.x,h.z)>4?Math.max(this.throwT(h,bx,bz),c.eta(bx,bz)):Infinity;   // すぐ隣の子へは投げない
+      if(runT<=thrT+0.15){bt=runT;how='run'}else{bt=thrT;how='throw'}
       const force=U.forced(r)||r.rb.mustRetouch,need=force?0.05:0.25;
       // 目の前（数m以内）の飛び出したランナーには走ってタッチ
       if(!force&&!U.onBase(r)&&h.dist(r.x,r.z)<4.5){cands.push({r,b,how:'tag',m:1,val:5});continue}
@@ -220,11 +238,14 @@ class Defense{
     if(pick&&pick.how==='tag'){h.goTo(pick.r.x,pick.r.z);this.decideAt=t+0.1;return}
     if(pick&&pick.how==='run'){const[bx,bz]=basePos(pick.b);h.goTo(bx,bz);this.decideAt=t+0.15;return}
     if(pick){this.throwTo(h,this.cover[pick.b],pick.b);return}
-    // アウトにできる塁がない：走っているランナーの先の塁へ。外野なら中継か内野へ返す
-    const mv=live.filter(r=>r.speed>0.5&&r.tx!=null).sort((a,c)=>c.rb.base-a.rb.base)[0];
-    if(mv){const nb=Math.min(4,this.headingTo(mv)||mv.rb.base+1),c=this.cover[nb];if(c&&c!==h){this.throwTo(h,c,nb);return}}
-    if(hyp(h.x,h.z)>FIELD.infieldR+4){const tgt=this.relay||this.nearestIF(h);if(tgt){this.throwTo(h,tgt,null);return}}
-    // 内野で持っている：ピッチャーへ返すか、そのまま持って止まる（プレーの区切り）
+    // アウトにできる塁がない：先へ進もうとしているランナーの、向かっている塁のひとつ先へ返して余分な進塁を止める
+    const adv=live.filter(r=>!r.rb.mustRetouch&&r.plan>U.legalBase(r)).sort((a,c)=>c.plan-a.plan)[0];
+    if(adv){const nb=Math.min(4,adv.plan+1),c=this.cover[nb];if(c&&c!==h&&h.dist(...basePos(nb))>3){this.throwTo(h,c,nb,'stop');return}}
+    // 外野で持っている：中継か内野へ返す。内野どうしでは投げない（そのまま持って区切り）
+    if(OF.includes(h.role)||hyp(h.x,h.z)>40){let tgt=this.relay&&this.relay!==h?this.relay:this.nearestIF(h);
+      // 返す相手は自分より内野側（8m以上近い）の子だけ。いなければ自分で内野へ持って戻る
+      if(tgt&&hyp(tgt.x,tgt.z)<hyp(h.x,h.z)-8){this.throwTo(h,tgt,null);return}
+      h.goTo(h.x*0.6,h.z*0.6+10,{frac:0.7});this.decideAt=t+0.3;return}
     if(live.some(r=>r.speed>0.5)){this.decideAt=t+0.2;return}
     this.decideAt=t+0.5;
   }
@@ -232,15 +253,15 @@ class Defense{
   runnerT(r,b){const[bx,bz]=basePos(b);const d=r.dist(bx,bz);const toward=r.speed>0.3?(r.vx*(bx-r.x)+r.vz*(bz-r.z))/(d||1):0;
     if(toward<-0.3)return 9;return r.eta(bx,bz)}
   nearestIF(h){let best=null,bd=1e9;for(const f of this.w.fielders){if(f===h||!['SS','2B','3B','1B','P'].includes(f.role))continue;const d=f.dist(h.x,h.z);if(d<bd){bd=d;best=f}}return best}
-  throwTo(h,c,b){
+  throwTo(h,c,b,kind){
     const w=this.w;let x=c.x,z=c.z;
     // 塁へ投げるときは、受ける子が間に合うなら塁の上へ。受ける子はそこへ向かう
     if(b!=null){const[bx,bz]=basePos(b);if(c.dist(bx,bz)<3||c.eta(bx,bz)<=this.throwT(h,bx,bz)+0.1){x=bx;z=bz}}
-    // 肩が届かない遠投は中継へ
+    // 外野から遠い塁へは中継を通す（直接は約40mまで。レフト・センターから一塁へは直接投げない）
     const d=hyp(x-h.x,z-h.z);
-    if(d>this.armRange(h)){const r=this.relay&&this.relay!==h&&this.relay!==c?this.relay:null;if(r&&r.dist(h.x,h.z)<d-6){x=r.x;z=r.z;c=r}}
+    if(OF.includes(h.role)&&(d>this.directMax(h)||b===1&&h.role!=='RF')){const r=this.relay&&this.relay!==h&&this.relay!==c?this.relay:this.nearestIF(h);if(r&&r!==c&&r.dist(h.x,h.z)<d-6){x=r.x;z=r.z;c=r;b=null}}
     if(c.dist(x,z)>0.3)c.goTo(x,z);
-    const aim=w.throwTo(h,[x,z,1.25]);this.lastThrow={x,z,t1:w.t+aim.t,to:c};this.decideAt=null;w.emit('throwTarget',{from:h.id,to:c.id,base:b});
+    const aim=w.throwTo(h,[x,z,1.25]);this.lastThrow={x,z,t1:w.t+aim.t,to:c};this.decideAt=null;w.emit('throwTarget',{from:h.id,to:c.id,base:b,kind:kind||(b==null?'return':'out')});
     this.nextPlan=w.t;
   }
 }

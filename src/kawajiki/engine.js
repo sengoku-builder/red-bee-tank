@@ -22,7 +22,7 @@ const FIELD={
   bd:23.05,                                  // 塁間
   bases:[[0,0],[16.3,16.3],[0,32.6],[-16.3,16.3]],
   mound:[0,16],
-  fence:60,fenceH:1.2,                       // 簡易フェンス（ホームから60m）
+  fence:85,fenceH:1.2,                       // 仮設の低いフェンス（両翼70m・中堅85m。fenceは最大値）
   backstopZ:-7,backstopH:3.5,
   infieldR:29,                               // 内野の土
   pos:{P:[0,15.6],C:[0,-1.25],'1B':[14.6,19.5],'2B':[6.8,28.5],'3B':[-14.6,19.5],SS:[-6.8,28.5],LF:[-23,45],CF:[0,52],RF:[23,45]}
@@ -33,13 +33,14 @@ KE.FIELD=FIELD;KE.basePos=basePos;KE.isFair=isFair;
 
 /* ---------- 能力 → 動きの大きさ（調整はここに集める） ----------
    Y(s)：少年野球らしさ。能力が低いと1に近く、S級（90台）でほぼ0＝甲子園常連校の動き */
+FIELD.fenceAt=(x,z)=>{const a=Math.min(Math.PI/4,Math.atan2(Math.abs(x),Math.max(z,0.01)));return 70+15*Math.cos(2*a)};
 const Y=s=>Math.pow(1-clamp(s,0,100)/100,1.4);
 const sk=(k,key)=>k&&k.sk&&k.sk[key]!=null?k.sk[key]:60;
 const PROF={
-  runV:s=>4.6+2.7*s/100,          // 全力で走る速さ m/s（4.6〜7.3）
+  runV:s=>4.5+2.2*s/100,          // 全力で走る速さ m/s（学童：一塁まで 能力30約4.8秒・60約4.3秒・S約3.9秒）
   runA:s=>5+3*s/100,              // 加速 m/s²
   react:s=>0.2+0.65*Y(s),          // 反応の遅れ 秒（野球の頭）
-  armV:s=>12+26*Math.pow(s/100,1.5),  // 送球の初速 m/s（能力30：59km/h・60：87km/h・90：123km/h）
+  armV:s=>10+17*s/100,            // 送球の初速（全力）m/s（学童：能力30約55km/h・60約73km/h・S約94km/h）
   armErr:s=>0.010+0.075*Y(s),     // 送球の向きのずれ（ラジアン、1σ）
 };
 KE.Y=Y;KE.sk=sk;KE.PROF=PROF;
@@ -92,12 +93,13 @@ class Ball{
   }
   walls(emit){
     const r=this.r;
-    if(r>=FIELD.fence&&this.z>-2){
+    const fd=FIELD.fenceAt(this.x,this.z);
+    if(r>=fd&&this.z>-2){
       const vo=this.vx*this.x+this.vz*this.z>0;
       if(vo&&this.h>FIELD.fenceH+BR){this.over={fair:isFair(this.x,this.z),bounced:this.bounces>0};this.state='out';emit&&emit('overFence',{...this.over,x:this.x,z:this.z});return}
       const nx=this.x/r,nz=this.z/r,vr=this.vx*nx+this.vz*nz;
       if(vr>0){const tx=this.vx-vr*nx,tz=this.vz-vr*nz;this.vx=tx*0.7-vr*0.3*nx;this.vz=tz*0.7-vr*0.3*nz;
-        this.x=nx*(FIELD.fence-0.05);this.z=nz*(FIELD.fence-0.05);this.wall=true;emit&&emit('wall',{x:this.x,z:this.z})}
+        this.x=nx*(fd-0.05);this.z=nz*(fd-0.05);this.wall=true;emit&&emit('wall',{x:this.x,z:this.z})}
     }
     if(this.z<=FIELD.backstopZ&&this.vz<0){
       if(this.h>FIELD.backstopH){this.state='out';this.over={fair:false,bounced:this.bounces>0};emit&&emit('overFence',{fair:false});return}
@@ -210,14 +212,14 @@ class World{
     if(src==='deflect'&&wasLoose){b.bounces=nb;b.wall=wl;this.umpire.onDeflect(k||{x:p[0],z:p[1]})}if(src!=='bat')this.emit(src,{who:k&&k.id,x:p[0],z:p[1]});this.emit('loose',{src})}
   // 投げた直後の本人は捕れない（手から離れたばかり）
   canCatch(f){const b=this.ball;return b.state!=='held'&&b.state!=='out'&&!(b.from===f&&this.t-b.relT<0.5)}
-  throwTo(k,to,quality=1){
+  throwTo(k,to,quality=1,effort=1){
     for(const r of this.liveRunners)r.rb.throwBase=this.umpire.legalBase(r);
-    const from=[k.x,k.z,1.6],aim=KE.aimThrow(from,to,PROF.armV(sk(k,'thr')));
+    const from=[k.x,k.z,1.6],aim=KE.aimThrow(from,to,PROF.armV(sk(k,'thr'))*effort);
     const tv=KE.throwVec(aim,k,this.rng,quality);this.release(from,tv.v,tv.w,'throw');return aim;
   }
   step(){
     const dt=this.dt;
-    for(const p of this.fielders){p.step(dt);const r=hyp(p.x,p.z);if(r>FIELD.fence-0.4){p.x*=(FIELD.fence-0.4)/r;p.z*=(FIELD.fence-0.4)/r}}
+    for(const p of this.fielders){p.step(dt);const r=hyp(p.x,p.z),fd=FIELD.fenceAt(p.x,p.z)-0.4;if(r>fd){p.x*=fd/r;p.z*=fd/r}}
     for(const p of this.runners)if(!p.rb.out)p.step(dt);
     this.ball.step(dt,(type,d)=>this.emit(type,d));
     this.t+=dt;
@@ -445,7 +447,7 @@ class Checker{
         return!w.fielders.some(f=>hyp(f.x-bx,f.z-bz)<2.5||f.tx!=null&&hyp(f.tx-bx,f.tz-bz)<1)});
       if(miss){this.nocT=this.nocT??t;if(t-this.nocT>1.5){this.nocDone=true;this.bad('noCover','押し出しの塁に誰も入っていない')}}else this.nocT=null}
     if(!this.ai)return;const b=w.ball,moving=w.liveRunners.some(r=>r.speed>0.5);
-    if(b.state==='held'&&b.holder&&b.holder.speed<0.2&&moving){this.holdT=this.holdT??t;if(t-this.holdT>4){this.bad('hold','ボールを持ったまま止まっている');this.holdT=t+1e9}}else this.holdT=null;
+    if(b.state==='held'&&b.holder&&b.holder.speed<0.2&&moving){this.holdT=this.holdT??t;if(t-this.holdT>6){this.bad('hold','ボールを持ったまま止まっている');this.holdT=t+1e9}}else this.holdT=null;
     if(b.state==='rest'&&!w.fielders.some(f=>f.tx!=null&&hyp(f.tx-b.x,f.tz-b.z)<3)){this.stillT=this.stillT??t;if(t-this.stillT>3){this.bad('still','止まったボールに誰も向かわない');this.stillT=t+1e9}}else this.stillT=null;
   }
 }

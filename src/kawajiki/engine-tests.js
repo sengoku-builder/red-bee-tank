@@ -45,7 +45,7 @@ function physics(KE,T){
     add('フェンスを越えたらホームラン（フェア）',b.state==='out'&&b.over&&b.over.fair&&!b.over.bounced,b.over?`越えた・フェア=${b.over.fair}`:'越えない');}
   { const b=new KE.Ball(),h=hitVec(42,30,52,2000);b.launch(h.p,h.v,h.w);let t=0;while(t<10&&b.state!=='out'&&b.bounces===0){b.step(1/60);t+=1/60}
     add('ポールの外を越えたらファウル',b.state==='out'&&b.over&&!b.over.fair,'');}
-  { const b=new KE.Ball(),h=hitVec(36,10,-5,500);b.launch(h.p,h.v,h.w);let t=0;while(t<10&&!b.wall&&b.state!=='rest'){b.step(1/60);t+=1/60}
+  { const b=new KE.Ball(),h=hitVec(46,10,-5,500);b.launch(h.p,h.v,h.w);let t=0;while(t<10&&!b.wall&&b.state!=='rest'){b.step(1/60);t+=1/60}
     add('低い強い打球はフェンスに当たってはね返る',b.wall&&b.state!=='out','');}
   { const a=land(hitVec(28,22,0,1500,0)),b=land(hitVec(28,22,0,1500,-900));
     add('横回転の打球は一塁側へ切れていく',b.b.x>a.b.x+1.5,`回転なし x=${a.b.x.toFixed(1)}m／横回転 x=${b.b.x.toFixed(1)}m`);}
@@ -57,7 +57,7 @@ function physics(KE,T){
   { const f=mk(KE,'s','SS',60),from=[f.x,f.z,1.6],aim=KE.aimThrow(from,[16.3,16.3,1.2],KE.PROF.armV(60));
     const b=new KE.Ball(),c=Math.cos(aim.el);b.launch(from,[Math.sin(aim.yaw)*aim.v0*c,Math.cos(aim.yaw)*aim.v0*c,aim.v0*Math.sin(aim.el)],[Math.cos(aim.yaw)*120,-Math.sin(aim.yaw)*120,0]);
     let best=99,t=0,bt=0;while(t<3){b.step(1/120);t+=1/120;const d=hyp(b.x-16.3,b.z-16.3,b.h-1.2);if(d<best){best=d;bt=t}}
-    add('ねらいどおりの送球はちょうど一塁手の胸に届く',best<0.3&&bt>0.7&&bt<1.4,`ずれ${best.toFixed(2)}m・${bt.toFixed(2)}秒`);}
+    add('ねらいどおりの送球はちょうど一塁手の胸に届く',best<0.3&&bt>0.7&&bt<1.7,`ずれ${best.toFixed(2)}m・${bt.toFixed(2)}秒`);}
   { const s=miss(90,200,3),w=miss(25,200,3);
     add('肩の弱い子ほど送球がそれる（S級はほぼ正確）',s.p90<0.9&&w.med>s.med*2.5,`S級：ふつう${s.med.toFixed(2)}m・悪いとき${s.p90.toFixed(2)}m／能力25：ふつう${w.med.toFixed(2)}m・悪いとき${w.p90.toFixed(2)}m`);
     add('S級の送球は速い',s.t<w.t*0.75,`ショート→一塁 S級${s.t.toFixed(2)}秒／能力25 ${w.t.toFixed(2)}秒`);}
@@ -93,7 +93,7 @@ function umpire(KE,T){
   // きわどい一塁：差ごとの割合
   { const base=scene(KE,1,S=>{const w=S.w;S.b=w.addRunner(mk(KE,'打者','',60,{at:[0.6,0]}),0,true);grounder(w);route(S.b,[1])},null,8);
     const ta=base.b.rb.arr[1],rows=[];let ok=true;
-    for(const[dl,lo,hi]of[[-0.15,1,1],[-0.05,0.62,0.88],[0,0.38,0.62],[0.05,0.12,0.38],[0.15,0,0]]){let outs=0;const N=240;
+    for(const[dl,lo,hi]of[[-0.15,1,1],[-0.05,0.62,0.92],[0,0.38,0.62],[0.05,0.12,0.38],[0.15,0,0]]){let outs=0;const N=240;
       for(let i=0;i<N;i++){const w=new KE.World({seed:100+i}),fb=w.addFielder(mk(KE,'1b','1B',60,{at:[16.3,16.3]})),b=w.addRunner(mk(KE,'打者','',60,{at:[0.6,0]}),0,true);
         grounder(w);route(b,[1]);let given=false;
         w.run(7,()=>{routeTick(w);if(!given&&w.t>=ta+dl-1e-9){given=true;w.give(fb,'catch')}});if(b.rb.out)outs++}
@@ -134,7 +134,7 @@ function umpire(KE,T){
       w.umpire.startPlay({batted:true});const h=hitVec(27,38,-2,1800);bat(w,h);route(S.b,[1]);
       const pr=KE.predict(w.ball,8,0.05),L=pr.find(q=>q[5]>0||q[3]<1.5&&q[0]>1);S.cf.goTo(L[1],L[2],{react:true});S.land=L},
     S=>{catchNear(S.w,S.cf,1.0);each&&each(S)},sec);
-  { const S=flyPlay(8,S=>{const w=S.w;S.fb=w.addFielder(mk(KE,'1b','1B',60,{at:[16.3,16.3]}));S.r1=w.addRunner(mk(KE,'一塁走者','',50),1);route(S.r1,[2]);S.st=0},
+  { const S=flyPlay(8,S=>{const w=S.w;S.cf.sk.thr=95;S.fb=w.addFielder(mk(KE,'1b','1B',60,{at:[16.3,16.3]}));S.r1=w.addRunner(mk(KE,'一塁走者','',30),1);route(S.r1,[2]);S.st=0},
       S=>{const w=S.w;if(S.st===0&&w.ball.holder===S.cf){S.st=1;S.r1.route=[1];S.r1.goTo(16.3,16.3);w.throwTo(S.cf,[16.3,16.3,1.2],0)}catchNear(w,S.fb,1.3)},14);
     const o=outsOf(S.w);add('フライを捕ったら打者アウト、飛び出した一塁走者は一塁に送球されてアウト',o.length===2&&o[0].outType==='fly'&&o[1].outType==='appeal'&&!S.ck.v.length,o.map(e=>e.outType).join('→'),S);}
   { const S=flyPlay(9,S=>{const w=S.w;S.r3=w.addRunner(mk(KE,'三塁走者','',60),3);S.c=w.addFielder(mk(KE,'c','C',60,{at:[0,-1.25]}));S.st=0},
@@ -170,7 +170,7 @@ function umpire(KE,T){
       w.umpire.startPlay({batted:true});if(pre)pre(S);else bat(w,h);w.on('hr',()=>w.runners.forEach(r=>route(r,[1,2,3,4].filter(b=>b>r.rb.start))));
       w.on('groundRule',()=>w.runners.forEach(r=>route(r,[1,2,3,4].filter(b=>b>r.rb.start&&b<=r.rb.start+2))))},null,60);
   { const S=award(16,hitVec(42,30,-15,2000));add('満塁ホームラン→全員ホームインで4点',S.w.score[0]===4&&!S.ck.v.length,`得点${S.w.score[0]}`,S);}
-  { const S=award(17,null,0,S=>{const w=S.w;w.ball.launch([12,52,0.04],[2.5,9,7],null,'bat');w.ball.bounces=1;w.emit('bounce',{x:12,z:52,n:1})});const gr=S.w.log.some(e=>e.type==='groundRule');
+  { const S=award(17,null,0,S=>{const w=S.w;w.ball.launch([14,72,0.04],[2.5,9,7],null,'bat');w.ball.bounces=1;w.emit('bounce',{x:12,z:52,n:1})});const gr=S.w.log.some(e=>e.type==='groundRule');
     add('はねてフェンスを越えたら2つ進める（エンタイトル二塁打）',gr&&S.w.score[0]===2&&S.b.rb.base===2,gr?`得点${S.w.score[0]}・打者は${S.b.rb.base}塁`:'フェンスを越えなかった',S);}
   // 同じ塁に2人
   { const S=scene(KE,18,S=>{const w=S.w;S.a=w.addRunner(mk(KE,'前の走者','',50),2);S.b=w.addRunner(mk(KE,'後ろの走者','',50),1);
@@ -191,7 +191,7 @@ function checker(KE,T){
   { const{w,ck}=W(),ss=w.addFielder(mk(KE,'ss','SS',60)),lf=w.addFielder(mk(KE,'lf','LF',60));w.addRunner(mk(KE,'打者','',50,{at:[0.6,0]}),0,true);w.umpire.startPlay({});
     w.ball.launch([-6,24,0.04],[0,0,0]);w.ball.state='rest';w.emit('loose',{src:'bat'});w.run(4);lf.x=-6.5;lf.z=24;w.give(lf,'pickup');
     add('わざと「遠い子が拾う」を起こす→見つける',ck.v.some(v=>v.code==='farPick'),ck.v.map(v=>v.msg).join(''));}
-  { const{w,ck}=W(),f=w.addFielder(mk(KE,'rf','RF',60)),r=w.addRunner(mk(KE,'走者','',30),1);w.umpire.startPlay({});w.give(f,'pickup');r.goTo(-30,40);w.run(6);
+  { const{w,ck}=W(),f=w.addFielder(mk(KE,'rf','RF',60)),r=w.addRunner(mk(KE,'走者','',30),1);w.umpire.startPlay({});w.give(f,'pickup');r.goTo(-60,80);w.run(8);
     add('わざと「ボールを持ったまま止まる」を起こす→見つける',ck.v.some(v=>v.code==='hold'),ck.v.map(v=>v.msg).join(''));}
   { const{w,ck}=W();w.addFielder(mk(KE,'cf','CF',60));w.addRunner(mk(KE,'打者','',50,{at:[0.6,0]}),0,true);w.umpire.startPlay({});w.ball.launch([10,40,0.04],[0,0,0]);w.ball.state='rest';w.run(5);
     add('わざと「止まったボールに誰も向かわない」を起こす→見つける',ck.v.some(v=>v.code==='still'),ck.v.map(v=>v.msg).join(''));}

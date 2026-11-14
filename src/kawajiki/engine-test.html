@@ -101,7 +101,7 @@ button.on{background:var(--grass);color:#fff;border-color:var(--grass)}
 (function(){
 const $=s=>document.querySelector(s),cv=$('#cv'),ctx=cv.getContext('2d');
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const W=cv.width,H=cv.height,S=W/96,X=x=>W/2+x*S,Z=z=>H-10*S-z*S*0.98;
+const W=cv.width,H=cv.height,S=Math.min(W/104,(H-12)/96),X=x=>W/2+x*S,Z=z=>H-10*S-z*S*0.98;
 const OUTJ={force:'フォース',tag:'タッチ',fly:'フライ',appeal:'リタッチ',strike:'三振'};
 function evText(e){switch(e.type){case'out':return`<b>アウト</b>（${OUTJ[e.outType]||e.outType}）${e.name||''}`;
   case'safe':return`セーフ${e.close?'（きわどい）':''}`;case'home':return`ホームイン ${e.name||''}`;case'fair':return'フェア';case'foul':return'ファウル';
@@ -110,13 +110,14 @@ function evText(e){switch(e.type){case'out':return`<b>アウト</b>（${OUTJ[e.o
   case'dive':return'飛びついた';case'diveCatch':return'ダイビングキャッチ';case'misjudge':return'投げる塁をまちがえた';case'contact':return`打球 ${e.v}km/h・${e.va}度`;case'overthrow':return'送球が外へ（2つ進塁）';case'rundown':return`<b>挟まれた</b> ${e.name||''}`;case'retreat':return'戻った';case'couldHaveGone':return`今のは行けたぞー!（${e.name||''}）`;case'rash':return`飛び出した（${e.name||''}）`;case'flyCatch':return'フライ捕球';case'playEnd':return`プレー終わり（${({time:'ボールが戻った',foul:'ファウル',threeOuts:'3アウト',hr:'ホームラン',groundRule:'エンタイトル'})[e.why]||e.why}）`;default:return e.type}}
 function field(){
   ctx.fillStyle=css('--field');ctx.fillRect(0,0,W,H);
-  ctx.fillStyle=css('--grass');ctx.beginPath();ctx.moveTo(X(0),Z(0));ctx.arc(X(0),Z(0),60*S,-Math.PI/4-Math.PI/2,-Math.PI/4);ctx.closePath();ctx.fill();
+  const fp=[];for(let i=0;i<=40;i++){const a=-Math.PI/4+i*Math.PI/80,d=KE.FIELD.fenceAt(Math.sin(a),Math.cos(a));fp.push([Math.sin(a)*d,Math.cos(a)*d])}
+  ctx.fillStyle=css('--grass');ctx.beginPath();ctx.moveTo(X(0),Z(0));fp.forEach(([x,z])=>ctx.lineTo(X(x),Z(z)));ctx.closePath();ctx.fill();
   ctx.fillStyle=css('--dirt');ctx.beginPath();ctx.moveTo(X(0),Z(0));ctx.arc(X(0),Z(0),29*S,-Math.PI/4-Math.PI/2,-Math.PI/4);ctx.closePath();ctx.fill();
   ctx.fillStyle=css('--grass2');ctx.beginPath();[[0,4],[12.3,16.3],[0,28.6],[-12.3,16.3]].forEach(([x,z],i)=>i?ctx.lineTo(X(x),Z(z)):ctx.moveTo(X(x),Z(z)));ctx.fill();
-  ctx.strokeStyle=css('--chalk');ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(X(-44),Z(44));ctx.lineTo(X(0),Z(0));ctx.lineTo(X(44),Z(44));ctx.stroke();
-  ctx.lineWidth=3;ctx.strokeStyle=css('--fg');ctx.globalAlpha=.5;ctx.beginPath();ctx.arc(X(0),Z(0),60*S,-Math.PI/4-Math.PI/2,-Math.PI/4);ctx.stroke();ctx.globalAlpha=1;
+  ctx.strokeStyle=css('--chalk');ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(X(-49.5),Z(49.5));ctx.lineTo(X(0),Z(0));ctx.lineTo(X(49.5),Z(49.5));ctx.stroke();
+  ctx.lineWidth=3;ctx.strokeStyle=css('--fg');ctx.globalAlpha=.5;ctx.beginPath();fp.forEach(([x,z],i)=>i?ctx.lineTo(X(x),Z(z)):ctx.moveTo(X(x),Z(z)));ctx.stroke();ctx.globalAlpha=1;
   ctx.fillStyle=css('--chalk');KE.FIELD.bases.forEach(([x,z])=>{ctx.save();ctx.translate(X(x),Z(z));ctx.rotate(Math.PI/4);ctx.fillRect(-4,-4,8,8);ctx.restore()});
-  ctx.fillStyle=css('--chalk');ctx.globalAlpha=.8;ctx.font=`${11}px ${css('--body')}`;ctx.fillText('60m',X(0)-10,Z(60)+14);ctx.globalAlpha=1;
+  ctx.fillStyle=css('--chalk');ctx.globalAlpha=.8;ctx.font=`${11}px ${css('--body')}`;ctx.fillText('85m',X(0)-10,Z(85)+14);ctx.fillText('70m',X(47),Z(49)+14);ctx.globalAlpha=1;
 }
 const JP={P:'投',C:'捕','1B':'一','2B':'二','3B':'三',SS:'遊',LF:'左',CF:'中',RF:'右'};
 function dot(x,z,r,c,label){r*=1.6;ctx.fillStyle=c;ctx.beginPath();ctx.arc(X(x),Z(z),r,0,7);ctx.fill();if(label){ctx.fillStyle=css('--chalk');ctx.font=`bold 20px ${css('--body')}`;ctx.fillText(JP[label]||String(label).replace(/^\D+/,''),X(x)+r+3,Z(z)+7)}}

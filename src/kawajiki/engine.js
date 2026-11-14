@@ -38,7 +38,7 @@ const Y=s=>Math.pow(1-clamp(s,0,100)/100,1.4);
 const sk=(k,key)=>k&&k.sk&&k.sk[key]!=null?k.sk[key]:60;
 const PROF={
   runV:s=>4.5+2.2*s/100,          // 全力で走る速さ m/s（学童：一塁まで 能力30約4.8秒・60約4.3秒・S約3.9秒）
-  runA:s=>5+3*s/100,              // 加速 m/s²
+  runA:s=>8+4*s/100,              // 加速 m/s²
   react:s=>0.2+0.65*Y(s),          // 反応の遅れ 秒（野球の頭）
   armV:s=>10+17*s/100,            // 送球の初速（全力）m/s（学童：能力30約55km/h・60約73km/h・S約94km/h）
   armErr:s=>0.010+0.075*Y(s),     // 送球の向きのずれ（ラジアン、1σ）

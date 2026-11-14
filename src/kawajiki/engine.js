@@ -75,7 +75,7 @@ class Ball{
       const sd=Math.exp(-d/SPIN_TAU);this.wx*=sd;this.wz*=sd;this.wh*=sd;
       if(this.h<=BR&&this.vh<0)this.bounce(emit);
     }else if(this.state==='ground'){
-      const v=hyp(this.vx,this.vz),dirt=this.r<FIELD.infieldR,dec=(dirt?2.6:3.4)+0.03*v;
+      const v=hyp(this.vx,this.vz),dirt=this.r<FIELD.infieldR,dec=(dirt?3.4:4.4)+0.04*v;   // 河川敷のでこぼこ・芝は転がりが止まりやすい
       if(v<=dec*d||v<0.12){this.vx=this.vz=0;this.state='rest';emit&&emit('ballStop',{x:this.x,z:this.z});return}
       const f=(v-dec*d)/v;this.vx*=f;this.vz*=f;this.x+=this.vx*d;this.z+=this.vz*d;this.h=BR;
     }
@@ -86,7 +86,7 @@ class Ball{
     const e=clamp((dirt?0.56:0.48)-0.007*iv,0.22,0.6);       // 軟式球はよくはねる
     // 回転の向き：バックスピンは止まり気味、トップスピンは伸びる
     const hv=hyp(this.vx,this.vz)||1,bs=(this.wx*this.vz-this.wz*this.vx)/hv;  // ＋ならバックスピン
-    const fr=clamp((dirt?0.80:0.72)-0.0006*bs,0.4,0.95);
+    const fr=clamp((dirt?0.74:0.66)-0.0006*bs,0.4,0.95);
     this.h=BR;this.vh=iv*e;this.vx*=fr;this.vz*=fr;this.wx*=0.5;this.wz*=0.5;this.wh*=0.5;this.bounces++;
     emit&&emit('bounce',{x:this.x,z:this.z,n:this.bounces});
     if(this.vh<0.6){this.vh=0;this.state='ground'}

@@ -76,7 +76,7 @@ class Defense{
   constructor(w){this.w=w;this.F={};this.involved=new Set();for(const f of w.fielders)this.F[f.role]=f;
     this.chaser=null;this.cover={};this.relay=null;this.nextPlan=0;this.decideAt=null;this.dove=new Set();this.tried=new Map();this.target=null;
     w.on('loose',()=>{this.nextPlan=w.t;this.decideAt=null});w.on('wall',()=>this.nextPlan=w.t);}
-  reset(){this.firstPlan=true;this.lunge=null;this.involved=new Set();this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
+  reset(){this.lockRelay=null;this.firstPlan=true;this.lunge=null;this.involved=new Set();this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
   // 外野の深さ：打者が強いほど下がる（レフト・ライト 能力30約46m・60約50m・S約54m、センターは+7m）
   setDepth(bat){const r=42+13*bat/100,o={};for(const[role,cr]of[['LF',r],['RF',r],['CF',r+7]]){const[x,z]=FIELD.pos[role],d=hyp(x,z);o[role]=[x*cr/d,z*cr/d]}this.opos=o}
   posOf(role){return this.opos&&this.opos[role]||FIELD.pos[role]}
@@ -110,13 +110,14 @@ class Defense{
     const F=this.F,used=new Set([chaser]),cover={},right=px>=-1;   // センターラインを含めて右
     const take=(b,list)=>{for(const r of list){const f=F[r];if(f&&!used.has(f)){cover[b]=f;used.add(f);return f}}return null};
     let relay=null;
-    if(deep){const tb=this.relayTarget();
+    if(deep&&this.lockRelay&&this.lockRelay!==chaser){relay=this.lockRelay;used.add(relay)}   // 一度決まった中継は途中で入れ替えない
+    else if(deep){const tb=this.relayTarget();
       if(tb===4&&px<-12)relay=F['3B'];                // レフトからの本塁：サード
       else if(tb===4&&px>12)relay=F['1B'];            // ライトからの本塁：ファースト
       else{const near=right?F['2B']:F.SS,far=right?F.SS:F['2B'],[sx,sz]=basePos(2);
         // 近いほうの二遊間。打球を追った子ならもう一人。ただし二塁に入っている子は動かさず、追った子が遅れても中継へ
         relay=near===chaser?far:this.involved.has(near)&&!(far.dist(sx,sz)<7)?far:near}
-      if(relay===chaser)relay=null;if(relay)used.add(relay)}
+      if(relay===chaser)relay=null;if(relay){used.add(relay);this.lockRelay=relay}}
     const on23=this.w.liveRunners.some(r=>!r.rb.isBatter&&r.rb.base>=2);
     if(deep||on23)take(4,['C','P']);   // 二塁・三塁にランナーがいなければ、内野ゴロでキャッチャーは一塁の後ろへ
     if(relay===F['1B'])take(1,['2B','P']);else take(1,['1B','P','2B']);
@@ -258,7 +259,8 @@ class Defense{
       const force=U.forced(r)||r.rb.mustRetouch,need=force?0.05:0.25;
       // 目の前（数m以内）の飛び出したランナーには走ってタッチ
       if(!force&&!U.onBase(r)&&h.dist(r.x,r.z)<4.5){cands.push({r,b,how:'tag',m:1,val:5});continue}
-      if(rt-bt>need)cands.push({r,b,how,m:rt-bt,val:({4:4,3:3,2:2,1:1})[b]+(force?0.5:0)+Math.min(1,rt-bt)*0.3});
+      // 本塁がきわどいときは前のランナー（本塁）を優先して狙う
+      if(rt-bt>need||b===4&&rt-bt>-0.4)cands.push({r,b,how,m:rt-bt,val:({4:4,3:3,2:2,1:1})[b]+(force?0.5:0)+Math.min(1,rt-bt)*0.3});
     }
     cands.sort((a,c)=>c.val-a.val);
     let pick=cands[0];

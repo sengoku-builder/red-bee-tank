@@ -45,7 +45,7 @@ function physics(KE,T){
     add('フェンスを越えたらホームラン（フェア）',b.state==='out'&&b.over&&b.over.fair&&!b.over.bounced,b.over?`越えた・フェア=${b.over.fair}`:'越えない');}
   { const b=new KE.Ball(),h=hitVec(42,30,52,2000);b.launch(h.p,h.v,h.w);let t=0;while(t<10&&b.state!=='out'&&b.bounces===0){b.step(1/60);t+=1/60}
     add('ポールの外を越えたらファウル',b.state==='out'&&b.over&&!b.over.fair,'');}
-  { const b=new KE.Ball(),h=hitVec(46,10,-5,500);b.launch(h.p,h.v,h.w);let t=0;while(t<10&&!b.wall&&b.state!=='rest'){b.step(1/60);t+=1/60}
+  { const b=new KE.Ball(),h=hitVec(54,10,-5,500);b.launch(h.p,h.v,h.w);let t=0;while(t<10&&!b.wall&&b.state!=='rest'){b.step(1/60);t+=1/60}
     add('低い強い打球はフェンスに当たってはね返る',b.wall&&b.state!=='out','');}
   { const a=land(hitVec(28,22,0,1500,0)),b=land(hitVec(28,22,0,1500,-900));
     add('横回転の打球は一塁側へ切れていく',b.b.x>a.b.x+1.5,`回転なし x=${a.b.x.toFixed(1)}m／横回転 x=${b.b.x.toFixed(1)}m`);}

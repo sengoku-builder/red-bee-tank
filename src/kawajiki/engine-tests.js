@@ -334,6 +334,12 @@ function running(KE,T){
         w.umpire.startPlay({});r3.x=-9.6;r3.z=9.6;r3.plan=4;r3.rd=true;r3.rdT=0;r3.goTo(0,0);F.C.x=0.6;F.C.z=-0.4;F['3B'].x=-15.8;F['3B'].z=15.8;w.give(F.C,'pickup')}});
       const o=S.log.find(e=>e.type==='out');if(o){outN++;tsum+=o.t}bad+=S.ck.v.length;if(!last)last=S}
     add('S級：三本間の挟殺は、捕ったらすぐ追って素早くアウトにする（200の件）',outN>=N*0.9&&bad===0,`${N}回中${outN}回アウト・平均${outN?(tsum/outN).toFixed(1):'-'}秒`,last);}
+  // 200：一二塁間・二三塁間の挟殺も同じ動き
+  for(const[nm,base,pos,plan,hold,hp]of[['一二塁間',1,[8.15,24.4],2,'SS',[0,32.6]],['二三塁間',2,[-8.15,24.4],3,'3B',[-16.3,16.3]]]){let outN=0,N=8,last,tsum=0,bad=0;
+    for(let i=0;i<N;i++){const S=liveScene(KE,{lv:92,seed:90+i,setup:(w,F,KE)=>{const r=w.addRunner(new KE.Player({id:'走',name:'走者',sk:{run:60,iq:60}}),base);
+        w.umpire.startPlay({});r.x=pos[0];r.z=pos[1];r.plan=plan;r.rd=true;r.rdT=0;r.goTo(...KE.basePos(plan));F[hold].x=hp[0];F[hold].z=hp[1];w.give(F[hold],'pickup')}});
+      const o=S.log.find(e=>e.type==='out');if(o){outN++;tsum+=o.t}bad+=S.ck.v.length;if(!last)last=S}
+    add(`S級：${nm}の挟殺も、捕ったらすぐ追って素早くアウトにする（200の件）`,outN>=N*0.9&&bad===0,`${N}回中${outN}回アウト・平均${outN?(tsum/outN).toFixed(1):'-'}秒`,last);}
   // 167：一三塁で三塁ランナーが挟まれたら、一塁ランナーは二塁へ
   { let adv=0,end=0,N=10,last,bad=0;
     for(let i=0;i<N;i++){const S=liveScene(KE,{lv:60,seed:60+i,setup:(w,F,KE)=>{

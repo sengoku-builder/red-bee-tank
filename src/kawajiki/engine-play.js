@@ -415,9 +415,12 @@ class Running{
         if(flying&&(catchable||r.half)&&w.outs<2){if(!r.half){r.half=true;const f=this.halfDist(r,lb)/FIELD.bd;r.goTo(lx+(cx-lx)*f,lz+(cz-lz)*f,{react:true})}continue}
         if(r.plan!==r.rb.forceBase||r.tx==null&&r.dist(cx,cz)>0.3){r.plan=r.rb.forceBase;r.half=false;r.goTo(cx,cz,{react:true})}continue}
       // フライ：捕られそうならハーフウェイ。深いフライなら塁に戻ってタッチアップの用意
-      if(flying&&!r.rb.isBatter&&(catchable||r.half||r.tagUp)&&w.outs<2){const deep=hyp(cur.x,cur.z)>(lb===3?36:44);
+      if(flying&&!r.rb.isBatter&&(catchable||r.half||r.tagUp)&&w.outs<2){
         const nb=lb+1;if(nb>4)continue;const[cx,cz]=basePos(nb);
-        if(r.tagUp||deep&&lb>=2||nb>=this.cap(r)&&nb<4){r.tagUp=true;if(r.dist(lx,lz)>0.3&&(r.tx==null||hyp(r.tx-lx,r.tz-lz)>0.3))r.goTo(lx,lz,{react:true})}
+        // タッチアップできるか：捕ってから送球がその塁に届く時間と、塁を離れて走って着く時間を比べる（深さの決め打ちはしない）
+        const bT=PROF.transfer(sk(cur.f,'fld'))+0.15+D.ofT(cur.f,hyp(cur.x-cx,cur.z-cz))+(nb===4?0.15:0.25),rT=KE.etaRest(r,FIELD.bd,0.1)-r.vmax/(2*r.dec);
+        const deep=this.judge(r,bT-rT,nb===4?0.6:0.35,true);
+        if(r.tagUp||deep&&nb<this.cap(r)+(nb===4?1:0)||nb>=this.cap(r)&&nb<4){r.tagUp=true;if(r.dist(lx,lz)>0.3&&(r.tx==null||hyp(r.tx-lx,r.tz-lz)>0.3))r.goTo(lx,lz,{react:true})}
         else if(!r.half){r.half=true;const f=this.halfDist(r,lb)/FIELD.bd;r.goTo(lx+(cx-lx)*f,lz+(cz-lz)*f,{react:true})}
         continue}
       r.half=false;
@@ -446,9 +449,11 @@ class Running{
         // はっきり負ける（0.5秒以上）とわかったときだけ、走り出してすぐなら戻る
         // 戻れないし進んでも間に合わない（どちらも0.5秒以上負ける）なら、挟まれる
         if(mf<-0.5&&!pf){
-          if(prog<0.4&&mb>0.1){r.plan=null;r.dcs={t:t+2,go:false};   // 引き返したら、しばらくは行き直さない（行ったり来たりしない）
+          // 戻るほうがはっきり分がいい（戻れば間に合う）なら戻る
+          if(mb>0.1&&mb>mf+0.3){r.plan=null;r.dcs={t:t+2,go:false};   // 引き返したら、しばらくは行き直さない（行ったり来たりしない）
             r.goTo(lx,lz);w.emit('retreat',{who:r.id});continue}
-          if(mb<-0.5&&prog<0.55&&!U.onBase(r)){r.rd=true;r.rdT=t;w.emit('rundown',{who:r.id,name:r.name,base:lb});continue}}
+          // 進んでも戻っても間に合わない：戻るほうがましなら挟まれる。進むほうがましならそのまま滑り込む
+          if(mb<-0.5&&mb>mf&&!U.onBase(r)){r.rd=true;r.rdT=t;w.emit('rundown',{who:r.id,name:r.name,base:lb});continue}}
         // 塁の手前で、その先まで行くか決める（行くなら止まらずに回る）
         const dd=r.dist(cx,cz);
         if(dd<5&&r.next==null&&pb<4){const nb2=pb+1,[ex,ez]=basePos(nb2);

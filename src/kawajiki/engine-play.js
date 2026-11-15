@@ -161,9 +161,23 @@ class Defense{
   relayTarget(){const w=this.w,live=w.liveRunners.filter(r=>!r.rb.isBatter),c=this.cur,b=w.ball;
     // 捕れそうなフライ：タッチアップで進む先の塁へ
     if(c&&c.air&&!c.late&&b.state==='air'&&b.bounces===0&&b.src==='bat'){const lead=Math.max(0,...live.map(r=>r.rb.base));return lead?Math.min(4,lead+1):2}
-    if(live.some(r=>r.rb.base>=2))return 4;
-    const gap=b.wall||c&&hyp(c.x,c.z)>FIELD.fenceAt(c.x,c.z)-10;   // 外野の間を破る長打（フェンスまで届く）：三塁打を想定
-    if(live.some(r=>r.rb.base===1))return gap?4:3;return gap?3:2}
+    return this.playBase()}
+  // 状況判断：ランナー全員の位置と足、ボールが外野から（中継を通して）各塁に届く時間を比べ、
+  // アウトを狙える見込みのあるいちばん先の塁へ。どこも無理なら、余分な進塁を止めたい塁へ
+  playBase(){const w=this.w,b=w.ball,U=w.umpire,t=w.t,c=this.cur;
+    let f,px,pz,t0;
+    if(b.state==='held'&&b.holder&&b.holder.side==='F'){f=b.holder;px=f.x;pz=f.z;t0=Math.max(0,(this.decideAt??t)-t)}
+    else if(c){f=c.f;px=c.x;pz=c.z;t0=Math.max(0,c.t-(t-(this.planT??t)))+PROF.transfer(sk(f,'fld'))+0.2}
+    else return 2;
+    const arm=PROF.armV(sk(f,'thr')),dm=this.directMax(f);
+    const ballT=k=>{const[bx,bz]=basePos(k),d=hyp(bx-px,bz-pz);return t0+(d>dm?KE.throwTime(d*0.55,arm)+0.55+KE.throwTime(d*0.45,arm):KE.throwTime(d,arm))+0.2};
+    let best=null,stop=2;
+    for(const r of w.liveRunners){if(r.rb.out||r.rd)continue;const lb=Math.max(U.legalBase(r),r.rb.base);let rt=0,x=r.x,z=r.z;
+      for(let k=lb+1;k<=4;k++){const[bx,bz]=basePos(k),d=hyp(bx-x,bz-z);rt+=d/Math.max(1,r.vmax)+(k>lb+1?0.25:0)+(rt===0?0.15:0);x=bx;z=bz;
+        const m=rt-ballT(k);   // ＋ならボールが先
+        if(m>-0.6){if(!best||k>best.k)best={k,m};break}   // ここで勝負できる
+        stop=Math.max(stop,Math.min(4,k+1))}}   // ここまでは楽に行かれる→その先を止める
+    return best?best.k:stop}
   // 捕れるかどうか：手の届く範囲に来た瞬間に決める
   tryCatch(f,dive){
     const w=this.w,b=w.ball,t=w.t;

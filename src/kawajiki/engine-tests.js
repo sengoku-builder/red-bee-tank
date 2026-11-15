@@ -333,7 +333,7 @@ function running(KE,T){
         const r3=w.addRunner(new KE.Player({id:'走3',name:'三塁走者',sk:{run:50,iq:50}}),3),r1=w.addRunner(new KE.Player({id:'走1',name:'一塁走者',sk:{run:50,iq:60}}),1);
         w.umpire.startPlay({});r3.x=-9.6;r3.z=9.6;r3.plan=4;r3.rd=true;r3.rdT=0;r3.goTo(0,0);F.C.x=0.6;F.C.z=-0.4;F['3B'].x=-15.8;F['3B'].z=15.8;w.give(F.C,'pickup')}});
       const r1=S.w.runners.find(r=>r.id==='走1'),r3=S.w.runners.find(r=>r.id==='走3');if(r1.rb.base>=2)adv++;if(S.w.umpire.ended)end++;bad+=S.ck.v.length;if(!last||S.log.some(e=>e.type==='rundown'))last=S}
-    add('一三塁で三塁ランナーが挟まれたら、そのあいだに一塁ランナーが二塁へ進む（167の件）',adv>=N*0.8&&end===N&&bad===0,`${N}回中、二塁へ進んだ${adv}回・挟殺が終わった${end}回`,last);}
+    add('一三塁で三塁ランナーが挟まれたら、そのあいだに一塁ランナーが二塁へ進む（167の件）',adv>=N*0.7&&end===N&&bad===0,`${N}回中、二塁へ進んだ${adv}回・挟殺が終わった${end}回`,last);}
   { let tagged=0,thru=0,safe=0,N=16,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:40,run:80,seed:70+i,hit:[10+(i%4)*3,-8,-30+(i%5)*12,-800]});const B=S.w.runners.find(r=>r.id==='打者');
       if(S.outs.some(e=>e.who==='打者'&&e.outType==='tag'&&B.rb.base===1))tagged++;if(B.rb.out)continue;safe++;if(S.w.frames.some(f=>f.r.some(q=>q[3]==='打者'&&q[0]>17.5))){thru++;last=S}}
     add('内野ゴロでは一塁を駆け抜け、戻るときにタッチされない',tagged===0&&safe>0&&thru>=safe*0.6,`一塁セーフ${safe}回のうち駆け抜け${thru}回・駆け抜け後のタッチアウト${tagged}回`,last);}

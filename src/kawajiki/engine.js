@@ -385,7 +385,7 @@ KE.Umpire=Umpire;KE.RULE={ON_R,BASE_F,TAG_R,CLOSE};
 
 /* ---------- 自動チェック：審判役とは別に、位置からおかしな場面を見つける ---------- */
 class Checker{
-  constructor(w,o={}){this.w=w;this.ai=o.ai!==false;this.v=[];this.touch=new Map();this.free=null;this.holdT=null;this.stillT=null;this.bounced=0;
+  constructor(w,o={}){w.on('playStart',()=>{this.holdT=null});this.w=w;this.ai=o.ai!==false;this.v=[];this.touch=new Map();this.free=null;this.holdT=null;this.stillT=null;this.bounced=0;
     w.checkers.push(this);
     w.on('out',e=>this.onOut(e));w.on('loose',e=>{this.src=e.src;this.snapFree()});w.on('playStart',()=>{this.bounced=0;this.snapFree();this.t0=w.t;this.voidRuns=0;this.homes=new Set();this.score0=[...w.score]});
     w.on('bounce',()=>this.bounced++);w.on('wall',()=>this.bounced++);
@@ -448,7 +448,7 @@ class Checker{
         return!w.fielders.some(f=>hyp(f.x-bx,f.z-bz)<2.5||f.tx!=null&&hyp(f.tx-bx,f.tz-bz)<1)});
       if(miss){this.nocT=this.nocT??t;if(t-this.nocT>1.5){this.nocDone=true;this.bad('noCover','押し出しの塁に誰も入っていない')}}else this.nocT=null}
     if(!this.ai)return;const b=w.ball,moving=w.liveRunners.some(r=>r.speed>0.5);
-    if(b.state==='held'&&b.holder&&b.holder.speed<0.2&&moving){this.holdT=this.holdT??t;if(t-this.holdT>6){this.bad('hold','ボールを持ったまま止まっている');this.holdT=t+1e9}}else this.holdT=null;
+    if(b.state==='held'&&b.holder&&b.holder.speed<0.2&&moving&&w.umpire.play&&!w.umpire.ended){this.holdT=this.holdT??t;if(t-this.holdT>6){this.bad('hold','ボールを持ったまま止まっている');this.holdT=t+1e9}}else this.holdT=null;
     if(b.state==='rest'&&!w.fielders.some(f=>f.tx!=null&&hyp(f.tx-b.x,f.tz-b.z)<3)){this.stillT=this.stillT??t;if(t-this.stillT>3){this.bad('still','止まったボールに誰も向かわない');this.stillT=t+1e9}}else this.stillT=null;
   }
 }

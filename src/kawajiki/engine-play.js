@@ -65,6 +65,17 @@ KE.swing=function(B,pitch,cnt,rng){
   return r;
 };
 
+/* ---------- バント：バットに当てて勢いを殺す。うまいほど転がす場所を選べて、失敗（空振り・ファウル・小フライ）が少ない ---------- */
+KE.bunt=function(B,pitch,cnt,rng,must){
+  const bs=sk(B,'bat'),y=Y(bs),inZ=KE.inZone(pitch.px,pitch.ph);
+  if(!inZ&&!must&&rng.chance(0.85))return{swing:false,bunt:true};        // ボール球はバットを引く
+  if(rng.chance(0.08+0.35*y+(inZ?0:0.25)))return{swing:true,bunt:true,contact:false};   // 当たらない
+  const hand=B.lefty?-1:1,side=rng.chance(0.5)?1:-1;
+  let ang=side*rng.range(12,30)+rng.gauss()*(4+18*y),va=-6+rng.gauss()*(5+14*y),v=rng.range(6,9)*(1+rng.gauss()*0.12)*(1+0.7*y*rng());
+  if(rng.chance(0.06+0.2*y)){va=rng.range(25,60);v=rng.range(8,13)}            // 小フライ
+  if(rng.chance(0.08+0.15*y))ang=side*rng.range(46,80);                         // ファウル
+  const ux=Math.sin(ang*DEG),uz=Math.cos(ang*DEG),c=Math.cos(va*DEG);
+  return{swing:true,bunt:true,contact:true,v,va,ang,p:[pitch.px*0.5+hand*-0.05,0.35,pitch.ph],vel:[ux*v*c,uz*v*c,v*Math.sin(va*DEG)],w:[0,0,0]}};
 // 送球にかかる時間（実際の弾道で計算し、距離と球速ごとに覚えておく）
 const TT=new Map();
 KE.throwTime=function(d,v){const k=Math.round(d)*1000+Math.round(v);let t=TT.get(k);
@@ -121,6 +132,8 @@ class Defense{
     const on23=this.w.liveRunners.some(r=>r.rb.base>=2||(r.plan||0)>=3);   // 打者走者が二塁より先へ来ても本塁は空けない
     if(deep||on23)take(4,['C','P']);   // 二塁・三塁にランナーがいなければ、内野ゴロでキャッチャーは一塁の後ろへ
     if(relay===F['1B'])take(1,['2B','P']);else take(1,['1B','P','2B']);
+    const bunt=!deep&&hyp(px,pz)<15;if(bunt){take(1,['1B','2B','P']);take(2,['SS','2B'])}   // バント：一塁はセカンド、二塁はショート
+    const pl=this.w.umpire.play;if(pl&&!pl.batted&&this.batLefty!=null)take(2,this.batLefty?['SS','2B']:['2B','SS']);   // 盗塁：右打者ならセカンド、左打者ならショートが二塁へ
     take(2,right?['SS','2B']:['2B','SS']);
     const anyOn=this.w.liveRunners.some(r=>!r.rb.isBatter);
     if(chaser===F['3B']&&!deep){if(anyOn)take(3,['P'])}   // サードゴロ：ショートはサードの後ろ、三塁はランナーがいるときだけピッチャー
@@ -523,35 +536,100 @@ class Game{
   atBat(inn,half){
     const w=this.w,T=this.teams[half],pl=T.players[this.order[half]%9];this.order[half]++;this.stat.PA++;
     const B=new KE.Player({id:pl.id,name:pl.name,sk:pl.sk,lefty:pl.lefty,team:half});B.x=B.lefty?0.95:-0.95;B.z=0;
-    this.def.setDepth(sk(B,'bat'));   // 打者を見て外野の深さを決める
-    const cnt={b:0,s:0},P=()=>this.def.F.P;
-    while(true){
+    this.def.setDepth(sk(B,'bat'));this.def.batLefty=!!B.lefty;   // 打者を見て外野の深さ・盗塁のときの二塁カバーを決める
+    const cnt={b:0,s:0},P=()=>this.def.F.P,occ=b=>w.runners.find(r=>r.rb.base===b&&!r.rb.out&&!r.rb.scored);
+    let guardP=0;
+    while(guardP++<60){
       this.resetField();
+      // 一塁ランナーがいて二塁が空いていれば、ファーストは一塁ベースについてランナーを見る
+      if(occ(1)&&!occ(2)){const f=this.def.F['1B'];f.x=15.6;f.z=15.4}
+      // ベンチの作戦（状況判断）：スクイズ・送りバント・盗塁・牽制
+      const plan=this.manager(B,cnt,inn,half);
+      if(plan.pick){this.pickoff(plan.pick);if(w.outs>=3)return;continue}
+      if(plan.bunt){const F=this.def.F;for(const[r,dx]of[['1B',-1.5],['3B',1.5]]){const f=F[r];f.x+=dx;f.z-=5}}   // バント警戒で前へ
       const pitch=KE.makePitch(P(),cnt,this.rng);this.stat.pitches++;
-      // リード：塁から少し離れ、投球と同時にもう一歩（第2リード）
+      // リード：塁から少し離れ、投球と同時にもう一歩（第2リード）。盗塁・スクイズの走者は投球と同時にスタート
       for(const r of w.runners){const b0=r.rb.base;if(b0<1||b0>3)continue;const[ax,az]=basePos(b0),[cx,cz]=basePos(b0+1),L=1.2+2.0*(1-Y(sk(r,'iq'))),d=FIELD.bd;
-        const ux=(cx-ax)/d,uz=(cz-az)/d;r.x=ax+ux*L;r.z=az+uz*L;r.goTo(ax+ux*(L+1.3),az+uz*(L+1.3),{frac:0.4})}
+        const ux=(cx-ax)/d,uz=(cz-az)/d;r.x=ax+ux*L;r.z=az+uz*L;
+        if(plan.steal.includes(r)){const jl=(0.45+0.5*Y(sk(P(),'thr')))*r.vmax*0.6;r.x+=ux*jl;r.z+=uz*jl;r.stealGo=true;r.awake=true;r.wait=0;r.goTo(cx,cz,{thru:true})}else r.goTo(ax+ux*(L+1.3),az+uz*(L+1.3),{frac:0.4})}
       // 投球を物理で飛ばす
       const aim=KE.aimThrow(REL,[pitch.px,0.3,pitch.ph],pitch.v),c=Math.cos(aim.el);
       w.ball.holder=null;w.ball.launch(REL,[Math.sin(aim.yaw)*pitch.v*c,Math.cos(aim.yaw)*pitch.v*c,pitch.v*Math.sin(aim.el)],[Math.cos(aim.yaw)*150,-Math.sin(aim.yaw)*150,0],'pitch');
-      w.ball.from=P();w.ball.relT=w.t;
-      const sw=KE.swing(B,pitch,cnt,this.rng);
+      w.ball.from=P();w.ball.relT=w.t;w.emit('pitchOut',{steal:plan.steal.length>0,bunt:!!plan.bunt});
+      const sw=plan.bunt?KE.bunt(B,pitch,cnt,this.rng,plan.squeeze):plan.steal.length&&cnt.s<2&&this.rng.chance(0.75)?{swing:false}:KE.swing(B,pitch,cnt,this.rng);
       let guard=0;while(w.ball.z>0.35&&w.ball.state==='air'&&guard++<300)w.step();
       const inZ=KE.inZone(pitch.px,pitch.ph);
       if(!sw.swing||!sw.contact){
-        const C=this.def.F.C;w.ball.state='held';w.ball.holder=C;
-        if(sw.swing||inZ){cnt.s++;if(cnt.s>=3){w.outs++;this.stat.K[half]++;w.emit('out',{who:B.id,name:B.name,outType:'strike',outs:w.outs});this.log(inn,half,B,'三振');return}}
-        else{cnt.b++;if(cnt.b>=4){this.walk(B);this.stat.BB[half]++;this.log(inn,half,B,'フォアボール');return}}
-        for(let i=0;i<30;i++)w.step();
+        const C=this.def.F.C;let k3=false,bb=false;
+        if(sw.swing||inZ){cnt.s++;if(cnt.s>=3)k3=true}else{cnt.b++;if(cnt.b>=4)bb=true}
+        if(sw.bunt&&sw.swing&&cnt.s>=3)k3=true;   // スリーバント失敗も三振
+        // キャッチャーが捕れるか：ワンバウンドや大きくそれた球はこぼす（ワイルドピッチ・パスボール）
+        const loose=!bb&&this.wild(pitch,C);
+        // 振り逃げ：三振でもキャッチャーが捕れず、一塁が空いている（ツーアウトなら関係なし）
+        const drop3=k3&&loose&&(!occ(1)||w.outs===2);
+        if(k3&&!drop3){w.outs++;this.stat.K[half]++;w.emit('out',{who:B.id,name:B.name,outType:'strike',outs:w.outs});this.log(inn,half,B,'三振');
+          if(w.outs>=3){this.clearSteal();return}}
+        if(bb){this.walk(B);this.stat.BB[half]++;this.log(inn,half,B,'フォアボール');this.clearSteal();return}
+        const live=plan.steal.length>0||loose||drop3;
+        if(live){if(drop3){this.stat.K[half]++;w.emit('dropThird',{who:B.id,name:B.name})}
+          this.livePlay(B,pitch,loose,drop3);
+          if(drop3||k3||w.outs>=3)return}
+        else for(let i=0;i<30;i++)w.step();
+        if(k3)return;
         continue;
       }
-      // 打った
+      // 打った（バントも）
       this.stat.contacts.push({v:sw.v,va:sw.va,ang:sw.ang});
       const res=this.play(B,sw,inn,half);
-      if(res==='foul'){if(cnt.s<2)cnt.s++;continue}
+      this.clearSteal();
+      if(res==='foul'){if(cnt.s<2||sw.bunt)cnt.s++;if(cnt.s>=3){w.outs++;this.stat.K[half]++;w.emit('out',{who:B.id,name:B.name,outType:'strike',outs:w.outs});this.log(inn,half,B,'スリーバント失敗');return}continue}
       return;
     }
   }
+  clearSteal(){for(const r of this.w.runners)r.stealGo=false}
+  // ベンチの作戦：その場の状況（点差・アウト・カウント・走者と捕手の力）で決める
+  manager(B,cnt,inn,half){
+    const w=this.w,rng=this.rng,occ=b=>w.runners.find(r=>r.rb.base===b&&!r.rb.out&&!r.rb.scored),res={steal:[]};
+    const diff=w.score[half]-w.score[1-half],close=Math.abs(diff)<=2,late=inn>=4,C=this.def.F.C,Pp=this.def.F.P;
+    // スクイズ：三塁ランナー・ツーアウト未満・接戦の終盤・追い込まれる前
+    if(occ(3)&&w.outs<2&&cnt.s<2&&close&&late&&rng.chance(0.10)){res.bunt=true;res.squeeze=true;res.steal=[occ(3)];return res}
+    // 送りバント：ノーアウトで一塁（一二塁）、接戦、打つのが得意でない子
+    if(w.outs===0&&occ(1)&&!occ(3)&&cnt.s<2&&close&&sk(B,'bat')<sk(Pp,'thr')+5&&rng.chance(0.25)){res.bunt=true;return res}
+    // 盗塁：走者がボールより先に着ける見込み（投球の時間＋捕手の捕ってから投げるまで＋送球）で決める
+    const pv=PROF.pitchV(sk(Pp,'thr'));
+    for(const b of[2,1]){const r=occ(b);if(!r||occ(b+1)||cnt.b===3&&cnt.s===2)continue;if(b===2&&w.outs===2)continue;
+      const[bx,bz]=basePos(b+1),L=1.2+2.0*(1-Y(sk(r,'iq'))),tDef=16/pv+PROF.transfer(sk(C,'fld'))*0.75+KE.throwTime(hyp(bx,bz),PROF.armV(sk(C,'thr')))+0.25;
+      const jump=0.45+0.5*Y(sk(Pp,'thr')),tRun=KE.etaRest(r,FIELD.bd-L,0.12)-jump,m=tDef-tRun+rng.gauss()*0.6*Y(sk(r,'iq'));   // 投手が投げ始めた瞬間にスタート（投球動作の分だけ先に出る）
+      if(m>0.15&&rng.chance(0.18+0.35*Math.min(1,m))){res.steal=[r];break}}
+    // 牽制：一塁ランナーのリードが大きいとき、ときどき
+    if(!res.steal.length&&occ(1)&&!occ(2)&&rng.chance(0.05+0.05*(1-Y(sk(Pp,'iq')))))res.pick=occ(1);
+    return res}
+  // ワイルドピッチ・パスボール：ワンバウンドや大きくそれた球ほど、捕手がうまくないほどこぼす
+  wild(pitch,C){const low=Math.max(0,0.3-pitch.ph),wide=Math.max(0,Math.abs(pitch.px)-0.4),y=Y(sk(C,'fld'));
+    const p=clamp((low*3.5+wide*2.5)*(0.1+0.55*y)+0.002+0.008*y,0,0.5);return this.rng.chance(p)}
+  // 投球のあとのプレー（盗塁・ワイルドピッチ・振り逃げ）
+  livePlay(B,pitch,loose,drop3){
+    const w=this.w,C=this.def.F.C,steal=w.runners.filter(r=>r.stealGo);
+    this.def.reset();this.run_.reset();
+    if(drop3){B.x=B.lefty?0.95:-0.95;B.z=0;B.vx=B.vz=0;B.stop();B.awake=true;B.wait=0.25;w.runners.push(B);B.side='R';
+      B.rb={base:0,start:0,isBatter:true,out:false,scored:false,forceBase:null,forcer:null,mustRetouch:false,arr:{},judged:{}}}
+    w.umpire.startPlay({forceAll:drop3});   // 振り逃げは打者が一塁へ。押し出しの鎖もできる
+    for(const r of steal){r.plan=r.rb.base+1;r.goTo(...basePos(r.plan),{thru:true})}
+    if(loose){const a=this.rng.range(-2.4,2.4),sp=this.rng.range(3,8);w.release([pitch.px*0.6,-0.4,0.25],[Math.sin(a)*sp,-Math.abs(Math.cos(a))*sp,0.6],null,'deflect');w.emit('wildPitch',{})}
+    else{w.ball.state='held';w.ball.holder=C;w.ball.x=C.x;w.ball.z=C.z;w.give(C,'catch')}
+    let n=0;while(!w.umpire.ended&&n++<60*45){this.def.tick();this.run_.tick();w.step()}
+    if(!w.umpire.ended)w.umpire.endPlay('time');
+    this.clearSteal();w.runners=w.runners.filter(r=>!r.rb.out&&!r.rb.scored&&r.rb.base>0)}
+  // 牽制：投手が一塁へ投げ、ランナーは帰塁する
+  pickoff(r){
+    const w=this.w,Pp=this.def.F.P,F1=this.def.F['1B'],[bx,bz]=basePos(1),[cx,cz]=basePos(2);
+    this.def.reset();this.run_.reset();
+    const L=1.2+2.0*(1-Y(sk(r,'iq'))),ux=(cx-bx)/FIELD.bd,uz=(cz-bz)/FIELD.bd;r.x=bx+ux*(L+0.5);r.z=bz+uz*(L+0.5);
+    F1.x=bx+0.2;F1.z=bz-0.4;w.umpire.startPlay({});r.awake=false;r.goTo(bx,bz,{react:true});
+    const aim=w.throwTo(Pp,[bx,bz,1.0],1,0.75);this.def.lastThrow={x:bx,z:bz,t1:w.t+aim.t,to:F1,base:1};this.def.cover={1:F1};w.emit('pickoff',{who:r.id});
+    let n=0;while(!w.umpire.ended&&n++<60*45){this.def.tick();this.run_.tick();w.step()}
+    if(!w.umpire.ended)w.umpire.endPlay('time');
+    w.runners=w.runners.filter(q=>!q.rb.out&&!q.rb.scored&&q.rb.base>0)}
   walk(B){const w=this.w,occ=b=>w.runners.find(r=>r.rb.base===b&&!r.rb.out&&!r.rb.scored);
     // 押し出し：一塁から続いているランナーだけ1つずつ進む
     const chain=[];for(let b=1;b<=3;b++){const r=occ(b);if(r)chain.push(r);else break}
@@ -565,7 +643,8 @@ class Game{
     this.def.reset();this.run_.reset();
     // 投球と同時に塁から数歩出ている（第2リード）：二塁走者は大きめ。ツーアウトならさらにスタートを切っている
     for(const r of w.liveRunners){if(r===B||r.rb.base<1||r.rb.base>3)continue;const[bx,bz]=basePos(r.rb.base),[nx,nz]=basePos(r.rb.base+1),d=hyp(nx-bx,nz-bz);
-      const L=(r.rb.base===2?3.5:2.5)*(0.55+0.45*sk(r,'run')/100)+(w.outs===2?1.5:0);r.x=bx+(nx-bx)/d*L;r.z=bz+(nz-bz)/d*L;r.vx=r.vz=0;r.stop();r.awake=true;r.wait=0.05}
+      const L=(r.rb.base===2?3.5:2.5)*(0.55+0.45*sk(r,'run')/100)+(w.outs===2?1.5:0)+(r.stealGo?4:0);r.x=bx+(nx-bx)/d*L;r.z=bz+(nz-bz)/d*L;r.vx=r.vz=0;r.stop();r.awake=true;r.wait=0.05;
+      if(r.stealGo){r.plan=r.rb.base+1;r.goTo(nx,nz,{thru:true})}}   // 盗塁・スクイズでスタートを切っていた走者はそのまま次の塁へ
     const f0=w.frames.length,t0=w.t,outs0=w.outs,s0=w.score[half];
     w.umpire.startPlay({batted:true});
     w.release(sw.p,sw.vel,sw.w,'bat');w.emit('contact',{v:+(sw.v*3.6).toFixed(0),va:+sw.va.toFixed(0),ang:+sw.ang.toFixed(0)});

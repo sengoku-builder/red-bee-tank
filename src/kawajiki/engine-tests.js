@@ -78,7 +78,7 @@ function movement(KE,T){
     p.goTo(p.x+d*0.6,p.z-d*0.8,{react:true});let t=0;while(t<12&&(p.tx!=null)){w.step();t+=w.dt}worst=Math.max(worst,Math.abs(t-e))}
   add('「何秒で着くか」の見込みが実際と合う',worst<0.35,`いちばん大きいずれ ${worst.toFixed(2)}秒`);
   const re=[20,60,95].map(s=>KE.PROF.react(s));
-  add('野球の頭が良いほど反応が速い',re[0]>re[1]&&re[1]>re[2]&&re[2]<0.25,re.map(v=>v.toFixed(2)+'秒').join('→'));
+  add('野球の頭が良いほど反応が速い',re[0]>re[1]&&re[1]>re[2]&&re[2]<0.4,re.map(v=>v.toFixed(2)+'秒').join('→'));
 }
 
 /* ================= 審判役 ================= */

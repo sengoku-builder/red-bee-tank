@@ -10,7 +10,7 @@ const hyp=Math.hypot,clamp=(v,a,b)=>v<a?a:v>b?b:v,DEG=Math.PI/180,RPM=Math.PI/30
 /* ---------- 投球と打撃の能力（調整はここに集める） ---------- */
 Object.assign(PROF,{
   pitchV:s=>12.5+17.5*s/100,      // 球速 m/s（学童：能力30約64km/h・60約83km/h・S約105km/h）
-  pitchErr:s=>0.10+0.42*Y(s),     // コースのずれ m（1σ）
+  pitchErr:s=>0.17+0.30*Y(s),     // コースのずれ m（1σ）
   batV:s=>18+12*s/100,             // スイングの速さ m/s
   timeErr:s=>0.014+0.04*Y(s),    // タイミングのずれ 秒（1σ、球速25m/sのとき）
   vertErr:s=>0.026+0.05*Y(s),    // 上下のずれ m（1σ）
@@ -32,7 +32,7 @@ KE.makePitch=function(P,cnt,rng){
   const ax=(rng.chance(0.5)?1:-1)*rng.range(edge*0.55,edge),ah=ZONE.mid+rng.range(-1,1)*Math.min(0.32,edge*1.3);
   const v=PROF.pitchV(s)*(1+rng.gauss()*0.025);
   // 球の動き（打者には読みきれない）：うまい投手ほど大きい
-  return{v,px:ax+rng.gauss()*err,ph:ah+rng.gauss()*err*0.9,aimX:ax,aimH:ah,mv:rng.gauss()*(0.03+0.03*s/100)};
+  return{v,px:ax+rng.gauss()*err,ph:ah+rng.gauss()*err*0.9,aimX:ax,aimH:ah,mv:rng.gauss()*(0.04+0.05*s/100)};
 };
 KE.inZone=(px,ph)=>Math.abs(px)<=ZONE.hw&&ph>=ZONE.lo&&ph<=ZONE.hi;
 
@@ -172,7 +172,7 @@ class Defense{
     let diff=thrown?0.35:fly?0.6+f.speed/7:b.state==='ground'||b.state==='rest'?0.5+rel/14:0.9+rel/12;   // はねるゴロは難しい
     if(b.state==='rest')diff=0.15;
     if(b.h>1.9)diff*=1.6;if(dive)diff=diff*2.2+1.2;
-    const pFail=dive?clamp(0.5+0.4*Y(s),0,0.92):clamp(base*diff,0,0.92);   // 飛びついて捕れるのはS級でも半分ほど
+    const pFail=dive?clamp(0.62+0.3*Y(s),0,0.92):clamp(base*diff,0,0.92);   // 飛びついて捕れるのはS級でも半分ほど
     if(!w.rng.chance(pFail)){w.give(f,fly?'catch':'pickup');if(dive)w.emit('diveCatch',{who:f.id});return true}
     // 失敗：はじく・トンネル・落とす
     const rec=(dive?0.45+0.6*Y(s):0.35+0.4*Y(s));   // 飛びついたあと起き上がる時間（S約0.5秒）f.wait=Math.max(f.wait,rec);this.tried.set(f,t+rec);
@@ -348,7 +348,7 @@ class Running{
   halfDist(r,lb){const c=this.def.cur;if(!c)return 2;const[lx,lz]=basePos(lb);
     const back=PROF.transfer(sk(c.f,'fld'))+KE.throwTime(hyp(c.x-lx,c.z-lz),PROF.armV(sk(c.f,'thr')))-r.react-0.35;
     return clamp(back*r.vmax*0.8,0.8,FIELD.bd*0.5)}
-  cap(r){const U=this.w.umpire,lead=this.w.liveRunners.filter(q=>q!==r&&q.rb.start>r.rb.start).map(q=>q.plan>0&&!q.rd?Math.max(q.plan,q.next||0,U.legalBase(q)):U.legalBase(q));return lead.length?Math.min(...lead):5}
+  cap(r){const U=this.w.umpire,lead=this.w.liveRunners.filter(q=>q!==r&&q.rb.start>r.rb.start).map(q=>q.plan>0&&!q.rd?Math.max(q.plan,q.plan>U.legalBase(q)?q.next||0:0,U.legalBase(q)):U.legalBase(q));return lead.length?Math.min(...lead):5}
   tick(){
     const w=this.w,U=w.umpire,p=U.play,D=this.def;if(!p||U.ended)return;const t=w.t,b=w.ball;
     const flying=p.fly&&b.state==='air'&&b.bounces===0&&b.src==='bat'&&!p.flyCaught;
@@ -516,6 +516,9 @@ class Game{
     B.x=B.lefty?0.95:-0.95;B.z=0;B.vx=B.vz=0;B.stop();B.plan=null;B.route=null;B.awake=true;B.wait=0.1+0.2*Y(sk(B,'iq'));   // 振り終わってすぐ走り出す
     w.runners.push(B);B.side='R';B.rb={base:0,start:0,isBatter:true,out:false,scored:false,forceBase:null,forcer:null,mustRetouch:false,arr:{},judged:{}};
     this.def.reset();this.run_.reset();
+    // 投球と同時に塁から数歩出ている（第2リード）：二塁走者は大きめ。ツーアウトならさらにスタートを切っている
+    for(const r of w.liveRunners){if(r===B||r.rb.base<1||r.rb.base>3)continue;const[bx,bz]=basePos(r.rb.base),[nx,nz]=basePos(r.rb.base+1),d=hyp(nx-bx,nz-bz);
+      const L=(r.rb.base===2?3.5:2.5)*(0.55+0.45*sk(r,'run')/100)+(w.outs===2?1.5:0);r.x=bx+(nx-bx)/d*L;r.z=bz+(nz-bz)/d*L;r.vx=r.vz=0;r.stop();r.awake=true;r.wait=0.05}
     const f0=w.frames.length,t0=w.t,outs0=w.outs,s0=w.score[half];
     w.umpire.startPlay({batted:true});
     w.release(sw.p,sw.vel,sw.w,'bat');w.emit('contact',{v:+(sw.v*3.6).toFixed(0),va:+sw.va.toFixed(0),ang:+sw.ang.toFixed(0)});

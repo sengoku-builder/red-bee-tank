@@ -38,8 +38,9 @@ const Y=s=>Math.pow(1-clamp(s,0,100)/100,1.4);
 const sk=(k,key)=>k&&k.sk&&k.sk[key]!=null?k.sk[key]:60;
 const PROF={
   runV:s=>4.5+2.2*s/100,          // 全力で走る速さ m/s（学童：一塁まで 能力30約4.8秒・60約4.3秒・S約3.9秒）
+  fieldA:s=>4+3*s/100,            // 守備の一歩目からの加速 m/s²（構えから横・斜めへ）
   runA:s=>8+4*s/100,              // 加速 m/s²
-  react:s=>0.2+0.65*Y(s),          // 反応の遅れ 秒（野球の頭）
+  react:s=>0.32+0.6*Y(s),          // 反応の遅れ 秒（野球の頭）
   armV:s=>10+17*s/100,            // 送球の初速（全力）m/s（学童：能力30約55km/h・60約73km/h・S約94km/h）
   armErr:s=>0.010+0.075*Y(s),     // 送球の向きのずれ（ラジアン、1σ）
 };
@@ -149,7 +150,7 @@ KE.throwVec=function(aim,k,rng,quality=1){
 class Player{
   constructor(o){Object.assign(this,{id:'',name:'',sk:{},role:'',team:0,x:0,z:0,vx:0,vz:0,tx:null,tz:null,frac:1,wait:0,face:0,active:true},o)}
   get vmax(){return PROF.runV(sk(this,'run'))*(this.frac||1)}
-  get acc(){return PROF.runA(sk(this,'run'))}
+  get acc(){return this.side==='F'?PROF.fieldA(sk(this,'run')):PROF.runA(sk(this,'run'))}
   get dec(){return this.acc*2.5}
   get react(){return PROF.react(sk(this,'iq'))}
   get speed(){return hyp(this.vx,this.vz)}
@@ -182,7 +183,7 @@ class Player{
 }
 KE.Player=Player;
 // 止まった状態から d m 先に着くまで（反応のあと加速・減速）
-KE.etaRest=function(f,d,re){const V=PROF.runV(sk(f,'run')),a=PROF.runA(sk(f,'run')),de=a*2.5;if(d<=0)return re;
+KE.etaRest=function(f,d,re){const V=PROF.runV(sk(f,'run')),a=f.acc,de=a*2.5;if(d<=0)return re;
   const need=V*V/(2*a)+V*V/(2*de);if(d>=need)return re+V/a+V/de+(d-need)/V;const vp=Math.sqrt(2*d/(1/a+1/de));return re+vp/a+vp/de};
 
 /* ---------- 共通の状況 ---------- */

@@ -717,7 +717,7 @@ class Defense{
     // 捕れそうなフライ：タッチアップで進む先の塁へ
     if(c&&c.air&&!c.late&&b.state==='air'&&b.bounces===0&&b.src==='bat'){const lead=Math.max(0,...live.map(r=>r.rb.base));return lead?Math.min(4,lead+1):2}
     if(live.some(r=>r.rb.base>=2))return 4;
-    const gap=c&&hyp(c.x,c.z)>56;   // 外野の間を破る長打（フェンスまで届く）：三塁打を想定
+    const gap=b.wall||c&&hyp(c.x,c.z)>FIELD.fenceAt(c.x,c.z)-10;   // 外野の間を破る長打（フェンスまで届く）：三塁打を想定
     if(live.some(r=>r.rb.base===1))return gap?4:3;return gap?3:2}
   // 捕れるかどうか：手の届く範囲に来た瞬間に決める
   tryCatch(f,dive){

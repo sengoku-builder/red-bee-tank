@@ -327,6 +327,13 @@ function liveScene(KE,o){
 }
 function running(KE,T){
   const add=(name,ok,detail,S)=>T.push({group:'走る（ランナーの判断）',name,ok,detail:detail+(S&&S.ck.v.length?` ／チェック:${S.ck.v.map(v=>v.msg).join('、')}`:''),frames:S&&S.w.frames,log:S&&S.w.log.filter(e=>/^(out|safe|home|playEnd|fair|foul|error|catch|pickup|rundown|retreat|couldHaveGone|rash|flyCatch|retouch)$/.test(e.type))});
+  // 200：S級の挟殺（三本間）。捕ったらすぐ追い、もたもたしない
+  { let outN=0,N=8,last,tsum=0,bad=0;
+    for(let i=0;i<N;i++){const S=liveScene(KE,{lv:92,seed:80+i,setup:(w,F,KE)=>{
+        const r3=w.addRunner(new KE.Player({id:'走3',name:'三塁走者',sk:{run:60,iq:60}}),3);
+        w.umpire.startPlay({});r3.x=-9.6;r3.z=9.6;r3.plan=4;r3.rd=true;r3.rdT=0;r3.goTo(0,0);F.C.x=0.6;F.C.z=-0.4;F['3B'].x=-15.8;F['3B'].z=15.8;w.give(F.C,'pickup')}});
+      const o=S.log.find(e=>e.type==='out');if(o){outN++;tsum+=o.t}bad+=S.ck.v.length;if(!last)last=S}
+    add('S級：三本間の挟殺は、捕ったらすぐ追って素早くアウトにする（200の件）',outN>=N*0.9&&bad===0,`${N}回中${outN}回アウト・平均${outN?(tsum/outN).toFixed(1):'-'}秒`,last);}
   // 167：一三塁で三塁ランナーが挟まれたら、一塁ランナーは二塁へ
   { let adv=0,end=0,N=10,last,bad=0;
     for(let i=0;i<N;i++){const S=liveScene(KE,{lv:60,seed:60+i,setup:(w,F,KE)=>{

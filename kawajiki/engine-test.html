@@ -798,7 +798,7 @@ class Defense{
   // 外野から直接投げてよい距離（S級でもおよそ40m、能力が低いほど短い）
   directMax(h){return 22+18*sk(h,'thr')/100}
   // 直接投げる時間（遠いほど・肩が弱いほど、それて捕り直す分がかかる）と、中継を通す時間
-  directT(f,d){const s=sk(f,'thr');return KE.throwTime(d,PROF.armV(s))+0.15*Math.pow(d/25,2)*(0.4+Y(s))}
+  directT(f,d){const s=sk(f,'thr');return KE.throwTime(d,PROF.armV(s))+0.12*Math.pow(d/25,2)*(0.15+Y(s))}
   relayT(f,d){const s=sk(f,'thr'),a=PROF.armV(s);return KE.throwTime(d*0.55,a)+0.06*Math.pow(d*0.55/25,2)+0.55+KE.throwTime(d*0.45,PROF.armV(75))}
   useRelay(f,d){return d>24&&this.relayT(f,d)<this.directT(f,d)}
   // 外野から塁へボールが届くまでの見込み（直接と中継の速いほう）
@@ -973,8 +973,8 @@ class Running{
       if(flying&&!r.rb.isBatter&&(catchable||r.half||r.tagUp)&&w.outs<2){
         const nb=lb+1;if(nb>4)continue;const[cx,cz]=basePos(nb);
         // タッチアップできるか：捕ってから送球がその塁に届く時間と、塁を離れて走って着く時間を比べる（深さの決め打ちはしない）
-        const bT=PROF.transfer(sk(cur.f,'fld'))+0.15+D.ofT(cur.f,hyp(cur.x-cx,cur.z-cz))+(nb===4?0.15:0.25),rT=KE.etaRest(r,FIELD.bd,0.1)-r.vmax/(2*r.dec);
-        const deep=this.judge(r,bT-rT,nb===4?0.6:0.35,true);
+        const bT=PROF.transfer(sk(cur.f,'fld'))+0.15+D.ofT(cur.f,hyp(cur.x-cx,cur.z-cz))+(nb===4?0.15:0.25),rT=KE.etaRest(r,FIELD.bd,0.25);
+        const deep=this.judge(r,bT-rT,nb===4?0.0:0.3,true);   // 本塁へのタッチアップはコーチが思いきって回す
         if(r.tagUp||deep&&nb<this.cap(r)+(nb===4?1:0)||nb>=this.cap(r)&&nb<4){r.tagUp=true;if(r.dist(lx,lz)>0.3&&(r.tx==null||hyp(r.tx-lx,r.tz-lz)>0.3))r.goTo(lx,lz,{react:true})}
         else if(!r.half){r.half=true;const f=this.halfDist(r,lb)/FIELD.bd;r.goTo(lx+(cx-lx)*f,lz+(cz-lz)*f,{react:true})}
         continue}
@@ -1026,8 +1026,8 @@ class Running{
       if(nb>=cap&&nb<4){if(away&&(r.tx==null||hyp(r.tx-lx,r.tz-lz)>0.3))r.goTo(lx,lz);continue}
       const[cx,cz]=basePos(nb);
       if(r.dcs==null||t-r.dcs.t>0.3){
-        const m=this.ballT(nb,r)-this.arrive(r,nb),go=this.judge(r,m,0.15+(nb===4?0.15:0),r.ready);r.dcs={t,go};r.ready=false;
-        if(go){r.plan=nb;r.next=null;r.goTo(cx,cz,{react:true});continue}}
+        const m=this.ballT(nb,r)-this.arrive(r,nb),rdy=r.ready,go=this.judge(r,m,0.15+(nb===4?0.15:0),r.ready);r.dcs={t,go};r.ready=false;
+        if(go){r.plan=nb;r.next=null;r.goTo(cx,cz,{react:!rdy});continue}}   // タッチアップのスタートは捕った瞬間（反応の遅れなし）
       if(away&&(r.tx==null||hyp(r.tx-lx,r.tz-lz)>0.3))r.goTo(lx,lz);
     }
   }

@@ -129,8 +129,9 @@ class Defense{
     return{cover,relay,used};
   }
   assign(best,second){
-    const w=this.w,F=this.F,deep=hyp(best.x,best.z)>40;   // 中継が要るのは外野の深いところだけ
-    const{cover,relay,used:busy}=this.roleTable(best.x,best.z,best.f,deep);
+    const w=this.w,F=this.F,tb0=this.playBase(),[tbx,tbz]=basePos(tb0);
+    const deep=OF.includes(best.f.role)&&this.useRelay(best.f,hyp(best.x-tbx,best.z-tbz))||hyp(best.x,best.z)>55;   // 中継が要るかは、直接と中継の速さを比べて決める
+    const{cover,relay,used:busy}=this.roleTable(best.x,best.z,best.f,deep);this.fixCover(cover,busy,relay);
     this.cover=cover;this.relay=relay;const t=w.t;
     // まず打球へ：打球の通り道の近くにいる内野手は、届かなくても一歩二歩打球に向かう（抜けたら自分の役へ）
     if(this.firstPlan){this.firstPlan=false;this.lunge=new Map();
@@ -170,10 +171,11 @@ class Defense{
     else if(c){f=c.f;px=c.x;pz=c.z;t0=Math.max(0,c.t-(t-(this.planT??t)))+PROF.transfer(sk(f,'fld'))+0.2}
     else return 2;
     const arm=PROF.armV(sk(f,'thr')),dm=this.directMax(f);
-    const ballT=k=>{const[bx,bz]=basePos(k),d=hyp(bx-px,bz-pz);return t0+(d>dm?KE.throwTime(d*0.55,arm)+0.55+KE.throwTime(d*0.45,arm):KE.throwTime(d,arm))+0.2};
+    const ballT=k=>{const[bx,bz]=basePos(k),d=hyp(bx-px,bz-pz);return t0+(OF.includes(f.role)?this.ofT(f,d):KE.throwTime(d,arm))+0.2};
     let best=null,stop=2;
     for(const r of w.liveRunners){if(r.rb.out||r.rd)continue;const lb=Math.max(U.legalBase(r),r.rb.base);let rt=0,x=r.x,z=r.z;
-      for(let k=lb+1;k<=4;k++){const[bx,bz]=basePos(k),d=hyp(bx-x,bz-z);rt+=d/Math.max(1,r.vmax)+(k>lb+1?0.25:0)+(rt===0?0.15:0);x=bx;z=bz;
+      for(let k=lb+1;k<=4;k++){const[bx,bz]=basePos(k),d=hyp(bx-x,bz-z);if(k===1&&OF.includes(f.role)){rt+=d/Math.max(1,r.vmax)+0.15;x=bx;z=bz;continue}   // 外野からの中継は一塁へは向けない（ライトゴロは直接）
+        rt+=d/Math.max(1,r.vmax)+(k>lb+1?0.25:0)+(rt===0?0.15:0);x=bx;z=bz;
         const m=rt-ballT(k);   // ＋ならボールが先
         if(m>-0.6){if(!best||k>best.k)best={k,m};break}   // ここで勝負できる
         stop=Math.max(stop,Math.min(4,k+1))}}   // ここまでは楽に行かれる→その先を止める
@@ -231,7 +233,8 @@ class Defense{
   flyOF(h){return OF.includes(h.role)}
   // ボールを持っているあいだのカバー（持った子以外）
   assignHeld(h){
-    const deep=hyp(h.x,h.z)>40,{cover,relay}=this.roleTable(h.x,h.z,h,deep);
+    const tb0=this.playBase(),[tbx,tbz]=basePos(tb0),deep=(OF.includes(h.role)||hyp(h.x,h.z)>40)&&this.useRelay(h,hyp(h.x-tbx,h.z-tbz))||hyp(h.x,h.z)>55;
+    const rt=this.roleTable(h.x,h.z,h,deep),{cover,relay}=rt;this.fixCover(cover,rt.used,relay);
     // 塁へ向かう途中で受けた子は、その塁を自分で受け持つ
     for(let b=1;b<=4;b++){const[bx,bz]=basePos(b);if(h.dist(bx,bz)<6&&(h.tx!=null&&hyp(h.tx-bx,h.tz-bz)<0.6||h.dist(bx,bz)<1.5||cover[b]&&h.dist(bx,bz)<cover[b].dist(bx,bz))){const o=cover[b];cover[b]=h;if(o&&o!==h&&o.dist(bx,bz)<2){const[px,pz]=this.posOf(o.role);o.goTo(px,pz,{frac:0.6})}}}
     this.cover=cover;this.relay=relay&&relay!==h?relay:null;
@@ -239,6 +242,19 @@ class Defense{
   }
   // 外野から直接投げてよい距離（S級でもおよそ40m、能力が低いほど短い）
   directMax(h){return 22+18*sk(h,'thr')/100}
+  // 直接投げる時間（遠いほど・肩が弱いほど、それて捕り直す分がかかる）と、中継を通す時間
+  directT(f,d){const s=sk(f,'thr');return KE.throwTime(d,PROF.armV(s))+0.15*Math.pow(d/25,2)*(0.4+Y(s))}
+  relayT(f,d){const s=sk(f,'thr'),a=PROF.armV(s);return KE.throwTime(d*0.55,a)+0.06*Math.pow(d*0.55/25,2)+0.55+KE.throwTime(d*0.45,PROF.armV(75))}
+  useRelay(f,d){return d>24&&this.relayT(f,d)<this.directT(f,d)}
+  // 外野から塁へボールが届くまでの見込み（直接と中継の速いほう）
+  ofT(f,d){return d>24?Math.min(this.directT(f,d),this.relayT(f,d)):KE.throwTime(d,PROF.armV(sk(f,'thr')))}
+  // 状況判断でカバーを入れ替える：ランナーが来うる塁に、担当の子が間に合わず別の子のほうがずっと早ければ替える。空けない
+  fixCover(cover,used,relay){const w=this.w,U=w.umpire,need=new Set();
+    for(const r of w.liveRunners){if(r.rb.out)continue;const lb=Math.max(U.legalBase(r),r.rb.base);for(let k=lb+1;k<=Math.min(4,lb+2);k++)need.add(k)}
+    for(const b of need){const[bx,bz]=basePos(b),f=cover[b];const busy=new Set([...used,...Object.values(cover)]);if(relay)busy.add(relay);
+      let alt=null,ae=1e9;for(const g of w.fielders){if(busy.has(g)||OF.includes(g.role)||g.role==='C'&&b!==4)continue;const e=g.eta(bx,bz);if(e<ae){ae=e;alt=g}}
+      if(!alt)continue;const fe=f?f.eta(bx,bz):1e9;if(!f||fe>ae+1.2&&fe>2.0){cover[b]=alt;used.add(alt)}}
+    return cover}
   baseOf(f){for(const b in this.cover)if(this.cover[b]===f)return +b;return null}
   // 投げる時間の見込み
   throwT(h,x,z){const v=PROF.armV(sk(h,'thr')),d=hyp(x-h.x,z-h.z);return KE.throwTime(d,v)}
@@ -316,7 +332,8 @@ class Defense{
     if(b!=null){const[bx,bz]=basePos(b);x=bx;z=bz;if(this.lunge)this.lunge.delete(c)}
     // 外野から遠い塁へは中継を通す（直接は約40mまで。レフト・センターから一塁へは直接投げない）
     const d=hyp(x-h.x,z-h.z);
-    if(OF.includes(h.role)&&(d>this.directMax(h)||b===1&&h.role!=='RF')){const r=this.relay&&this.relay!==h&&this.relay!==c?this.relay:this.nearestIF(h);if(r&&r!==c&&r.dist(h.x,h.z)<d-6){x=r.x;z=r.z;c=r;b=null}}
+    if(OF.includes(h.role)&&this.useRelay(h,d)){   // 直接より中継を通すほうが速いとき
+      const r=this.relay&&this.relay!==h&&this.relay!==c?this.relay:this.nearestIF(h);if(r&&r!==c&&r.dist(h.x,h.z)<d-6){x=r.x;z=r.z;c=r;b=null}}
     if(c.dist(x,z)>0.3)c.goTo(x,z);
     const v0=PROF.armV(sk(h,'thr')),dd0=hyp(x-h.x,z-h.z);   // 遠い送球は届く強さまで上げる
     const ef=Math.min(1,Math.max(effort??(kind==='out'?1:0.8),Math.sqrt(dd0*9.8/0.55)/v0));
@@ -341,7 +358,7 @@ class Running{
   ballT(b,r){
     const w=this.w,d=this.def,ball=w.ball,[bx,bz]=basePos(b);let t;
     // 送球がそれる分も見込む（肩の弱い子ほど・遠いほど）
-    const miss=(f,dd)=>f?1.5*Y(sk(f,'thr'))*Math.min(1,dd/40)+(OF.includes(f.role)&&dd>d.directMax(f)?0.8:0):0;   // 外野から遠い塁は中継を通す分も
+    const miss=(f,dd)=>f?1.5*Y(sk(f,'thr'))*Math.min(1,dd/40)+(OF.includes(f.role)&&dd>24?d.ofT(f,dd)-KE.throwTime(dd,PROF.armV(sk(f,'thr'))):0):0;   // 外野から遠い塁は中継を通す・それる分も
     if(ball.state==='held'&&ball.holder&&ball.holder.side==='F'){const h=ball.holder,dd=h.dist(bx,bz);t=Math.max(0,(d.decideAt??w.t)-w.t)+(dd<5?h.eta(bx,bz):d.throwT(h,bx,bz)+miss(h,dd))}
     else if(ball.src==='throw'&&ball.state==='air'&&d.lastThrow){const L=d.lastThrow,arr=Math.max(0,L.t1-w.t),dd=hyp(L.x-bx,L.z-bz),rc=L.to;
       t=dd<1.5?arr:arr+(rc?PROF.transfer(sk(rc,'fld'))+KE.throwTime(dd,PROF.armV(sk(rc,'thr')))+miss(rc,dd):0.6+dd/20)}

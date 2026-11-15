@@ -400,7 +400,9 @@ class Running{
         // ボールから遠ざかる向きへ（ボールが前の塁へ投げられたら引き返す）
         const fb=Math.min(lb+1,4),[fx,fz]=basePos(fb),bp=b.state==='held'?[b.x,b.z]:D.lastThrow?[D.lastThrow.x,D.lastThrow.z]:[b.x,b.z];
         const dF=hyp(bp[0]-fx,bp[1]-fz),dB=hyp(bp[0]-lx,bp[1]-lz),hy=r.plan===fb?-1.5:1.5;
-        const want=(fb<cap||fb===4)&&dF>dB+hy?fb:lb;
+        // 前の塁へ投げられても、ボールより先に着けそうならそのまま滑り込む
+        const beat=r.plan===fb&&b.state!=='held'&&D.lastThrow&&this.arrive(r,fb)<Math.max(0,D.lastThrow.t1-t)+0.35;
+        const want=(fb<cap||fb===4)&&(beat||dF>dB+hy)?fb:lb;
         if(r.plan!==want){r.plan=want;r.wait=Math.max(r.wait,0.25);const[x,z]=basePos(want);r.goTo(x,z)}
         if(t-r.rdT>15){r.rd=false;r.plan=fb}
         continue}
@@ -415,7 +417,7 @@ class Running{
         if(mf<-0.5&&!pf){
           if(prog<0.4&&mb>0.1){r.plan=null;r.dcs={t:t+2,go:false};   // 引き返したら、しばらくは行き直さない（行ったり来たりしない）
             r.goTo(lx,lz);w.emit('retreat',{who:r.id});continue}
-          if(mb<-0.5&&prog<0.85&&!U.onBase(r)){r.rd=true;r.rdT=t;w.emit('rundown',{who:r.id,name:r.name,base:lb});continue}}
+          if(mb<-0.5&&prog<0.55&&!U.onBase(r)){r.rd=true;r.rdT=t;w.emit('rundown',{who:r.id,name:r.name,base:lb});continue}}
         // 塁の手前で、その先まで行くか決める（行くなら止まらずに回る）
         const dd=r.dist(cx,cz);
         if(dd<5&&r.next==null&&pb<4){const nb2=pb+1,[ex,ez]=basePos(nb2);

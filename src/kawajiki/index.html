@@ -3401,9 +3401,10 @@ function drawAdult(c,e){
   if(sit){c.fillStyle=pants;if(side)rr(c,-.04*U,hipY,.26*U,.09*U,.04*U);else{rr(c,-.11*U,hipY,.1*U,.12*U,.04*U);rr(c,.01*U,hipY,.1*U,.12*U,.04*U)}}
   else{const a=e.moving?Math.sin(e.phase)*(e.speed>2?.5:.3):0,lw=e.role==='coach'?.14:.09,lx=e.role==='coach'?.08:.05;[[-1,a],[1,-a]].forEach(([s,ang])=>{c.save();c.translate(side?0:s*lx*U,hipY);c.rotate(side?ang:0);c.fillStyle=pants;rr(c,-lw/2*U,0,lw*U,-hipY*.95,.05*U);if(e.role==='coach'){c.fillStyle=e.team.sock;c.fillRect(-lw/2*U,-hipY*.55,lw*U,-hipY*.32)}c.fillStyle='#2b2b30';c.beginPath();c.ellipse(side?.02*U:0,-hipY,.06*U,.03*U,0,0,7);c.fill();c.restore()})}
   const fat=e.role==='coach';
-  const by0=(-.8+sq)*U,by1=hipY+.02*U,bw=fat?(side?.3:.4):(side?.2:.26);
-  c.fillStyle=shirt;rr(c,-bw/2*U,by0,bw*U,by1-by0,fat?.14*U:.07*U);
-  if(fat){c.beginPath();if(side)c.ellipse(.12*U,(by0+by1)/2+.05*U,.14*U,.17*U,0,0,7);else c.ellipse(0,(by0+by1)/2+.05*U,.22*U,.17*U,0,0,7);c.fill();c.fillStyle='rgba(0,0,0,.12)';c.fillRect(-bw/2*U,by1-.07*U,bw*U,.03*U)}
+  const by0=(-.8+sq)*U,by1=hipY+.02*U,bw=fat?(side?.36:.46):(side?.2:.26);
+  c.fillStyle=shirt;rr(c,-bw/2*U,by0,bw*U,by1-by0,fat?.17*U:.07*U);
+  if(fat){c.beginPath();if(side)c.ellipse(.05*U,(by0+by1)/2+.04*U,.18*U,.16*U,0,0,7);else c.ellipse(0,(by0+by1)/2+.04*U,.23*U,.15*U,0,0,7);c.fill();   // 体全体をふっくら（お腹だけ突き出さない）
+  c.fillStyle='rgba(0,0,0,.12)';c.fillRect(-bw/2*U,by1-.07*U,bw*U,.03*U)}
   if(e.role==='ump'&&!side&&face!=='b'){c.fillStyle='#3b4558';rr(c,-.09*U,by0+.04*U,.18*U,.2*U,.04*U)}
   let hands=pose==='cheer'?[[-.18,-1.02],[.18,-1.02]]:sit?[[-.1,-.5],[.1,-.5]]:[[-.16,-.45],[.16,-.45]];
   if(e.moving&&!sit){const sw=Math.sin(e.phase)*.1;hands=side?[[-.04-sw,-.47],[.04+sw,-.47]]:[[-.16,-.47+sw*.3],[.16,-.47-sw*.3]]}
@@ -3438,7 +3439,7 @@ function drawAdult(c,e){
   if(fat&&!side){c.fillStyle=e.team.trim;c.fillRect(-bw/2*U,by0+.04*U,.03*U,.14*U);c.fillRect(bw/2*U-.03*U,by0+.04*U,.03*U,.14*U)}
   hands.forEach(([x,y])=>{c.fillStyle=e.skin;c.beginPath();c.arc(x*U,(y+sq)*U,.03*U,0,7);c.fill()});
   if(pose==='brush'){const [x,y]=hands[1];c.fillStyle='#6b4a2b';c.fillRect(x*U-.05*U,(y+sq)*U,.1*U,.04*U);c.fillStyle='#d9c79a';c.fillRect(x*U-.05*U,(y+sq)*U+.04*U,.1*U,.03*U)}
-  const hr=.12*U,hy=(-.9+sq)*U;
+  const hr=(fat?.135:.12)*U,hy=(-.9+sq)*U;   // 監督は丸顔
   c.fillStyle=e.hair;c.beginPath();c.arc(0,hy,hr,0,7);c.fill();
   if(face!=='b'||side){c.fillStyle=e.skin;c.beginPath();c.arc(side?hr*.08:0,hy+hr*.08,hr*.92,0,7);c.fill();
     c.fillStyle='#2a2a2a';(side?[hr*.5]:[-hr*.35,hr*.35]).forEach(x=>{c.beginPath();c.arc(x,hy+hr*.15,hr*.1,0,7);c.fill()});

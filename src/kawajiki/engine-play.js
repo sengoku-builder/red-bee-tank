@@ -534,9 +534,11 @@ class Game{
     this.stat.runs[half]=w.score[half];
   }
   atBat(inn,half){
+    this.curInn=inn;
     const w=this.w,T=this.teams[half],pl=T.players[this.order[half]%9];this.order[half]++;this.stat.PA++;
     const B=new KE.Player({id:pl.id,name:pl.name,sk:pl.sk,lefty:pl.lefty,team:half});B.x=B.lefty?0.95:-0.95;B.z=0;
     this.def.setDepth(sk(B,'bat'));this.def.batLefty=!!B.lefty;   // 打者を見て外野の深さ・盗塁のときの二塁カバーを決める
+    w.emit('paStart',{inn,half,who:B.name});
     const cnt={b:0,s:0},P=()=>this.def.F.P,occ=b=>w.runners.find(r=>r.rb.base===b&&!r.rb.out&&!r.rb.scored);
     let guardP=0;
     while(guardP++<60){
@@ -562,6 +564,7 @@ class Game{
       if(!sw.swing||!sw.contact){
         const C=this.def.F.C;let k3=false,bb=false;
         if(sw.swing||inZ){cnt.s++;if(cnt.s>=3)k3=true}else{cnt.b++;if(cnt.b>=4)bb=true}
+        if(!k3&&!bb)w.emit('pitchResult',{r:sw.swing?'swing':inZ?'strike':'ball',b:cnt.b,s:cnt.s});
         if(sw.bunt&&sw.swing&&cnt.s>=3)k3=true;   // スリーバント失敗も三振
         // キャッチャーが捕れるか：ワンバウンドや大きくそれた球はこぼす（ワイルドピッチ・パスボール）
         const loose=!bb&&this.wild(pitch,C);
@@ -579,10 +582,10 @@ class Game{
         continue;
       }
       // 打った（バントも）
-      this.stat.contacts.push({v:sw.v,va:sw.va,ang:sw.ang});
+      this.stat.contacts.push({v:sw.v,va:sw.va,ang:sw.ang});w.emit('pitchResult',{r:sw.bunt?'bunt':'inplay',b:cnt.b,s:cnt.s});
       const res=this.play(B,sw,inn,half);
       this.clearSteal();
-      if(res==='foul'){if(cnt.s<2||sw.bunt)cnt.s++;if(cnt.s>=3){w.outs++;this.stat.K[half]++;w.emit('out',{who:B.id,name:B.name,outType:'strike',outs:w.outs});this.log(inn,half,B,'スリーバント失敗');return}continue}
+      if(res==='foul'){if(cnt.s<2||sw.bunt)cnt.s++;w.emit('pitchResult',{r:'foul',b:cnt.b,s:cnt.s});if(cnt.s>=3){w.outs++;this.stat.K[half]++;w.emit('out',{who:B.id,name:B.name,outType:'strike',outs:w.outs});this.log(inn,half,B,'スリーバント失敗');return}continue}
       return;
     }
   }
@@ -610,6 +613,7 @@ class Game{
   // 投球のあとのプレー（盗塁・ワイルドピッチ・振り逃げ）
   livePlay(B,pitch,loose,drop3){
     const w=this.w,C=this.def.F.C,steal=w.runners.filter(r=>r.stealGo);
+    const f0=w.frames.length,t0=w.t,i0=w.log.length;
     this.def.reset();this.run_.reset();
     if(drop3){B.x=B.lefty?0.95:-0.95;B.z=0;B.vx=B.vz=0;B.stop();B.awake=true;B.wait=0.25;w.runners.push(B);B.side='R';
       B.rb={base:0,start:0,isBatter:true,out:false,scored:false,forceBase:null,forcer:null,mustRetouch:false,arr:{},judged:{}}}
@@ -619,17 +623,21 @@ class Game{
     else{w.ball.state='held';w.ball.holder=C;w.ball.x=C.x;w.ball.z=C.z;w.give(C,'catch')}
     let n=0;while(!w.umpire.ended&&n++<60*45){this.def.tick();this.run_.tick();w.step()}
     if(!w.umpire.ended)w.umpire.endPlay('time');
-    this.clearSteal();w.runners=w.runners.filter(r=>!r.rb.out&&!r.rb.scored&&r.rb.base>0)}
+    this.clearSteal();w.runners=w.runners.filter(r=>!r.rb.out&&!r.rb.scored&&r.rb.base>0);
+    const L=w.log.slice(i0),outs=L.filter(e=>e.type==='out').length,runs=L.filter(e=>e.type==='home').length;
+    this.plays.push({inn:this.curInn,half:w.half,who:B.name,txt:(drop3?'振り逃げ':loose?'ワイルドピッチ':'盗塁')+(outs?`（アウト${outs}）`:'')+(runs?`（${runs}点）`:''),outs:w.outs,score:[...w.score],f0,f1:w.frames.length,t0,t1:w.t,ev:L,live:true})}
   // 牽制：投手が一塁へ投げ、ランナーは帰塁する
   pickoff(r){
     const w=this.w,Pp=this.def.F.P,F1=this.def.F['1B'],[bx,bz]=basePos(1),[cx,cz]=basePos(2);
+    const f0=w.frames.length,t0=w.t,i0=w.log.length;
     this.def.reset();this.run_.reset();
     const L=1.2+2.0*(1-Y(sk(r,'iq'))),ux=(cx-bx)/FIELD.bd,uz=(cz-bz)/FIELD.bd;r.x=bx+ux*(L+0.5);r.z=bz+uz*(L+0.5);
     F1.x=bx+0.2;F1.z=bz-0.4;w.umpire.startPlay({});r.awake=false;r.goTo(bx,bz,{react:true});
     const aim=w.throwTo(Pp,[bx,bz,1.0],1,0.75);this.def.lastThrow={x:bx,z:bz,t1:w.t+aim.t,to:F1,base:1};this.def.cover={1:F1};w.emit('pickoff',{who:r.id});
     let n=0;while(!w.umpire.ended&&n++<60*45){this.def.tick();this.run_.tick();w.step()}
     if(!w.umpire.ended)w.umpire.endPlay('time');
-    w.runners=w.runners.filter(q=>!q.rb.out&&!q.rb.scored&&q.rb.base>0)}
+    w.runners=w.runners.filter(q=>!q.rb.out&&!q.rb.scored&&q.rb.base>0);
+    const Lg=w.log.slice(i0);this.plays.push({inn:this.curInn,half:w.half,who:r.name,txt:'牽制'+(Lg.some(e=>e.type==='out')?'（アウト）':''),outs:w.outs,score:[...w.score],f0,f1:w.frames.length,t0,t1:w.t,ev:Lg,live:true})}
   walk(B){const w=this.w,occ=b=>w.runners.find(r=>r.rb.base===b&&!r.rb.out&&!r.rb.scored);
     // 押し出し：一塁から続いているランナーだけ1つずつ進む
     const chain=[];for(let b=1;b<=3;b++){const r=occ(b);if(r)chain.push(r);else break}
@@ -665,7 +673,7 @@ class Game{
     this.log(inn,half,B,txt+(runs?`（${runs}点）`:'')+(this.playErr?`・エラー${this.playErr}`:''),{f0,f1:w.frames.length,t0,t1:w.t,ev:L});
     return txt;
   }
-  log(inn,half,B,txt,ex={}){this.plays.push({inn,half,who:B.name,txt,outs:this.w.outs,score:[...this.w.score],...ex})}
+  log(inn,half,B,txt,ex={}){this.w.emit('paEnd',{txt});this.plays.push({inn,half,who:B.name,txt,outs:this.w.outs,score:[...this.w.score],...ex})}
 }
 KE.Game=Game;
 

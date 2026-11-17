@@ -1106,7 +1106,7 @@ class Game{
       // リード：塁から少し離れ、投球と同時にもう一歩（第2リード）。盗塁・スクイズの走者は投球と同時にスタート
       for(const r of w.runners){const b0=r.rb.base;if(b0<1||b0>3)continue;const[ax,az]=basePos(b0),[cx,cz]=basePos(b0+1),L=1.2+2.0*(1-Y(sk(r,'iq'))),d=FIELD.bd;
         const ux=(cx-ax)/d,uz=(cz-az)/d;r.x=ax+ux*L;r.z=az+uz*L;
-        if(plan.steal.includes(r)){const jl=(0.45+0.5*Y(sk(P(),'thr')))*r.vmax*0.6;r.x+=ux*jl;r.z+=uz*jl;r.stealGo=true;r.awake=true;r.wait=0;r.goTo(cx,cz,{thru:true})}else r.goTo(ax+ux*(L+1.3),az+uz*(L+1.3),{frac:0.4})}
+        if(plan.steal.includes(r)){const jl=(0.6+0.5*Y(sk(P(),'thr')))*r.vmax*0.6;r.x+=ux*jl;r.z+=uz*jl;r.stealGo=true;r.awake=true;r.wait=0;r.goTo(cx,cz,{thru:true})}else r.goTo(ax+ux*(L+1.3),az+uz*(L+1.3),{frac:0.4})}
       // 投球を物理で飛ばす
       const aim=KE.aimThrow(REL,[pitch.px,0.3,pitch.ph],pitch.v),c=Math.cos(aim.el);
       w.ball.holder=null;w.ball.launch(REL,[Math.sin(aim.yaw)*pitch.v*c,Math.cos(aim.yaw)*pitch.v*c,pitch.v*Math.sin(aim.el)],[Math.cos(aim.yaw)*150,-Math.sin(aim.yaw)*150,0],'pitch');
@@ -1147,15 +1147,15 @@ class Game{
     const w=this.w,rng=this.rng,occ=b=>w.runners.find(r=>r.rb.base===b&&!r.rb.out&&!r.rb.scored),res={steal:[]};
     const diff=w.score[half]-w.score[1-half],close=Math.abs(diff)<=2,late=inn>=4,C=this.def.F.C,Pp=this.def.F.P;
     // スクイズ：三塁ランナー・ツーアウト未満・接戦の終盤・追い込まれる前
-    if(occ(3)&&w.outs<2&&cnt.s<2&&close&&late&&rng.chance(0.10)){res.bunt=true;res.squeeze=true;res.steal=[occ(3)];return res}
+    if(occ(3)&&w.outs<2&&cnt.s<2&&close&&inn>=3&&rng.chance(0.18)){res.bunt=true;res.squeeze=true;res.steal=[occ(3)];return res}
     // 送りバント：ノーアウトで一塁（一二塁）、接戦、打つのが得意でない子
-    if(w.outs===0&&occ(1)&&!occ(3)&&cnt.s<2&&close&&sk(B,'bat')<sk(Pp,'thr')+5&&rng.chance(0.25)){res.bunt=true;return res}
+    if(w.outs===0&&(occ(1)||occ(2))&&!occ(3)&&cnt.s<2&&close&&sk(B,'bat')<sk(Pp,'thr')+15&&rng.chance(0.4)){res.bunt=true;return res}
     // 盗塁：走者がボールより先に着ける見込み（投球の時間＋捕手の捕ってから投げるまで＋送球）で決める
     const pv=PROF.pitchV(sk(Pp,'thr'));
     for(const b of[2,1]){const r=occ(b);if(!r||occ(b+1)||cnt.b===3&&cnt.s===2)continue;if(b===2&&w.outs===2)continue;
-      const[bx,bz]=basePos(b+1),L=1.2+2.0*(1-Y(sk(r,'iq'))),tDef=16/pv+PROF.transfer(sk(C,'fld'))*0.75+KE.throwTime(hyp(bx,bz),PROF.armV(sk(C,'thr')))+0.25;
-      const jump=0.45+0.5*Y(sk(Pp,'thr')),tRun=KE.etaRest(r,FIELD.bd-L,0.12)-jump,m=tDef-tRun+rng.gauss()*0.6*Y(sk(r,'iq'));   // 投手が投げ始めた瞬間にスタート（投球動作の分だけ先に出る）
-      if(m>0.15&&rng.chance(0.18+0.35*Math.min(1,m))){res.steal=[r];break}}
+      const[bx,bz]=basePos(b+1),L=1.2+2.0*(1-Y(sk(r,'iq'))),tDef=16/pv+PROF.transfer(sk(C,'fld'))*0.9+KE.throwTime(hyp(bx,bz),PROF.armV(sk(C,'thr')))+0.25;
+      const jump=0.6+0.5*Y(sk(Pp,'thr')),tRun=KE.etaRest(r,FIELD.bd-L,0.12)-jump,m=tDef-tRun+rng.gauss()*0.6*Y(sk(r,'iq'));   // 投手が投げ始めた瞬間にスタート（投球動作の分だけ先に出る）
+      if(m>-0.1&&rng.chance(0.3+0.4*Math.min(1,m+0.1))){res.steal=[r];break}}
     // 牽制：一塁ランナーのリードが大きいとき、ときどき
     if(!res.steal.length&&occ(1)&&!occ(2)&&rng.chance(0.05+0.05*(1-Y(sk(Pp,'iq')))))res.pick=occ(1);
     return res}

@@ -398,7 +398,7 @@ class Umpire{
       else w.emit('reach',{who:r.id,base:b});
       for(const pd of this.pend)if(pd.r===r&&pd.b===b&&!pd.done){pd.done=true;this.closeCall(r,b,t-pd.t,pd.type,pd.by)}
     }else if(b===rb.base-1&&b>=rb.start){rb.base=b;rb.arr[b]=t}
-    else if(b===rb.base)rb.arr[b]=t;   // 離れてまた戻った
+    else if(b===rb.base){if(!(rb.isBatter&&b===1&&!rb.turned))rb.arr[b]=t}   // 離れてまた戻った（一塁を駆け抜けて戻った打者は「着いた直後」扱いにしない）
   }
   // きわどい判定：m＝走者が着いた時刻−野手が着いた時刻（＋なら野手が先）。差が0.1秒より小さいときだけ五分五分に近づける
   closeCall(r,b,m,type,by){
@@ -674,7 +674,7 @@ class Defense{
   // 役割表（設計書「守備の役割表」）：打球の位置とランナーの状況から、ベースカバーと中継を決める
   roleTable(px,pz,chaser,deep){
     const F=this.F,used=new Set([chaser]),cover={},right=px>=-1;   // センターラインを含めて右
-    const take=(b,list)=>{for(const r of list){const f=F[r];if(f&&!used.has(f)){cover[b]=f;used.add(f);return f}}return null};
+    const take=(b,list)=>{if(cover[b])return cover[b];for(const r of list){const f=F[r];if(f&&!used.has(f)){cover[b]=f;used.add(f);return f}}return null};
     let relay=null;
     if(deep&&this.lockRelay&&this.lockRelay!==chaser){relay=this.lockRelay;used.add(relay)}   // 一度決まった中継は途中で入れ替えない
     else if(deep){const tb=this.relayTarget(),hit=!this.lastThrow&&hyp(px,pz)<56;   // 外野手が前で捕るふつうのヒット・タッチアップ（悪送球の処理・フェンスまでの長打は除く）
@@ -687,8 +687,13 @@ class Defense{
     const on23=this.w.liveRunners.some(r=>r.rb.base>=2||(r.plan||0)>=3);   // 打者走者が二塁より先へ来ても本塁は空けない
     if(deep||on23)take(4,['C','P']);   // 二塁・三塁にランナーがいなければ、内野ゴロでキャッチャーは一塁の後ろへ
     if(relay===F['1B'])take(1,['2B','P']);else take(1,['1B','P','2B']);
-    const bunt=!deep&&hyp(px,pz)<15;if(bunt){take(1,['1B','2B','P']);take(2,['SS','2B'])}   // バント：一塁はセカンド、二塁はショート
-    const pl=this.w.umpire.play;if(pl&&!pl.batted&&this.batLefty!=null)take(2,this.batLefty?['SS','2B']:['2B','SS']);   // 盗塁：右打者ならセカンド、左打者ならショートが二塁へ
+    const pl=this.w.umpire.play;
+    // バント（打者がバントの構えで当てたときだけ。場所では決めない）：前に出たファーストの代わりにセカンドが一塁、二塁はショート
+    const bunt=this.buntPlay&&pl&&pl.batted&&!deep&&hyp(px,pz)<15;
+    if(bunt){const f1=F['1B'],f2=F['2B'],[bx,bz]=basePos(1),cur=cover[1];
+      if(f2&&!used.has(f2)&&(chaser===f1||cur===f1&&f1.eta(bx,bz)>f2.eta(bx,bz))){if(cur&&cur!==f1)used.delete(cur);cover[1]=f2;used.add(f2)}
+      take(2,['SS','2B'])}
+    if(pl&&!pl.batted&&this.batLefty!=null)take(2,this.batLefty?['SS','2B']:['2B','SS']);   // 盗塁：右打者ならセカンド、左打者ならショートが二塁へ
     take(2,right?['SS','2B']:['2B','SS']);
     const anyOn=this.w.liveRunners.some(r=>!r.rb.isBatter);
     if(chaser===F['3B']&&!deep){if(anyOn)take(3,['P'])}   // サードゴロ：ショートはサードの後ろ、三塁はランナーがいるときだけピッチャー
@@ -705,7 +710,10 @@ class Defense{
     if(this.firstPlan){this.firstPlan=false;this.lunge=new Map();
       if(this.pr&&w.ball.src==='bat')for(const f of w.fielders){if(!['P','1B','2B','SS','3B'].includes(f.role)||f===best.f)continue;
         let bd=1e9,bq=null;for(const q of this.pr){if(q[0]>1.6||q[3]>1.6)continue;if(hyp(q[1],q[2])>FIELD.infieldR+4)break;const d=hyp(q[1]-f.x,q[2]-f.z);if(d<bd){bd=d;bq=q}}
-        if(bq&&bd<(f.role==='P'?2.5:7)){this.lunge.set(f,t+Math.min(1.1,bq[0]+0.25));f.goTo(bq[1],bq[2],{react:true});this.involved.add(f)}}}
+        if(bq&&bd<(f.role==='P'?2.5:7)){this.lunge.set(f,t+Math.min(1.1,bq[0]+0.25));f.goTo(bq[1],bq[2],{react:true});this.involved.add(f)}}
+      // ピッチャー：自分より一塁側への打球は、まず一塁へ二、三歩スタート（要らなければそこで見守る）
+      const P=F.P;if(P&&w.ball.src==='bat'&&best.f!==P&&cover[1]!==P&&!this.lunge.has(P)&&w.ball.vx>0.3){const[bx,bz]=basePos(1),d=P.dist(bx,bz)||1,s=Math.min(2.5,d);
+        P.goTo(P.x+(bx-P.x)/d*s,P.z+(bz-P.z)/d*s,{react:true});this.lunge.set(P,t+0.9);this.involved.add(P)}}
     const lunging=f=>this.lunge&&this.lunge.get(f)>t;
     for(const b in cover){const f=cover[b],[bx,bz]=basePos(+b);if(f!==w.ball.holder&&!lunging(f))f.goTo(bx,bz,{react:true})}
     if(relay&&lunging(relay)){}else if(relay){const tb=this.relayTarget(),[tx,tz]=basePos(tb),k=0.42;relay.goTo(best.x+(tx-best.x)*k,best.z+(tz-best.z)*k,{react:true})}
@@ -718,7 +726,11 @@ class Defense{
       const p=lt===4?[1.5,-6]:lt===3?[-21,13]:live2.some(r=>r.rb.base>=2)?[-9,4]:this.relayTarget()>=3?[-21,13]:[-4,13];pp.goTo(p[0],p[1],{react:true});busy.add(pp)}
     // 内野ゴロ：外野は送球の後ろへ（ライト→一塁、センター→二塁、レフト→三塁）。キャッチャーは一塁の後ろ（二塁・三塁にランナーがいないとき）
     const lazy=f=>w.rng.chance(0.35*Y(sk(f,'iq')));   // 能力が低いとときどき出遅れる
-    if(!deep){const bu=[['RF',[24,10]],['CF',[0,42]],['LF',[-24,10]]];
+    const pl0=w.umpire.play,steal=pl0&&!pl0.batted;
+    // 盗塁：二塁に入らなかった二遊間とセンターは二塁の後ろ（送球がそれたとき用）
+    if(steal){const[bx,bz]=basePos(2);for(const f of[F.SS,F['2B']]){if(!f||f===cover[2]||busy.has(f)||lunging(f))continue;f.goTo(bx+(f===F.SS?-3:3),bz+5,{react:true});busy.add(f)}
+      const cf=F.CF;if(cf&&!busy.has(cf)){cf.goTo(bx,bz+18,{react:true,frac:0.9});busy.add(cf)}}
+    if(!deep&&!steal){const bu=[['RF',[24,10]],['CF',[0,42]],['LF',[-24,10]]];
       for(const[role,[x,z]]of bu){const f=F[role];if(!f||busy.has(f)||f===best.f)continue;if(role==='LF'&&!live2.some(r=>r.rb.base>=1&&r.rb.base<=2))continue;if(!lazy(f)){f.goTo(x,z,{react:true,frac:0.9});busy.add(f)}}
       const cc=F.C;if(cc&&!busy.has(cc)&&cc!==best.f&&!Object.values(cover).includes(cc)&&!live2.some(r=>r.rb.base>=2)){cc.goTo(17.5,9.5,{react:true});busy.add(cc)}}
     const sb=F['2B'];if(!deep&&sb&&!busy.has(sb)&&!lunging(sb)){if(best.f===F.P){sb.goTo(2,21,{react:true});busy.add(sb)}else if(best.f===F['1B']){sb.goTo(14,21,{react:true});busy.add(sb)}}
@@ -859,7 +871,7 @@ class Defense{
       // 自分で走って踏むか、投げるか：早いほう（近くの子へ投げ返すより自分で踏むほうが早ければ走る）
       const runT=h.eta(bx,bz),thrT=c&&c!==h&&c.dist(h.x,h.z)>4?Math.max(this.throwT(h,bx,bz),c.eta(bx,bz)):Infinity;   // すぐ隣の子へは投げない
       if(runT<=thrT+0.15){bt=runT;how='run'}else{bt=thrT;how='throw'}
-      const force=U.forced(r)||r.rb.mustRetouch,need=force?0.05:0.25;
+      const force=U.forced(r)||r.rb.mustRetouch,need=force?-0.15:0.0;   // きわどい塁は勝負する（フォースはタッチが要らない分さらに攻める）
       // 目の前（数m以内）の飛び出したランナーには走ってタッチ
       if(!force&&!U.onBase(r)&&h.dist(r.x,r.z)<4.5){cands.push({r,b,how:'tag',m:1,val:5});continue}
       // 本塁がきわどいときは前のランナー（本塁）を優先して狙う
@@ -877,11 +889,17 @@ class Defense{
       if(c&&c.dist(bx,bz)>=1&&c.eta(bx,bz)>this.throwT(h,bx,bz)+0.1&&pick.m>0.3){if(this.lunge)this.lunge.delete(c);if(c.tx==null||hyp(c.tx-bx,c.tz-bz)>0.5)c.goTo(bx,bz);this.decideAt=t+0.06;return}}
     if(pick){this.throwTo(h,this.cover[pick.b],pick.b,'out',pick.m>1.2?0.72:pick.m>0.6?0.85:1);return}   // 余裕があれば軽く、きわどければ全力
     // アウトにできる塁がない：先へ進もうとしているランナーの、向かっている塁のひとつ先へ返して余分な進塁を止める
-    const adv=live.filter(r=>!r.rb.mustRetouch&&r.plan>U.legalBase(r)&&!(r.rb.isBatter&&r.plan<=1)).sort((a,c)=>c.plan-a.plan)[0];   // 一塁へ走っているだけの打者は対象外
-    if(adv){let nb=Math.min(4,adv.plan+1),c=this.cover[nb];if(!c||c===h){nb=adv.plan;c=this.cover[nb]}   // 自分がその塁の担当（遠くでボールを拾った）なら、走者が向かう塁へ
-      if(c&&c!==h&&h.dist(...basePos(nb))>3){this.throwTo(h,c,nb,'stop');return}}
+    // 投げるのは、その走者が本当に先の塁を狙える（位置・体勢・足と、送球が届く時間の比べ合い）ときだけ。余裕があれば投げない
+    let stopT=null;
+    for(const r of live){if(r.rb.mustRetouch||r.rd)continue;const hb=this.headingTo(r);if(hb==null||hb<=U.legalBase(r)||hb>=4)continue;if(r.rb.isBatter&&hb<=1)continue;
+      const nb=hb+1,c=this.cover[nb];if(!c||c===h||h.dist(...basePos(nb))<=3)continue;
+      const[ax,az]=basePos(hb),[nx,nz]=basePos(nb),V=Math.max(1,r.vmax);
+      const rT=r.dist(ax,az)/V+FIELD.bd/V+(r.thru&&!r.stealGo?0.2:0.9);   // 塁で止まるつもりの走者（盗塁の滑り込みなど）は、もう一度加速する分おそい
+      const bT=Math.max(this.throwT(h,nx,nz),c.eta(nx,nz))+0.6;   // 投げずに内野へ返していても、気づいて投げ直すまでの分
+      if(rT<bT+0.4&&(!stopT||nb>stopT.nb))stopT={nb,c}}
+    if(stopT){this.throwTo(h,stopT.c,stopT.nb,'stop');return}
     // 外野で持っている：中継か内野へ返す。内野どうしでは投げない（そのまま持って区切り）
-    if(OF.includes(h.role)||hyp(h.x,h.z)>40||hyp(h.x,h.z-15)>22){   // 外野や、ファウルグラウンドの遠くで持っている
+    if(OF.includes(h.role)||hyp(h.x,h.z)>FIELD.infieldR+3||hyp(h.x,h.z-15)>22){   // 外野や、ファウルグラウンドの遠くで持っている
       let tgt=this.relay&&this.relay!==h?this.relay:this.nearestIF(h);
       // 返す相手は自分より内野側（8m以上近い）の子だけ。いなければ自分で内野へ持って戻る
       if(tgt&&(OF.includes(h.role)&&!OF.includes(tgt.role)&&tgt.dist(h.x,h.z)>4||hyp(tgt.x,tgt.z)<hyp(h.x,h.z)-8)){this.throwTo(h,tgt,null);return}   // 外野手は内野の子へすぐ返す
@@ -906,8 +924,16 @@ class Defense{
     const v0=PROF.armV(sk(h,'thr')),dd0=hyp(x-h.x,z-h.z);   // 遠い送球は届く強さまで上げる
     const ef=Math.min(1,Math.max(effort??(kind==='out'?1:0.8),Math.sqrt(dd0*9.8/0.55)/v0));
     const aim=w.throwTo(h,[x,z,1.25],1,ef);this.lastThrow={x,z,t1:w.t+aim.t,to:c,base:b};this.decideAt=null;w.emit('throwTarget',{from:h.id,to:c.id,base:b,kind:kind||(b==null?'return':'out')});
+    if(b==null)this.chaseHigh(c);
     this.nextPlan=w.t;
   }
+  // 中継・返球：受ける子は飛んでくるボールの線に合わせて動く（それた球に寄る・頭を越えそうなら下がって跳ぶ）。届かなければ抜けて、後ろの子が処理する
+  chaseHigh(c){const w=this.w,b=w.ball,rh=this.reachH(c);
+    const sb=b.clone(),dt=1/60;let t=0,best=null;
+    while(t<4&&sb.state==='air'&&sb.bounces===0){sb.step(dt);t+=dt;if(sb.h>rh||sb.h<0.25)continue;
+      const need=Math.max(0,c.dist(sb.x,sb.z)-0.6),e=need<0.05?0:c.eta(sb.x,sb.z,1,0.6)+0.1+0.45*Y(sk(c,'fld'));   // それた球への反応は能力しだい（低いと間に合わずに抜ける）
+      if(e<=t){const sc=need+Math.max(0,t-1.2)*0.5;if(!best||sc<best.sc)best={x:sb.x,z:sb.z,t,sc}}}   // 近くで捕れる場所ほどよい
+    if(best){const d=c.dist(best.x,best.z);if(d>0.3){c.goTo(best.x,best.z);this.lastThrow.x=best.x;this.lastThrow.z=best.z}this.lastThrow.t1=w.t+best.t}}
 }
 KE.Defense=Defense;
 
@@ -1032,12 +1058,14 @@ class Running{
         if(dd<5&&r.next==null&&pb<4){const nb2=pb+1,[ex,ez]=basePos(nb2);
           const m2=this.ballT(nb2,r)-(this.arrive(r,pb)+hyp(ex-cx,ez-cz)/r.vmax+0.3);
           r.next=(nb2<cap||nb2===4)&&this.judge(r,m2,0.2+(nb2===4?0.15:0))?nb2:0;
-          r.goTo(cx,cz,{thru:r.next>0})}
+          r.goTo(cx,cz,{thru:r.next>0||this.rounds(r,pb)})}
         if(r.rb.base>=pb){const nx=r.next;r.next=null;r.dcs=null;
           if(nx){r.plan=nx;const[ex,ez]=basePos(nx);r.goTo(ex,ez,{thru:true})}
           else{r.plan=null;r.goTo(cx,cz)}}
         else if(r.tx==null)r.goTo(cx,cz,{thru:r.next>0});
         continue}
+      // 外野へのヒット：打者走者は一塁を数歩回ってから戻る（オーバーラン）。その間も二塁へ行けるかは見続ける
+      if(lb===1&&r.rb.isBatter&&r.roundP!==p&&this.rounds(r,1)&&r.dist(lx,lz)<1.2){r.roundP=p;r.plan=null;const[ex,ez]=basePos(2),k=2.5/FIELD.bd;r.goTo(lx+(ex-lx)*k+0.8,lz+(ez-lz)*k-0.8);r.roundT=t+1.2}
       // 塁にいる（駆け抜けた打者・回りすぎた走者も含む）：次の塁へ行けるか
       const nb=lb+1;if(nb>4)continue;
       const away=r.dist(lx,lz)>0.4;
@@ -1046,9 +1074,12 @@ class Running{
       if(r.dcs==null||t-r.dcs.t>0.3){
         const m=this.ballT(nb,r)-this.arrive(r,nb),rdy=r.ready,go=this.judge(r,m,0.15+(nb===4?0.15:0),r.ready);r.dcs={t,go};r.ready=false;
         if(go){r.plan=nb;r.next=null;r.goTo(cx,cz,{react:!rdy});continue}}   // タッチアップのスタートは捕った瞬間（反応の遅れなし）
+      if(r.roundT&&t<r.roundT&&r.tx!=null)continue;   // 回っている途中（回りきってから戻る）
       if(away&&(r.tx==null||hyp(r.tx-lx,r.tz-lz)>0.3))r.goTo(lx,lz);
     }
   }
+  // 打者走者が一塁を回るか：外野へ抜けたヒット（ボールが外野にある）
+  rounds(r,pb){const b=this.w.ball;return r.rb.isBatter&&pb===1&&!r.rd&&(this.def.ofTouched||hyp(b.x,b.z)>FIELD.infieldR+3)}
 }
 KE.Running=Running;
 
@@ -1108,7 +1139,9 @@ class Game{
       // ベンチの作戦（状況判断）：スクイズ・送りバント・盗塁・牽制
       const plan=this.manager(B,cnt,inn,half);
       if(plan.pick){this.pickoff(plan.pick);if(w.outs>=3)return;continue}
-      if(plan.bunt){const F=this.def.F;for(const[r,dx]of[['1B',-1.5],['3B',1.5]]){const f=F[r];f.x+=dx;f.z-=5}}   // バント警戒で前へ
+      // バント警戒：攻撃の作戦は見ずに、状況（ノーアウト一二塁・接戦・打つのが得意でない打者）から守備が読んで前へ。能力が低いと読み落とす
+      {const Pp=P(),F=this.def.F,close=Math.abs(w.score[half]-w.score[1-half])<=2;
+        if(w.outs===0&&(occ(1)||occ(2))&&!occ(3)&&cnt.s<2&&close&&sk(B,'bat')<sk(Pp,'thr')+15&&!this.rng.chance(0.4*Y(sk(F['3B'],'iq'))))for(const[r,dx]of[['1B',-1.5],['3B',1.5]]){const f=F[r];f.x+=dx;f.z-=5}}
       const pitch=KE.makePitch(P(),cnt,this.rng);this.stat.pitches++;
       // リード：塁から少し離れ、投球と同時にもう一歩（第2リード）。盗塁・スクイズの走者は投球と同時にスタート
       for(const r of w.runners){const b0=r.rb.base;if(b0<1||b0>3)continue;const[ax,az]=basePos(b0),[cx,cz]=basePos(b0+1),L=1.2+2.0*(1-Y(sk(r,'iq'))),d=FIELD.bd;
@@ -1119,6 +1152,7 @@ class Game{
       w.ball.holder=null;w.ball.launch(REL,[Math.sin(aim.yaw)*pitch.v*c,Math.cos(aim.yaw)*pitch.v*c,pitch.v*Math.sin(aim.el)],[Math.cos(aim.yaw)*150,-Math.sin(aim.yaw)*150,0],'pitch');
       w.ball.from=P();w.ball.relT=w.t;w.emit('pitchOut',{steal:plan.steal.length>0,bunt:!!plan.bunt});
       const sw=plan.bunt?KE.bunt(B,pitch,cnt,this.rng,plan.squeeze):plan.steal.length&&cnt.s<2&&this.rng.chance(0.75)?{swing:false}:KE.swing(B,pitch,cnt,this.rng);
+      this.def.buntPlay=!!sw.bunt;   // 守備は打者の構えでバントとわかる
       let guard=0;while(w.ball.z>0.35&&w.ball.state==='air'&&guard++<300)w.step();
       const inZ=KE.inZone(pitch.px,pitch.ph);
       if(!sw.swing||!sw.contact){
@@ -1621,6 +1655,12 @@ function fielding(KE,T){
   const add=(name,ok,detail,S)=>T.push({group:'捕る・投げる（守備）',name,ok,detail:detail+(S&&S.ck.v.length?` ／チェック:${S.ck.v.map(v=>v.msg).join('、')}`:''),frames:S&&S.w.frames,log:S&&S.w.log.filter(e=>/^(out|safe|home|playEnd|fair|foul|error|throwTarget|catch|pickup|dive)$/.test(e.type))});
   { let home=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:70,seed:40+i,on:[1,2,3],hit:[13,-8,3,-600]}),o=S.outs[0];if(o&&o.base===4)home++;if(!last||o&&o.base===4)last=S}
     add('満塁でピッチャーゴロ→ホームでアウト（156の件）',home>=N*0.8,`${N}回中${home}回ホームでアウト（ほかは投げる塁をまちがえた・エラー）`,last);}
+  // 208：ふつうのピッチャーゴロ（バントではない）はファーストが一塁で受ける
+  { let ok=0,n=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:70,seed:600+i,hit:[16,-8,3,-600]});const t=S.log.find(e=>e.type==='throwTarget'&&e.base===1);if(!t)continue;n++;const f=S.w.fielders.find(f=>f.id===t.to);if(f&&f.role==='1B')ok++;if(!last||f&&f.role!=='1B')last=S}
+    add('バントでないピッチャーゴロは、ファーストが一塁に入って受ける（208の件）',n>0&&ok===n,`一塁送球${n}回のうちファーストが受けた${ok}回`,last);}
+  // 209：止めの送球は、走者が本当に先の塁を狙えるときだけ（二塁ランナーのファーストゴロで本塁へ投げない）
+  { let bad=0,N=12,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:60,seed:500+i,on:[2],hit:[18+(i%4)*2,-6,30+(i%3)*4,-900]});if(S.log.some(e=>e.type==='throwTarget'&&e.base===4))bad++;if(!last)last=S}
+    add('ランナー二塁のファーストゴロで、本塁へ無駄な送球をしない（209の件）',bad===0,`${N}回中${bad}回本塁へ送球`,last);}
   { let dp=0,N=12,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:90,seed:20+i,on:[1],run:40,hit:[21,-6,-18,-900]});if(S.outs.length===2&&S.outs[0].base===2&&S.outs[1].base===1)dp++;last=S}
     add('一塁ランナーありのショートゴロ→二塁→一塁のゲッツー（S級）',dp>=N*0.6,`${N}回中${dp}回ゲッツー`,last);}
   { let dp=0,N=12;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:30,seed:20+i,on:[1],run:40,hit:[21,-6,-18,-900]});if(S.outs.length===2)dp++}
@@ -1692,8 +1732,8 @@ function running(KE,T){
       if(S.log.some(e=>e.type==='flyCatch')&&!r.rb.out)ok++;last=S}
     add('浅いフライ：一塁ランナーは飛び出しすぎず、捕られたら戻ってセーフ',ok>=N*0.8,`${N}回中${ok}回戻ってセーフ`,last);}
   { let two=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:50,run:70,seed:100+i,hit:[30,16,-40+i%2,800]});const B=S.w.runners.find(r=>r.id==='打者');
-      if(!B.rb.out&&B.rb.base>=2)two++;if(B.rb.base>=2&&!last)last=S}
-    add('三塁手の頭を越えてレフト線へ転がる当たりでは、打者は一塁を回って二塁をねらう',two>=N*0.2,`${N}回中${two}回二塁打以上`,last);}
+      if(!B.rb.out&&B.rb.base>=2||B.rb.turned)two++;if(B.rb.base>=2&&!last)last=S}
+    add('三塁手の頭を越えてレフト線へ転がる当たりでは、打者は一塁を回って二塁をねらう',two>=N*0.2,`${N}回中${two}回、一塁を回って二塁をねらった（二塁打を含む）`,last);}
   { const cnt=lv=>{let hes=0,rash=0;for(let i=0;i<40;i++){const S=fieldScene(KE,{lv,run:lv,seed:400+i,on:[1,2],hit:[24+(i%5)*2,4+(i%4)*4,-40+(i*13)%80,900]});
       hes+=S.log.filter(e=>e.type==='couldHaveGone').length;rash+=S.log.filter(e=>e.type==='rash').length}return{hes,rash}};
     const a=cnt(30),b=cnt(90);

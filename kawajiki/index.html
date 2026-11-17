@@ -1,3 +1,6 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>河川敷の少年野球</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -186,7 +189,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261110095054';
+const BUILD='20261118061123';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 // スマホの壁紙（?wallpaper）は歯車を隠す。PCの壁紙（?wallpaper=1 など）は歯車を出して設定できるようにする
@@ -559,11 +562,14 @@ function liveRun(batter,opt={}){
   const forcedTo=(b,me)=>st.some(o=>o!==me&&o.mode==='run'&&o.tgt===b);
   const goNext=(o,strict)=>{const b=o.base+1;if(b>4)return false;if(occupied(b,o))return false;
     const[x,z]=BASES[b%4],tR=dist(o.k,x,z)/Math.max(2,o.k.spd),tB=ballETA(x,z);
-    const noise=(Math.random()-.5)*2*(1-iq(o.k))*1.1;return tR+(strict?.8:.15)+noise<tB*(strict?1:b===2?1.32:b===3?1.12:1.08)};
+    // 判断ミスは「行けたのに行かない」が多め（飛び出しは少なめ）
+    const m=tR+(strict?.8:.2),f=tB*(strict?1:b===2?1.26:b===3?1.08:1.04),noise=(Math.random()*1.0-.22)*2*(1-iq(o.k))*1.1,go=m+noise<f;
+    if(!go&&m+.35<f&&!o.hes){o.hes=true;(async()=>{await sleep(1.6);if(G.bat&&!G.bat.coach.dead)say(chance(.5)?G.bat.coach:(pick(benchKids(G.bat))||G.bat.coach),pick(['今のは行けたぞー!','行けたよー!','回れたなー!']),1)})()}
+    return go};
   const sync=()=>{const nb=[null,null,null];st.forEach(o=>{if(o.mode==='ext'||o.k.ext){const i=G.bases.indexOf(o.k);if(i>=0&&!nb[i])nb[i]=o.k;return}if(o.mode!=='done'&&o.mode!=='out'&&o.base>=1&&o.base<=3&&o.mode!=='run'&&!nb[o.base-1])nb[o.base-1]=o.k});G.bases=nb};
   // 打った瞬間：詰まっているランナーは必ず、そうでなければ判断して走る
   {let f=!!batter;for(let b=1;b<=3;b++){const o=st.find(q=>q.base===b&&!q.bat);if(!o){f=false;continue}if(f)o.forced=true;else f=false}}
-  for(const o of st){if(o.bat)continue;if(two||o.forced||(o.base===2&&!G.bases[2]?true:goNext(o))){o.mode='run';o.tgt=o.base+1}}
+  for(const o of st){if(o.bat)continue;if(two||o.forced||goNext(o)){o.mode='run';o.tgt=o.base+1}}
   const t0=simT;let pickT=0,calm=0,picked=false;
   return(async()=>{
     while(true){
@@ -754,12 +760,14 @@ async function relayOrThrow0(of){
     if(G.ball.holder!==h)break;
     const d=decideThrow(h);
     if(!d){ // 間に合う塁がない：外野からは中継へ、内野ならそこで止める
-      if(Math.hypot(h.x,h.z)>34){const c=cutoffFor(h.x);if(c&&c!==h){c.walkTo(h.x*.55,h.z*.55,4.4);say(fielder('C'),pick(['カット!','カット!ボール止めて!']),1);await sleep(.2);await throwTo(h,c,thrSpd(h));h=c;continue}}
+      // 外野手はかならず内野へ返す（持ったまま止まらない）
+      if(Math.hypot(h.x,h.z)>26||['LF','CF','RF'].includes(h.role)){const c=cutoffFor(h.x);if(c&&c!==h){const far=Math.hypot(h.x,h.z)>34;if(far)c.walkTo(h.x*.55,h.z*.55,4.4);say(fielder('C'),pick(['カット!','カット!ボール止めて!','内野に返せー!']),1);await sleep(.2);await throwTo(h,c,thrSpd(h));h=c;continue}}
       break}
     if(!said){said=true;say(fielder('C'),BWORD[d.b],1);await sleep(.2)}
     const far=Math.hypot(h.x,h.z)>34;
     if(d.via){if(far)say(baseRecv(d.b,d.via)||fielder('C'),pick(['カット!','カット!カット!','中継!']),1);d.via.walkTo(h.x*.55,h.z*.55,4.6);await throwTo(h,d.via,thrSpd(h));h=d.via;await sleep(reactT(h)*.6);continue}
-    const recv=baseRecv(d.b,h);if(!recv)break;const[bx,bz]=bpos(d.b);
+    let recv=baseRecv(d.b,h);if(!recv)break;const[bx,bz]=bpos(d.b);
+    if(recv===h&&dist(h,bx,bz)>3){const o2=G.field.kids.filter(k=>k!==h&&k.role!=='P').sort((p,q)=>dist(p,bx,bz)-dist(q,bx,bz))[0];if(o2)recv=o2}
     if(far&&G.relay&&G.relay.cut&&G.relay.cut!==recv)say(recv,pick(['一本!','ノーカット!','そのまま!']),1);
     if(recv!==h){recv.walkTo(bx+(d.b===1?-.3:.3),bz-.3,5);await sleep(.12);
       if(chance(.03+.12*(1-sk(h,'thr')/100))){const wx=recv.x+rnd(-4,4),wz=recv.z+rnd(-4,3);await throwTo(h,recv,thrSpd(h),G.ball,[wx,wz]);oops(recv,'recv');oops(h,'thr',0);markErr(h);await recv.goto(wx,wz,4.4);G.ball.holder=recv;h=recv;continue}
@@ -850,7 +858,7 @@ async function rundown0(k,a){
   say(pick(benchKids(G.bat))||G.bat.coach,'戻れ戻れー!',1);if(chance(.6))say(pick([fa,fb]),pick(['挟んだぞ!','挟め挟めー!']),1);
   let h=G.ball.holder;
   if(h!==fa&&h!==fb){const r=dist(k,ax,az)<dist(k,bx,bz)?fa:fb;if(h)await throwTo(h,r,15);G.ball.holder=r;h=r}
-  const cover={[bA]:fa,[bB]:fb};let throws=0,lastThrow=simT;
+  const cover={[bA]:fa,[bB]:fb};let throws=0,lastThrow=simT-.6;
   spot(k,4,null);
   for(let t=0;t<260;t++){
     if(G.outs>=3)return{res:'safe',base:freeB(dist(k,ax,az)<dist(k,bx,bz)?bA:bB)};
@@ -861,13 +869,15 @@ async function rundown0(k,a){
     if(toBase<.5){const fb2=freeB(flee);if(fb2===flee){call(nearestUmp(fx,fz),'safe',1);return{res:'safe',base:flee}}}
     k.walkTo(fx,fz,k.spd*.92);
     // ボールを持った子：ランナーを追いかける
-    h.walkTo(k.x,k.z,4.9);
+    if(!(dist(h,k.x,k.z)>4.5&&throws===0))h.walkTo(k.x,k.z,4.9);
     if(dist(h,k.x,k.z)<.8){call(nearestUmp(k.x,k.z),'out');addOut();sendToBench(G.bat,k);if(kn)didRight(h,'rundown');say(pick(G.field.kids),'ナイスタッチ!',0);spot(k,1.4,.1);return{res:'out'}}
     // 投げるタイミング：ランナーが逃げる先の子に近づいたら投げる（上手な子ほどちょうどいい距離で）
     const recv=toward&&toward!==h?toward:null;
     if(recv&&simT-lastThrow>.8){
       const want=5+4*q+rnd(-2,2)*(1-q),dr=dist(k,recv.x,recv.z),close=dist(h,k.x,k.z)<3.2+2.5*q;
-      if((close&&dr<want)||(dist(k,fx,fz)<2.6&&dist(k,fx,fz)>1.4&&close)){
+      // ボールを持った子がランナーから遠いときは、走って追わずにすぐ投げる
+      const farH=dist(h,k.x,k.z)>4.5&&throws===0;
+      if(farH||(close&&dr<want)||(dist(k,fx,fz)<2.6&&dist(k,fx,fz)>1.4&&close)){
         throws++;lastThrow=simT;
         if(chance(.05+.2*(1-q))){const wx=recv.x+rnd(-3,3),wz=recv.z+rnd(-3,3);await throwTo(h,recv,13,G.ball,[wx,wz]);oops(recv,'recv');oops(h,'thr',0);mistake(h,'rundown');
           const sb=freeB(flee),[sx,sz]=bpos(sb);await Promise.race([k.goto(sx,sz,k.spd),sleep(5)]);G.ball.holder=recv;return{res:'safe',base:sb}}
@@ -1550,7 +1560,7 @@ async function tagJudge0(k,bx,bz,tagger,ump,a){
   let caught=false,slid=false;
   for(let i=0;i<60;i++){if(dist(tagger,k.x,k.z)<.8){caught=true;break}if(dist(k,bx,bz)<.45)break;
     // ランナーがベースへ向かってくるなら、ベースの前で待ってタッチ
-    const toward=Math.hypot(k.tx-bx,k.tz-bz)<.8;if(toward){const d=dist(k,bx,bz)||1;tagger.walkTo(bx+(k.x-bx)/d*.6,bz+(k.z-bz)/d*.6,4.8);if(d<3&&!slid){slid=true;slideTo(k,bx,bz)}}else tagger.walkTo(k.x,k.z,4.8);await sleep(.1)}
+    const toward=Math.hypot(k.tx-bx,k.tz-bz)<.8;if(!toward&&a!=null&&dist(tagger,k.x,k.z)>2.2){cancelRun(k);k.goto(k.x,k.z);return'far'}if(toward){const d=dist(k,bx,bz)||1;tagger.walkTo(bx+(k.x-bx)/d*.6,bz+(k.z-bz)/d*.6,4.8);if(d<3&&!slid){slid=true;slideTo(k,bx,bz)}}else tagger.walkTo(k.x,k.z,4.8);await sleep(.1)}
   if(!caught)return false;
   if(chance(.03+.08*(1-sk(tagger,'fld')/100))){oops(tagger,'drop');return false}
   cancelRun(k);k.goto(k.x,k.z);return true;
@@ -3394,9 +3404,10 @@ function drawAdult(c,e){
   if(sit){c.fillStyle=pants;if(side)rr(c,-.04*U,hipY,.26*U,.09*U,.04*U);else{rr(c,-.11*U,hipY,.1*U,.12*U,.04*U);rr(c,.01*U,hipY,.1*U,.12*U,.04*U)}}
   else{const a=e.moving?Math.sin(e.phase)*(e.speed>2?.5:.3):0,lw=e.role==='coach'?.14:.09,lx=e.role==='coach'?.08:.05;[[-1,a],[1,-a]].forEach(([s,ang])=>{c.save();c.translate(side?0:s*lx*U,hipY);c.rotate(side?ang:0);c.fillStyle=pants;rr(c,-lw/2*U,0,lw*U,-hipY*.95,.05*U);if(e.role==='coach'){c.fillStyle=e.team.sock;c.fillRect(-lw/2*U,-hipY*.55,lw*U,-hipY*.32)}c.fillStyle='#2b2b30';c.beginPath();c.ellipse(side?.02*U:0,-hipY,.06*U,.03*U,0,0,7);c.fill();c.restore()})}
   const fat=e.role==='coach';
-  const by0=(-.8+sq)*U,by1=hipY+.02*U,bw=fat?(side?.3:.4):(side?.2:.26);
-  c.fillStyle=shirt;rr(c,-bw/2*U,by0,bw*U,by1-by0,fat?.14*U:.07*U);
-  if(fat){c.beginPath();if(side)c.ellipse(.12*U,(by0+by1)/2+.05*U,.14*U,.17*U,0,0,7);else c.ellipse(0,(by0+by1)/2+.05*U,.22*U,.17*U,0,0,7);c.fill();c.fillStyle='rgba(0,0,0,.12)';c.fillRect(-bw/2*U,by1-.07*U,bw*U,.03*U)}
+  const by0=(-.8+sq)*U,by1=hipY+.02*U,bw=fat?(side?.36:.46):(side?.2:.26);
+  c.fillStyle=shirt;rr(c,-bw/2*U,by0,bw*U,by1-by0,fat?.17*U:.07*U);
+  if(fat){c.beginPath();if(side)c.ellipse(.05*U,(by0+by1)/2+.04*U,.18*U,.16*U,0,0,7);else c.ellipse(0,(by0+by1)/2+.04*U,.23*U,.15*U,0,0,7);c.fill();   // 体全体をふっくら（お腹だけ突き出さない）
+  c.fillStyle='rgba(0,0,0,.12)';c.fillRect(-bw/2*U,by1-.07*U,bw*U,.03*U)}
   if(e.role==='ump'&&!side&&face!=='b'){c.fillStyle='#3b4558';rr(c,-.09*U,by0+.04*U,.18*U,.2*U,.04*U)}
   let hands=pose==='cheer'?[[-.18,-1.02],[.18,-1.02]]:sit?[[-.1,-.5],[.1,-.5]]:[[-.16,-.45],[.16,-.45]];
   if(e.moving&&!sit){const sw=Math.sin(e.phase)*.1;hands=side?[[-.04-sw,-.47],[.04+sw,-.47]]:[[-.16,-.47+sw*.3],[.16,-.47-sw*.3]]}
@@ -3431,7 +3442,7 @@ function drawAdult(c,e){
   if(fat&&!side){c.fillStyle=e.team.trim;c.fillRect(-bw/2*U,by0+.04*U,.03*U,.14*U);c.fillRect(bw/2*U-.03*U,by0+.04*U,.03*U,.14*U)}
   hands.forEach(([x,y])=>{c.fillStyle=e.skin;c.beginPath();c.arc(x*U,(y+sq)*U,.03*U,0,7);c.fill()});
   if(pose==='brush'){const [x,y]=hands[1];c.fillStyle='#6b4a2b';c.fillRect(x*U-.05*U,(y+sq)*U,.1*U,.04*U);c.fillStyle='#d9c79a';c.fillRect(x*U-.05*U,(y+sq)*U+.04*U,.1*U,.03*U)}
-  const hr=.12*U,hy=(-.9+sq)*U;
+  const hr=(fat?.135:.12)*U,hy=(-.9+sq)*U;   // 監督は丸顔
   c.fillStyle=e.hair;c.beginPath();c.arc(0,hy,hr,0,7);c.fill();
   if(face!=='b'||side){c.fillStyle=e.skin;c.beginPath();c.arc(side?hr*.08:0,hy+hr*.08,hr*.92,0,7);c.fill();
     c.fillStyle='#2a2a2a';(side?[hr*.5]:[-hr*.35,hr*.35]).forEach(x=>{c.beginPath();c.arc(x,hy+hr*.15,hr*.1,0,7);c.fill()});
@@ -3854,3 +3865,5 @@ if(document.fonts)document.fonts.load("700 16px 'Zen Maru Gothic'").catch(()=>{}
 startPhase(phaseAt(hourNow()));
 requestAnimationFrame(frame);
 </script>
+
+</html>

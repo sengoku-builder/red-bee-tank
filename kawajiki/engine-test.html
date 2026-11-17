@@ -1089,9 +1089,11 @@ class Game{
     this.stat.runs[half]=w.score[half];
   }
   atBat(inn,half){
+    this.curInn=inn;
     const w=this.w,T=this.teams[half],pl=T.players[this.order[half]%9];this.order[half]++;this.stat.PA++;
     const B=new KE.Player({id:pl.id,name:pl.name,sk:pl.sk,lefty:pl.lefty,team:half});B.x=B.lefty?0.95:-0.95;B.z=0;
     this.def.setDepth(sk(B,'bat'));this.def.batLefty=!!B.lefty;   // 打者を見て外野の深さ・盗塁のときの二塁カバーを決める
+    w.emit('paStart',{inn,half,who:B.name});
     const cnt={b:0,s:0},P=()=>this.def.F.P,occ=b=>w.runners.find(r=>r.rb.base===b&&!r.rb.out&&!r.rb.scored);
     let guardP=0;
     while(guardP++<60){
@@ -1117,6 +1119,7 @@ class Game{
       if(!sw.swing||!sw.contact){
         const C=this.def.F.C;let k3=false,bb=false;
         if(sw.swing||inZ){cnt.s++;if(cnt.s>=3)k3=true}else{cnt.b++;if(cnt.b>=4)bb=true}
+        if(!k3&&!bb)w.emit('pitchResult',{r:sw.swing?'swing':inZ?'strike':'ball',b:cnt.b,s:cnt.s});
         if(sw.bunt&&sw.swing&&cnt.s>=3)k3=true;   // スリーバント失敗も三振
         // キャッチャーが捕れるか：ワンバウンドや大きくそれた球はこぼす（ワイルドピッチ・パスボール）
         const loose=!bb&&this.wild(pitch,C);
@@ -1134,10 +1137,10 @@ class Game{
         continue;
       }
       // 打った（バントも）
-      this.stat.contacts.push({v:sw.v,va:sw.va,ang:sw.ang});
+      this.stat.contacts.push({v:sw.v,va:sw.va,ang:sw.ang});w.emit('pitchResult',{r:sw.bunt?'bunt':'inplay',b:cnt.b,s:cnt.s});
       const res=this.play(B,sw,inn,half);
       this.clearSteal();
-      if(res==='foul'){if(cnt.s<2||sw.bunt)cnt.s++;if(cnt.s>=3){w.outs++;this.stat.K[half]++;w.emit('out',{who:B.id,name:B.name,outType:'strike',outs:w.outs});this.log(inn,half,B,'スリーバント失敗');return}continue}
+      if(res==='foul'){if(cnt.s<2||sw.bunt)cnt.s++;w.emit('pitchResult',{r:'foul',b:cnt.b,s:cnt.s});if(cnt.s>=3){w.outs++;this.stat.K[half]++;w.emit('out',{who:B.id,name:B.name,outType:'strike',outs:w.outs});this.log(inn,half,B,'スリーバント失敗');return}continue}
       return;
     }
   }
@@ -1165,6 +1168,7 @@ class Game{
   // 投球のあとのプレー（盗塁・ワイルドピッチ・振り逃げ）
   livePlay(B,pitch,loose,drop3){
     const w=this.w,C=this.def.F.C,steal=w.runners.filter(r=>r.stealGo);
+    const f0=w.frames.length,t0=w.t,i0=w.log.length;
     this.def.reset();this.run_.reset();
     if(drop3){B.x=B.lefty?0.95:-0.95;B.z=0;B.vx=B.vz=0;B.stop();B.awake=true;B.wait=0.25;w.runners.push(B);B.side='R';
       B.rb={base:0,start:0,isBatter:true,out:false,scored:false,forceBase:null,forcer:null,mustRetouch:false,arr:{},judged:{}}}
@@ -1174,17 +1178,21 @@ class Game{
     else{w.ball.state='held';w.ball.holder=C;w.ball.x=C.x;w.ball.z=C.z;w.give(C,'catch')}
     let n=0;while(!w.umpire.ended&&n++<60*45){this.def.tick();this.run_.tick();w.step()}
     if(!w.umpire.ended)w.umpire.endPlay('time');
-    this.clearSteal();w.runners=w.runners.filter(r=>!r.rb.out&&!r.rb.scored&&r.rb.base>0)}
+    this.clearSteal();w.runners=w.runners.filter(r=>!r.rb.out&&!r.rb.scored&&r.rb.base>0);
+    const L=w.log.slice(i0),outs=L.filter(e=>e.type==='out').length,runs=L.filter(e=>e.type==='home').length;
+    this.plays.push({inn:this.curInn,half:w.half,who:B.name,txt:(drop3?'振り逃げ':loose?'ワイルドピッチ':'盗塁')+(outs?`（アウト${outs}）`:'')+(runs?`（${runs}点）`:''),outs:w.outs,score:[...w.score],f0,f1:w.frames.length,t0,t1:w.t,ev:L,live:true})}
   // 牽制：投手が一塁へ投げ、ランナーは帰塁する
   pickoff(r){
     const w=this.w,Pp=this.def.F.P,F1=this.def.F['1B'],[bx,bz]=basePos(1),[cx,cz]=basePos(2);
+    const f0=w.frames.length,t0=w.t,i0=w.log.length;
     this.def.reset();this.run_.reset();
     const L=1.2+2.0*(1-Y(sk(r,'iq'))),ux=(cx-bx)/FIELD.bd,uz=(cz-bz)/FIELD.bd;r.x=bx+ux*(L+0.5);r.z=bz+uz*(L+0.5);
     F1.x=bx+0.2;F1.z=bz-0.4;w.umpire.startPlay({});r.awake=false;r.goTo(bx,bz,{react:true});
     const aim=w.throwTo(Pp,[bx,bz,1.0],1,0.75);this.def.lastThrow={x:bx,z:bz,t1:w.t+aim.t,to:F1,base:1};this.def.cover={1:F1};w.emit('pickoff',{who:r.id});
     let n=0;while(!w.umpire.ended&&n++<60*45){this.def.tick();this.run_.tick();w.step()}
     if(!w.umpire.ended)w.umpire.endPlay('time');
-    w.runners=w.runners.filter(q=>!q.rb.out&&!q.rb.scored&&q.rb.base>0)}
+    w.runners=w.runners.filter(q=>!q.rb.out&&!q.rb.scored&&q.rb.base>0);
+    const Lg=w.log.slice(i0);this.plays.push({inn:this.curInn,half:w.half,who:r.name,txt:'牽制'+(Lg.some(e=>e.type==='out')?'（アウト）':''),outs:w.outs,score:[...w.score],f0,f1:w.frames.length,t0,t1:w.t,ev:Lg,live:true})}
   walk(B){const w=this.w,occ=b=>w.runners.find(r=>r.rb.base===b&&!r.rb.out&&!r.rb.scored);
     // 押し出し：一塁から続いているランナーだけ1つずつ進む
     const chain=[];for(let b=1;b<=3;b++){const r=occ(b);if(r)chain.push(r);else break}
@@ -1220,10 +1228,101 @@ class Game{
     this.log(inn,half,B,txt+(runs?`（${runs}点）`:'')+(this.playErr?`・エラー${this.playErr}`:''),{f0,f1:w.frames.length,t0,t1:w.t,ev:L});
     return txt;
   }
-  log(inn,half,B,txt,ex={}){this.plays.push({inn,half,who:B.name,txt,outs:this.w.outs,score:[...this.w.score],...ex})}
+  log(inn,half,B,txt,ex={}){this.w.emit('paEnd',{txt});this.plays.push({inn,half,who:B.name,txt,outs:this.w.outs,score:[...this.w.score],...ex})}
 }
 KE.Game=Game;
 
+if(typeof module!=='undefined'&&module.exports)module.exports=KE;
+})(typeof window!=='undefined'?window:globalThis);
+
+</script>
+<script>
+/* ============================================================
+   河川敷の少年野球 新エンジン 第5段：演出（セリフ・ジェスチャー・ズーム・一球速報）
+   試合の中身は「できごと」を知らせるだけ。ここはそれを聞いて「きっかけ（cue）」を並べる。
+   試合の動きには口を出さない（ここで何をしても試合結果は変わらない）。
+   cue = {t, k:'say'|'pose'|'zoom'|'call', who:{role}|{name}|{ump:0..3}|{bench:0|1}|{coach:1|3}, text, pose, dur, pri}
+   ============================================================ */
+(function(root){
+'use strict';
+const KE=root.KE||require('./engine.js');
+const pick=(rng,a)=>a[Math.floor(rng()*a.length)];
+const OUTN=['','ワンアウト!','ツーアウト!','スリーアウト!'];
+class Show{
+  constructor(game){
+    this.g=game;const w=this.w=game.w;this.cues=[];this.sokuho=[];this.last={};this.rng=KE.makeRng((game.o.seed||1)*31+5);
+    this.pa=null;const st=w.step.bind(w);w.step=(...a)=>{const r=st(...a);if(this._later&&this._later.length)this.flush();return r};const on=(e,f)=>w.on(e,x=>{try{f(x||{})}catch(err){}});
+    const R=()=>this.rng();
+    const fielder=id=>w.fielders.find(f=>f.id===id),runner=id=>w.runners.find(r=>r.id===id);
+    const roleOf=id=>{const f=fielder(id);return f?{role:f.role}:null};
+    const off=()=>w.half,def=()=>1-w.half;
+    // ---- 投球 ----
+    on('pitchOut',e=>{this.pose({role:'P'},'pitch',0.6);
+      if(e.steal){this.later(0.35,()=>this.say({role:'C'},'走った!',2));this.later(0.2,()=>this.say({bench:off()},'ゴー!',1))}
+      if(e.bunt)this.later(0.05,()=>this.say({role:'3B'},'バント!',1))});
+    on('pitchResult',e=>{
+      const s=this.pa;if(s)s.pitches.push(e.r);
+      if(e.r==='strike')this.call(0,'ストライク!','strike',1.0);
+      else if(e.r==='ball')this.call(0,'ボール','ball',0.8,0);
+      else if(e.r==='swing'){this.call(0,'ストライク!','strike',0.9);if(this.rng()<0.3)this.say({bench:def()},'ナイスボール!',0)}
+      else if(e.r==='foul')this.call(0,'ファウル!','foul',0.9);
+      if(e.r==='strike'&&e.s===2&&e.b<3&&this.rng()<0.5)this.say({bench:def()},'あと一球!',0)});
+    // ---- 打った ----
+    on('contact',e=>{this.lastContact=e;
+      // 捕れそうなフライなら、捕る子が「オーライ!」
+      this.later(0.55,()=>{const c=game.def&&game.def.cur;if(c&&c.air&&w.ball.state==='air'&&w.ball.bounces===0)this.say({role:c.f.role},pick(this.rng,['オーライ!','オーライ、オーライ!','まかせて!']),2)});
+      if(e.v>95&&e.va>15&&e.va<40)this.later(0.4,()=>this.say({bench:off()},'いったー!',1))});
+    on('overFence',()=>{this.zoom(null,3,false);this.say({bench:off()},'ホームラン!',3,2.2);this.later(0.6,()=>this.say({bench:def()},'ドンマイ、ドンマイ!',0))});
+    on('wall',()=>{this.zoom(null,1.6,false)});
+    on('flyCatch',e=>{const k=roleOf(e.who||w.ball.holder&&w.ball.holder.id);});
+    // 外野が拾ったら、中継・送球先の子が声で呼ぶ（「カット!」「一本!」）
+    on('pickup',e=>{const d=game.def;if(!d)return;const OF=['LF','CF','RF'];if(!OF.includes(e.role))return;
+      this.later(0.15,()=>{if(d.relay){this.say({role:d.relay.role},'こっち!',2);const tb=d.relayTarget?d.relayTarget():2,c=d.cover&&d.cover[tb];
+          if(c&&c!==d.relay)this.say({role:c.role},tb===4?'バックホーム!':'カット!',2)}
+        else{const c=d.cover&&d.cover[2];if(c)this.say({role:c.role},'一本!',1)}})});
+    on('throwTarget',e=>{if(e.rundown)return;const to=fielder(e.to);if(!to)return;
+      if(e.base===4)this.say({role:to.role},'バックホーム!',2);
+      if(e.base==null&&to)this.say({role:to.role},'オッケー!',0,0.8)});
+    on('dive',e=>{const k=roleOf(e.who);if(k)this.pose(k,'dive',0.9)});
+    on('diveCatch',e=>{this.zoom(null,1.8,true);this.later(0.4,()=>this.say({bench:def()},'ナイスキャッチ!',3))});
+    on('diveMiss',e=>{this.later(0.8,()=>this.say({role:'P'},'ドンマイ!',0))});
+    on('error',e=>{const k=roleOf(e.who);this.later(1.0,()=>this.say(k&&k.role==='P'?{role:'C'}:{role:'P'},'ドンマイ、切りかえ!',1));
+      this.later(0.6,()=>this.say({bench:def()},pick(this.rng,['あー!','おしい!','ドンマイ!']),0))});
+    on('rundown',e=>{this.say({bench:def()},'はさめ、はさめ!',1);this.zoom(null,2.4,false)});
+    // ---- 審判のコール ----
+    on('out',e=>{
+      if(e.margin!=null&&Math.abs(e.margin)<0.25)this.zoom(null,1.6,true);   // きわどいアウトはスローで寄る
+      if(e.outType==='strike'){this.call(0,e.looking===false?'バッターアウト!':'ストライク、バッターアウト!','outCall',1.4)}
+      else{const b=e.base!=null?e.base:this.baseNear(e.x,e.z);this.call(b===4?0:Math.max(1,Math.min(3,b||1)),'アウト!','outCall',1.3,2)}
+      const n=e.outs!=null?e.outs:w.outs;if(n>=1&&n<=3)this.later(0.9,()=>this.say({role:'C'},OUTN[n],1));
+      if(w.outs===3)this.later(1.2,()=>this.say({bench:def()},'ナイス守備!',0))});
+    on('safe',e=>{const b=e.base!=null?e.base:1;this.call(b===4?0:Math.max(1,Math.min(3,b)),'セーフ!','safe',1.2,2);if(e.close)this.zoom(null,1.4,true)});
+    on('home',e=>{if(e.walk)return;this.say({bench:off()},pick(this.rng,['ナイスラン!','よっしゃー!','ナイスバッティング!']),2);
+      const r=runner(e.who);if(r)this.say({name:r.name},'ただいま!',0,0.8)});
+    on('walk',()=>{this.call(0,'フォアボール','ball',1.2,1);this.later(0.5,()=>this.say({bench:off()},'ナイスセン!',0))});
+    on('wildPitch',()=>{this.say({bench:off()},'ゴー、ゴー!',2);this.later(0.2,()=>this.say({role:'P'},'カバー!',1))});
+    on('dropThird',()=>{this.say({bench:off()},'走れ!',3);this.later(0.2,()=>this.say({role:'C'},'ファースト!',1))});
+    on('pickoff',e=>{this.pose({role:'P'},'throw',0.5);this.later(0.15,()=>this.say({coach:1},'バック!',2))});
+    on('retouch',()=>{});
+    // 三塁コーチャー：本塁へ回すか止めるか（走者が三塁を回ったとき）
+    on('reach',e=>{if(e.base!==3)return;const r=runner(e.who);if(!r||r.rb.isBatter&&w.liveRunners.length>1&&false)return;
+      this.later(0.05,()=>{if(r.rb.out)return;if(r.plan===4)this.say({coach:3},'回れ回れ!',2);else if(r.speed>3)this.say({coach:3},'ストップ!',2)})});
+    on('playEnd',()=>{});
+    // ---- 一球速報 ----
+    on('paStart',e=>{this.pa={inn:e.inn,half:e.half,who:e.who,outs:w.outs,score:[...w.score],pitches:[],txt:''};});
+    on('paEnd',e=>{if(!this.pa)return;this.pa.txt=e.txt;this.pa.after={outs:w.outs,score:[...w.score]};this.sokuho.push(this.pa);this.pa=null});
+  }
+  // 同じ子が立て続けにしゃべらない・大事なセリフを優先
+  say(who,text,pri=1,dur=1.3){const w=this.w,key=JSON.stringify(who),t=w.t,l=this.last[key];
+    if(l&&t<l.until&&pri<=l.pri)return;this.last[key]={until:t+dur,pri};this.cues.push({t,k:'say',who,text,pri,dur})}
+  pose(who,pose,dur=0.8,face){this.cues.push({t:this.w.t,k:'pose',who,pose,dur,face})}
+  call(ump,text,pose,dur=1.2,pri=1){this.pose({ump},pose,dur);this.say({ump},text,pri,dur)}
+  zoom(at,dur=1.5,slow=false){const b=this.w.ball;this.cues.push({t:this.w.t,k:'zoom',at:at||[b.x,b.z],dur,slow})}
+  later(s,f){(this._later=this._later||[]).push({t:this.w.t+s,f})}
+  flush(){const w=this.w;if(!this._later)return;const due=this._later.filter(q=>w.t>=q.t);this._later=this._later.filter(q=>w.t<q.t);for(const q of due){try{q.f()}catch(e){}}}
+  baseNear(x,z){if(x==null)return 1;let b=1,bd=1e9;KE.FIELD.bases.forEach(([bx,bz],i)=>{const d=Math.hypot(x-bx,z-bz);if(d<bd){bd=d;b=i===0?4:i}});return b}
+}
+KE.Show=Show;
 if(typeof module!=='undefined'&&module.exports)module.exports=KE;
 })(typeof window!=='undefined'?window:globalThis);
 
@@ -1631,12 +1730,21 @@ const JP={P:'投',C:'捕','1B':'一','2B':'二','3B':'三',SS:'遊',LF:'左',CF:
 function dot(x,z,r,c,label){r*=1.6;ctx.fillStyle=c;ctx.beginPath();ctx.arc(X(x),Z(z),r,0,7);ctx.fill();if(label){ctx.fillStyle=css('--chalk');ctx.font=`bold 20px ${css('--body')}`;ctx.fillText(JP[label]||String(label).replace(/^\D+/,''),X(x)+r+3,Z(z)+7)}}
 function ball(x,z,h){ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(X(x),Z(z),4,2.5,0,0,7);ctx.fill();
   ctx.fillStyle='#fff';ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.beginPath();ctx.arc(X(x),Z(z)-h*S*0.55,6,0,7);ctx.fill();ctx.stroke()}
+// 第5段：セリフ（吹き出し）・審判・ベンチ・コーチャーの仮表示
+const UMPS=[[0,-2.6],[19.5,13.5],[5,35],[-19.5,13.5]],BENCH=[[-24,3],[24,3]],COACH={1:[20.5,12.5],3:[-20.5,12.5]};
+function bubble(x,z,text,big){ctx.font=`bold ${big?19:16}px ${css('--body')}`;const w=ctx.measureText(text).width+14,h=big?28:24,bx=Math.min(W-w-2,Math.max(2,X(x)-w/2)),by=Z(z)-h-16;
+  ctx.fillStyle='rgba(255,255,255,.94)';ctx.strokeStyle='#333';ctx.lineWidth=1.2;ctx.beginPath();ctx.roundRect?ctx.roundRect(bx,by,w,h,8):ctx.rect(bx,by,w,h);ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.moveTo(X(x)-5,by+h);ctx.lineTo(X(x),by+h+7);ctx.lineTo(X(x)+5,by+h);ctx.fill();ctx.fillStyle='#222';ctx.fillText(text,bx+7,by+h-8)}
+function whoPos(who,f){if(who.ump!=null)return UMPS[who.ump];if(who.bench!=null)return BENCH[who.bench];if(who.coach)return COACH[who.coach];
+  if(who.role){const p=(f.f||[]).find(q=>q[2]===who.role);return p&&[p[0],p[1]]}if(who.name){const p=(f.r||[]).find(q=>q[3]===who.name);return p&&[p[0],p[1]]}return null}
+function drawCues(cues,T,f){UMPS.forEach(([x,z])=>dot(x,z,4,'#333'));for(const c of cues){if(c.k!=='say'||T<c.t||T>c.t+c.dur)continue;const p=whoPos(c.who,f);if(p)bubble(p[0],p[1],c.text,c.pri>=2)}
+  const zm=cues.find(c=>c.k==='zoom'&&T>=c.t&&T<=c.t+c.dur);if(zm){ctx.strokeStyle='#e0a400';ctx.lineWidth=3;ctx.strokeRect(4,4,W-8,H-8);ctx.fillStyle='#e0a400';ctx.font=`bold 16px ${css('--body')}`;ctx.fillText(zm.slow?'ズーム・スロー':'ズーム',12,24)}}
 let anim=null;
 function play(frames,trail,done,end){cancelAnimationFrame(anim);let i=0,t0=performance.now();const T=frames[frames.length-1].t;
   const tick=now=>{const t=(now-t0)/1000;while(i<frames.length-1&&frames[i+1].t<=t)i++;field();
     if(trail){ctx.strokeStyle=css('--chalk');ctx.globalAlpha=.55;ctx.setLineDash([3,4]);ctx.beginPath();trail.forEach((q,j)=>{if(q[0]>t)return;j?ctx.lineTo(X(q[1]),Z(q[2])-q[3]*S*.55):ctx.moveTo(X(q[1]),Z(q[2])-q[3]*S*.55)});ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1}
     const f=frames[i];(f.f||[]).forEach(p=>dot(p[0],p[1],6,css('--fielder'),p[2]));(f.r||[]).forEach(p=>dot(p[0],p[1],6,p[2]?css('--mute'):css('--runner'),p[3]));
-    if(f.b)ball(...f.b);if(done)done(t);if(t<T+0.6)anim=requestAnimationFrame(tick);else if(end)end()};anim=requestAnimationFrame(tick)}
+    if(f.b)ball(...f.b);if(done)done(t,f);if(t<T+0.6)anim=requestAnimationFrame(tick);else if(end)end()};anim=requestAnimationFrame(tick)}
 const KIND={goro:()=>[r(20,32),r(-14,-4),r(-40,40),r(-1500,-300),r(-500,500)],liner:()=>[r(28,36),r(5,12),r(-35,35),r(500,1500),r(-500,500)],
   fly:()=>[r(22,28),r(26,36),r(-38,38),r(1500,2400),r(-600,600)],pop:()=>[r(18,26),r(65,80),r(-30,30),r(1500,2500),r(-400,400)],
   hr:()=>[r(39,43),r(26,32),r(-35,35),r(1800,2500),r(-300,300)],foul:()=>[r(20,30),r(10,35),(Math.random()<.5?-1:1)*r(47,60),r(800,2000),r(-500,500)],
@@ -1670,7 +1778,7 @@ setTimeout(()=>{allT=KT.runAll(KE,{base:true}).tests;base=renderTests({tests:all
 const SHOWN=/^(out|safe|home|fair|foul|hr|groundRule|runVoid|error|dive|diveCatch|misjudge|contact|overthrow|playEnd|rundown|retreat|couldHaveGone|rash|flyCatch)$/;
 $('#lvs').addEventListener('click',e=>{const lv=e.target.dataset&&e.target.dataset.lv;if(!lv)return;
   [...$('#lvs').children].forEach(b=>b.classList.toggle('on',b===e.target));$('#gsum').textContent='計算中…';
-  setTimeout(()=>{const seed=(Date.now()%100000)|0,rng=KE.makeRng(seed),g=new KE.Game({seed,record:true,teams:[KE.mkTeam('赤',+lv,rng),KE.mkTeam('青',+lv,rng)]}),s=g.run();
+  setTimeout(()=>{const seed=(Date.now()%100000)|0,rng=KE.makeRng(seed),g=new KE.Game({seed,record:true,teams:[KE.mkTeam('赤',+lv,rng),KE.mkTeam('青',+lv,rng)]}),sh=new KE.Show(g),s=g.run();
     const bad=s.viol.length;
     $('#gsum').innerHTML=`赤 ${s.runs[0]} − ${s.runs[1]} 青（${s.innings}回）　安打 ${s.H[0]}・${s.H[1]}　エラー ${s.E[0]}・${s.E[1]}　三振 ${s.K[0]}・${s.K[1]}　四球 ${s.BB[0]}・${s.BB[1]}　<span style="color:var(${bad?'--ng':'--ok'})">おかしな場面 ${bad}件</span>`;
     const fr=g.w.frames;
@@ -1683,7 +1791,8 @@ $('#lvs').addEventListener('click',e=>{const lv=e.target.dataset&&e.target.datas
       if(!(p.f1>p.f0)){$('#info').textContent=head;$('#log').innerHTML='';setTimeout(()=>show(i+1,id),1100);return}
       const frames=fr.slice(p.f0,p.f1).map(f=>({...f,t:f.t-t0}));$('#info').textContent='再生中：'+head;
       const ev2=(p.ev||[]).filter(e=>SHOWN.test(e.type)),shown=new Set();$('#log').innerHTML='';
-      play(frames,null,tt=>ev2.forEach((e,j)=>{if(e.t-t0<=tt&&!shown.has(j)){shown.add(j);$('#log').insertAdjacentHTML('beforeend',`<span>${(e.t-t0).toFixed(1)}秒 ${evText(e)}</span>`)}}),()=>setTimeout(()=>show(i+1,id),700))};
+      const sk=sh.sokuho.filter(q=>q.inn===p.inn&&q.half===p.half&&q.who===p.who).pop(),PJ={ball:'ボ',strike:'ス',swing:'空',foul:'フ',inplay:'打',bunt:'バ'};if(sk)$('#info').textContent+='　一球速報：'+sk.pitches.map(x=>PJ[x]||x).join(' ');
+      play(frames,null,(tt,f)=>{drawCues(sh.cues,t0+tt,f);ev2.forEach((e,j)=>{if(e.t-t0<=tt&&!shown.has(j)){shown.add(j);$('#log').insertAdjacentHTML('beforeend',`<span>${(e.t-t0).toFixed(1)}秒 ${evText(e)}</span>`)}})},()=>setTimeout(()=>show(i+1,id),700))};
     const start=i=>{seq++;show(i,seq)};
     $('#plays').onclick=ev=>{const i=ev.target.dataset&&ev.target.dataset.p;if(i!=null)start(+i)};
     $('#playAll').onclick=()=>start(0);

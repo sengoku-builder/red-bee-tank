@@ -877,7 +877,7 @@ class Defense{
       if(c&&c.dist(bx,bz)>=1&&c.eta(bx,bz)>this.throwT(h,bx,bz)+0.1&&pick.m>0.3){if(this.lunge)this.lunge.delete(c);if(c.tx==null||hyp(c.tx-bx,c.tz-bz)>0.5)c.goTo(bx,bz);this.decideAt=t+0.06;return}}
     if(pick){this.throwTo(h,this.cover[pick.b],pick.b,'out',pick.m>1.2?0.72:pick.m>0.6?0.85:1);return}   // 余裕があれば軽く、きわどければ全力
     // アウトにできる塁がない：先へ進もうとしているランナーの、向かっている塁のひとつ先へ返して余分な進塁を止める
-    const adv=live.filter(r=>!r.rb.mustRetouch&&r.plan>U.legalBase(r)&&!(r.rb.isBatter&&r.plan<=1))   // 一塁へ走っているだけの打者は対象外.sort((a,c)=>c.plan-a.plan)[0];
+    const adv=live.filter(r=>!r.rb.mustRetouch&&r.plan>U.legalBase(r)&&!(r.rb.isBatter&&r.plan<=1)).sort((a,c)=>c.plan-a.plan)[0];   // 一塁へ走っているだけの打者は対象外
     if(adv){let nb=Math.min(4,adv.plan+1),c=this.cover[nb];if(!c||c===h){nb=adv.plan;c=this.cover[nb]}   // 自分がその塁の担当（遠くでボールを拾った）なら、走者が向かう塁へ
       if(c&&c!==h&&h.dist(...basePos(nb))>3){this.throwTo(h,c,nb,'stop');return}}
     // 外野で持っている：中継か内野へ返す。内野どうしでは投げない（そのまま持って区切り）
@@ -963,7 +963,12 @@ class Running{
       if(r.route&&r.route.length){if(r.tx==null){const nb=r.route[0];if(r.rb.base>=nb){r.route.shift();continue}const[bx,bz]=basePos(nb);r.goTo(bx,bz,{react:true})}continue}
       if(p.dead)continue;
       const lb=U.legalBase(r),[lx,lz]=basePos(lb);
-      if(r.rb.mustRetouch){if(r.plan!==lb||r.tx==null){r.plan=lb;r.goTo(lx,lz,{react:true})}continue}
+      // フライを捕られて戻るときは、回った塁を踏み直して（逆の順に）元の塁へ。近道はしない
+      if(r.rb.mustRetouch){if(!r.backVia){r.backVia=[];for(let k=Math.min(3,r.rb.base);k>r.rb.start;k--)r.backVia.push(k)}
+        while(r.backVia.length){const[vx,vz]=basePos(r.backVia[0]);if(r.dist(vx,vz)<0.6)r.backVia.shift();else break}
+        const[gx,gz]=r.backVia.length?basePos(r.backVia[0]):[lx,lz];
+        if(r.plan!==lb||r.tx==null||hyp(r.tx-gx,r.tz-gz)>0.3){r.plan=lb;r.goTo(gx,gz,{react:r.tx==null,thru:r.backVia.length>0})}continue}
+      r.backVia=null;
       const pf=r.rb.forceBase&&r.rb.base<r.rb.forceBase&&!p.flyCaught&&p.fair!==false&&(()=>{let f=r.rb.forcer;while(f){if(f.rb.out)return false;f=f.rb.forcer}return true})();
       // 打者：内野ゴロは一塁を駆け抜ける。外野へ抜けたら回る
       if(r.rb.isBatter&&r.rb.base===0){

@@ -304,7 +304,7 @@ class Umpire{
       else w.emit('reach',{who:r.id,base:b});
       for(const pd of this.pend)if(pd.r===r&&pd.b===b&&!pd.done){pd.done=true;this.closeCall(r,b,t-pd.t,pd.type,pd.by)}
     }else if(b===rb.base-1&&b>=rb.start){rb.base=b;rb.arr[b]=t}
-    else if(b===rb.base)rb.arr[b]=t;   // 離れてまた戻った
+    else if(b===rb.base){if(!(rb.isBatter&&b===1&&!rb.turned))rb.arr[b]=t}   // 離れてまた戻った（一塁を駆け抜けて戻った打者は「着いた直後」扱いにしない）
   }
   // きわどい判定：m＝走者が着いた時刻−野手が着いた時刻（＋なら野手が先）。差が0.1秒より小さいときだけ五分五分に近づける
   closeCall(r,b,m,type,by){

@@ -286,6 +286,12 @@ function fielding(KE,T){
   const add=(name,ok,detail,S)=>T.push({group:'捕る・投げる（守備）',name,ok,detail:detail+(S&&S.ck.v.length?` ／チェック:${S.ck.v.map(v=>v.msg).join('、')}`:''),frames:S&&S.w.frames,log:S&&S.w.log.filter(e=>/^(out|safe|home|playEnd|fair|foul|error|throwTarget|catch|pickup|dive)$/.test(e.type))});
   { let home=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:70,seed:40+i,on:[1,2,3],hit:[13,-8,3,-600]}),o=S.outs[0];if(o&&o.base===4)home++;if(!last||o&&o.base===4)last=S}
     add('満塁でピッチャーゴロ→ホームでアウト（156の件）',home>=N*0.8,`${N}回中${home}回ホームでアウト（ほかは投げる塁をまちがえた・エラー）`,last);}
+  // 208：ふつうのピッチャーゴロ（バントではない）はファーストが一塁で受ける
+  { let ok=0,n=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:70,seed:600+i,hit:[16,-8,3,-600]});const t=S.log.find(e=>e.type==='throwTarget'&&e.base===1);if(!t)continue;n++;const f=S.w.fielders.find(f=>f.id===t.to);if(f&&f.role==='1B')ok++;if(!last||f&&f.role!=='1B')last=S}
+    add('バントでないピッチャーゴロは、ファーストが一塁に入って受ける（208の件）',n>0&&ok===n,`一塁送球${n}回のうちファーストが受けた${ok}回`,last);}
+  // 209：止めの送球は、走者が本当に先の塁を狙えるときだけ（二塁ランナーのファーストゴロで本塁へ投げない）
+  { let bad=0,N=12,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:60,seed:500+i,on:[2],hit:[18+(i%4)*2,-6,30+(i%3)*4,-900]});if(S.log.some(e=>e.type==='throwTarget'&&e.base===4))bad++;if(!last)last=S}
+    add('ランナー二塁のファーストゴロで、本塁へ無駄な送球をしない（209の件）',bad===0,`${N}回中${bad}回本塁へ送球`,last);}
   { let dp=0,N=12,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:90,seed:20+i,on:[1],run:40,hit:[21,-6,-18,-900]});if(S.outs.length===2&&S.outs[0].base===2&&S.outs[1].base===1)dp++;last=S}
     add('一塁ランナーありのショートゴロ→二塁→一塁のゲッツー（S級）',dp>=N*0.6,`${N}回中${dp}回ゲッツー`,last);}
   { let dp=0,N=12;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:30,seed:20+i,on:[1],run:40,hit:[21,-6,-18,-900]});if(S.outs.length===2)dp++}
@@ -357,8 +363,8 @@ function running(KE,T){
       if(S.log.some(e=>e.type==='flyCatch')&&!r.rb.out)ok++;last=S}
     add('浅いフライ：一塁ランナーは飛び出しすぎず、捕られたら戻ってセーフ',ok>=N*0.8,`${N}回中${ok}回戻ってセーフ`,last);}
   { let two=0,N=10,last;for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:50,run:70,seed:100+i,hit:[30,16,-40+i%2,800]});const B=S.w.runners.find(r=>r.id==='打者');
-      if(!B.rb.out&&B.rb.base>=2)two++;if(B.rb.base>=2&&!last)last=S}
-    add('三塁手の頭を越えてレフト線へ転がる当たりでは、打者は一塁を回って二塁をねらう',two>=N*0.2,`${N}回中${two}回二塁打以上`,last);}
+      if(!B.rb.out&&B.rb.base>=2||B.rb.turned)two++;if(B.rb.base>=2&&!last)last=S}
+    add('三塁手の頭を越えてレフト線へ転がる当たりでは、打者は一塁を回って二塁をねらう',two>=N*0.2,`${N}回中${two}回、一塁を回って二塁をねらった（二塁打を含む）`,last);}
   { const cnt=lv=>{let hes=0,rash=0;for(let i=0;i<40;i++){const S=fieldScene(KE,{lv,run:lv,seed:400+i,on:[1,2],hit:[24+(i%5)*2,4+(i%4)*4,-40+(i*13)%80,900]});
       hes+=S.log.filter(e=>e.type==='couldHaveGone').length;rash+=S.log.filter(e=>e.type==='rash').length}return{hes,rash}};
     const a=cnt(30),b=cnt(90);

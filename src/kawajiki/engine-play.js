@@ -191,7 +191,7 @@ class Defense{
         // ①捕る内野手の後ろ（打球の通り道の延長。抜けたら止める）
         give(inField(best.x*(d+13)/d,best.z*(d+13)/d),true);
         // ②送球の後ろ：投げる見込みのある塁（一塁と、押し出しの塁）。送球の線を塁の後ろへ延ばしたところ
-        const on=b=>live2.some(r=>r.rb.base===b),fb=[];if(!cOK)fb.push(1);if(on(1))fb.push(2);if(on(1)&&on(2))fb.push(3);
+        const on=b=>live2.some(r=>r.rb.base===b),fb=[1];if(on(1))fb.push(2);if(on(1)&&on(2))fb.push(3);
         for(const b of fb.reverse()){const[bx,bz]=basePos(b),dx=bx-best.x,dz=bz-best.z,dd=hyp(dx,dz)||1;give(inField(bx+dx/dd*12,bz+dz/dd*12),true)}}}
     const sb=F['2B'];if(!deep&&sb&&!busy.has(sb)&&!lunging(sb)){if(best.f===F.P){sb.goTo(2,21,{react:true});busy.add(sb)}else if(best.f===F['1B']){sb.goTo(14,21,{react:true});busy.add(sb)}}
     // ほかの子は定位置近くで様子を見る

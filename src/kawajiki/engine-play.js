@@ -87,7 +87,7 @@ class Defense{
   constructor(w){this.w=w;this.F={};this.involved=new Set();for(const f of w.fielders)this.F[f.role]=f;
     this.chaser=null;this.cover={};this.relay=null;this.nextPlan=0;this.decideAt=null;this.dove=new Set();this.tried=new Map();this.target=null;
     w.on('loose',()=>{this.nextPlan=w.t;this.decideAt=null});w.on('pickup',e=>{if(OF.includes(e.role))this.ofTouched=true});w.on('catch',e=>{if(OF.includes(e.role))this.ofTouched=true});w.on('wall',()=>this.nextPlan=w.t);}
-  reset(){this.ofTouched=false;this.lockRelay=null;this.firstPlan=true;this.lunge=null;this.involved=new Set();this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
+  reset(){this.ofTouched=false;this.lockRelay=null;this.firstPlan=true;this.lunge=null;this.involved=new Set();this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.cut=null;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
   // 外野の深さ：打者が強いほど下がる（レフト・ライト 能力30約46m・60約50m・S約54m、センターは+7m）
   setDepth(bat){const r=42+13*bat/100,o={};for(const[role,cr]of[['LF',r],['RF',r],['CF',r+7]]){const[x,z]=FIELD.pos[role],d=hyp(x,z);o[role]=[x*cr/d,z*cr/d]}this.opos=o}
   posOf(role){return this.opos&&this.opos[role]||FIELD.pos[role]}
@@ -161,6 +161,11 @@ class Defense{
         P.goTo(P.x+(bx-P.x)/d*s,P.z+(bz-P.z)/d*s,{react:true});this.lunge.set(P,t+0.9);this.involved.add(P)}}
     const lunging=f=>this.lunge&&this.lunge.get(f)>t;
     for(const b in cover){const f=cover[b],[bx,bz]=basePos(+b);if(f!==w.ball.holder&&!lunging(f))f.goTo(bx,bz,{react:true})}
+    // 外野の前に落ちたヒット（中継までは要らない近さ）：近いほうの二遊間は、送球する塁と外野手を結ぶ線の上に数メートル出て受ける（カットに入る）
+    this.cut=null;
+    if(!deep&&OF.includes(best.f.role)){const rt=best.x>=-1,a1=rt?F['2B']:F.SS,a2=rt?F.SS:F['2B'],ok=f=>f&&f!==cover[2]&&f!==best.f&&!busy.has(f);
+      const cut=ok(a1)?a1:ok(a2)?a2:null;
+      if(cut){busy.add(cut);this.cut=cut;if(!lunging(cut)){const tb=Math.min(3,Math.max(2,this.playBase())),[bx,bz]=basePos(tb),d=hyp(best.x-bx,best.z-bz)||1,k=Math.min(0.45,9/d);cut.goTo(bx+(best.x-bx)*k,bz+(best.z-bz)*k,{react:true})}}}
     if(relay&&lunging(relay)){}else if(relay){const tb=this.relayTarget(),[tx,tz]=basePos(tb),k=0.42;relay.goTo(best.x+(tx-best.x)*k,best.z+(tz-best.z)*k,{react:true})}
     // バックアップ：ピッチャーゴロはセカンドが投手の後ろ、ファーストゴロはセカンドが一塁の手伝い
     // サードゴロ：ショートはサードの斜め後ろ近く（はじいたボールを拾う役）
@@ -345,7 +350,7 @@ class Defense{
     if(stopT){this.throwTo(h,stopT.c,stopT.nb,'stop');return}
     // 外野で持っている：中継か内野へ返す。内野どうしでは投げない（そのまま持って区切り）
     if(OF.includes(h.role)||hyp(h.x,h.z)>FIELD.infieldR+3||hyp(h.x,h.z-15)>22){   // 外野や、ファウルグラウンドの遠くで持っている
-      let tgt=this.relay&&this.relay!==h?this.relay:this.nearestIF(h);
+      let tgt=this.relay&&this.relay!==h?this.relay:this.cut&&this.cut!==h?this.cut:this.nearestIF(h);
       // 返す相手は自分より内野側（8m以上近い）の子だけ。いなければ自分で内野へ持って戻る
       if(tgt&&(OF.includes(h.role)&&!OF.includes(tgt.role)&&tgt.dist(h.x,h.z)>4||hyp(tgt.x,tgt.z)<hyp(h.x,h.z)-8)){this.throwTo(h,tgt,null);return}   // 外野手は内野の子へすぐ返す
       h.goTo(h.x*0.6,h.z*0.6+10,{frac:0.7});this.decideAt=t+0.3;return}

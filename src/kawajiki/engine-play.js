@@ -178,8 +178,7 @@ class Defense{
     const lazy=f=>w.rng.chance(0.35*Y(sk(f,'iq')));   // 能力が低いとときどき出遅れる
     const pl0=w.umpire.play,steal=pl0&&!pl0.batted;
     // 盗塁：二塁に入らなかった二遊間とセンターは二塁の後ろ（送球がそれたとき用）
-    if(steal){const[bx,bz]=basePos(2);for(const f of[F.SS,F['2B']]){if(!f||f===cover[2]||busy.has(f)||lunging(f))continue;f.goTo(bx+(f===F.SS?-3:3),bz+5,{react:true});busy.add(f)}
-      const cf=F.CF;if(cf&&!busy.has(cf)){cf.goTo(bx,bz+18,{react:true,frac:0.9});busy.add(cf)}}
+    if(steal)this.stealBack(cover,busy);
     if(!deep&&!steal){const bu=[['RF',[24,10]],['CF',[0,42]],['LF',[-24,10]]];
       for(const[role,[x,z]]of bu){const f=F[role];if(!f||busy.has(f)||f===best.f)continue;if(role==='LF'&&!live2.some(r=>r.rb.base>=1&&r.rb.base<=2))continue;if(!lazy(f)){f.goTo(x,z,{react:true,frac:0.9});busy.add(f)}}
       const cc=F.C;if(cc&&!busy.has(cc)&&cc!==best.f&&!Object.values(cover).includes(cc)&&!live2.some(r=>r.rb.base>=2)){cc.goTo(17.5,9.5,{react:true});busy.add(cc)}}
@@ -269,7 +268,14 @@ class Defense{
     for(let b=1;b<=4;b++){const[bx,bz]=basePos(b);if(h.dist(bx,bz)<6&&(h.tx!=null&&hyp(h.tx-bx,h.tz-bz)<0.6||h.dist(bx,bz)<1.5||cover[b]&&h.dist(bx,bz)<cover[b].dist(bx,bz))){const o=cover[b];cover[b]=h;if(o&&o!==h&&o.dist(bx,bz)<2){const[px,pz]=this.posOf(o.role);o.goTo(px,pz,{frac:0.6})}}}
     this.cover=cover;this.relay=relay&&relay!==h?relay:null;
     for(const b in cover){const f=cover[b];if(f===h)continue;const[bx,bz]=basePos(+b);if(f.dist(bx,bz)>0.3)f.goTo(bx,bz)}
+    const pl=this.w.umpire.play;if(pl&&!pl.batted)this.stealBack(cover,new Set([h,...Object.values(cover)]));   // 盗塁：キャッチャーが捕った後も、二塁の後ろに入る
   }
+  // 盗塁のスタート（「走った!」の声）で、二塁のカバーとその後ろの子が動き出す。捕ってからでは遅い
+  stealStart(){const F=this.F,c2=this.batLefty?F.SS:F['2B'];if(!c2)return;const[bx,bz]=basePos(2);c2.goTo(bx,bz,{react:true});this.stealBack({2:c2},new Set([c2]))}
+  // 盗塁：二塁に入らなかった二遊間は二塁の後ろ、センターはさらに後ろ（送球がそれたとき用）
+  stealBack(cover,busy){const F=this.F,[bx,bz]=basePos(2),t=this.w.t,lg=f=>this.lunge&&this.lunge.get(f)>t;
+    for(const f of[F.SS,F['2B']]){if(!f||f===cover[2]||busy.has(f)||lg(f))continue;const x=bx+(f===F.SS?-3:3),z=bz+5;if(f.tx==null||hyp(f.tx-x,f.tz-z)>0.5)f.goTo(x,z,{react:true});busy.add(f)}
+    const cf=F.CF;if(cf&&!busy.has(cf)){if(cf.tx==null||hyp(cf.tx-bx,cf.tz-bz-18)>0.5)cf.goTo(bx,bz+18,{react:true,frac:0.9});busy.add(cf)}}
   // 外野から直接投げてよい距離（S級でもおよそ40m、能力が低いほど短い）
   directMax(h){return 22+18*sk(h,'thr')/100}
   // 直接投げる時間（遠いほど・肩が弱いほど、それて捕り直す分がかかる）と、中継を通す時間
@@ -601,6 +607,7 @@ class Game{
       const aim=KE.aimThrow(REL,[pitch.px,0.3,pitch.ph],pitch.v),c=Math.cos(aim.el);
       w.ball.holder=null;w.ball.launch(REL,[Math.sin(aim.yaw)*pitch.v*c,Math.cos(aim.yaw)*pitch.v*c,pitch.v*Math.sin(aim.el)],[Math.cos(aim.yaw)*150,-Math.sin(aim.yaw)*150,0],'pitch');
       w.ball.from=P();w.ball.relT=w.t;w.emit('pitchOut',{steal:plan.steal.length>0,bunt:!!plan.bunt});
+      if(plan.steal.some(r=>r.rb.base===1)&&!plan.bunt)this.def.stealStart();
       const sw=plan.bunt?KE.bunt(B,pitch,cnt,this.rng,plan.squeeze):plan.steal.length&&cnt.s<2&&this.rng.chance(0.75)?{swing:false}:KE.swing(B,pitch,cnt,this.rng);
       this.def.buntPlay=!!sw.bunt;   // 守備は打者の構えでバントとわかる
       let guard=0;while(w.ball.z>0.35&&w.ball.state==='air'&&guard++<300)w.step();

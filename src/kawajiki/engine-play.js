@@ -86,8 +86,10 @@ const IF=['P','C','1B','2B','3B','SS'],OF=['LF','CF','RF'];
 class Defense{
   constructor(w){this.w=w;this.F={};this.involved=new Set();for(const f of w.fielders)this.F[f.role]=f;
     this.chaser=null;this.cover={};this.relay=null;this.nextPlan=0;this.decideAt=null;this.dove=new Set();this.tried=new Map();this.target=null;
-    w.on('loose',()=>{this.nextPlan=w.t;this.decideAt=null});w.on('pickup',e=>{if(OF.includes(e.role))this.ofTouched=true});w.on('catch',e=>{if(OF.includes(e.role))this.ofTouched=true});w.on('wall',()=>this.nextPlan=w.t);}
-  reset(){this.ofTouched=false;this.lockRelay=null;this.firstPlan=true;this.lunge=null;this.involved=new Set();this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.cut=null;this.chased=false;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
+    w.on('loose',()=>{this.nextPlan=w.t;this.decideAt=null});w.on('pickup',e=>{if(OF.includes(e.role))this.ofTouched=true});w.on('catch',e=>{if(OF.includes(e.role))this.ofTouched=true});w.on('wall',()=>this.nextPlan=w.t);
+    // アウトが確定し、ほかに走っているランナーがいなければ、カバー（バックアップ）に走っていた子はそこで止まる
+    w.on('out',()=>{this.outStop=w.t+0.05});}
+  reset(){this.ofTouched=false;this.lockRelay=null;this.firstPlan=true;this.lunge=null;this.involved=new Set();this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.cut=null;this.chased=false;this.outStop=null;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
   // 外野の深さ：打者が強いほど下がる（レフト・ライト 能力30約46m・60約50m・S約54m、センターは+7m）
   setDepth(bat){const r=42+13*bat/100,o={};for(const[role,cr]of[['LF',r],['RF',r],['CF',r+7]]){const[x,z]=FIELD.pos[role],d=hyp(x,z);o[role]=[x*cr/d,z*cr/d]}this.opos=o}
   posOf(role){return this.opos&&this.opos[role]||FIELD.pos[role]}
@@ -240,6 +242,8 @@ class Defense{
   }
   tick(){
     const w=this.w,b=w.ball,t=w.t;if(b.state==='out')return;
+    if(this.outStop&&t>=this.outStop){const U=w.umpire;if(!w.liveRunners.some(r=>!r.rb.out&&!U.onBase(r))){this.outStop=null;const keep=new Set([...Object.values(this.cover),b.holder,this.chaser,this.relay,this.cut]);
+        for(const f of w.fielders)if(!keep.has(f)&&f.tx!=null){f.stop();if(this.lunge)this.lunge.delete(f)}}else this.outStop=t+0.1}
     if(b.state!=='held'){this.picked=b.state==='ground'||b.state==='rest';this.lastBallV=hyp(b.vx,b.vz)}
     if(b.state!=='held'){
       // 送球が飛んでいるあいだは、受ける子を動かさない（それたら届かなかった後で追う）

@@ -310,8 +310,8 @@ function fielding(KE,T){
     for(let i=0;i<N;i++){const S=fieldScene(KE,{lv:90,seed:620+i,hit:[18,-7,30,-600]});const th=S.log.find(e=>e.type==='throwTarget'&&e.base===1);const o=S.log.find(e=>e.type==='out'&&e.base===1);
       if(th&&rl(S,th.to)==='P'||o&&rl(S,o.by)==='1B')ok++;last=S}
     add('S級：ファーストゴロは、ピッチャーが一塁に入るか、ファーストが自分で踏む',ok>=N*0.75,`${N}回中${ok}回`,last);}
-  { const err=lv=>{let e=0,ch=0;for(let i=0;i<40;i++){const S=fieldScene(KE,{lv,seed:100+i,hit:[18+(i%5)*3,-6+(i%3)*2,-40+(i*7)%80,-600]});e+=S.log.filter(x=>x.type==='error').length;ch++}return e/ch};
-    const a=err(30),b=err(90);add('エラーは能力が低いほど多く、S級ではほとんど出ない',a>b*3&&b<0.08,`同じ40本のゴロで、能力30：1本あたり${a.toFixed(2)}回、能力90：${b.toFixed(2)}回`);}
+  { const err=lv=>{let e=0,ch=0;for(let i=0;i<200;i++){const S=fieldScene(KE,{lv,seed:1000+i,hit:[18+(i%5)*3,-6+(i%3)*2,-40+(i*7)%80,-600]});e+=S.log.filter(x=>x.type==='error').length;ch++}return e/ch};
+    const a=err(30),b=err(90);add('エラーは能力が低いほど多く、S級ではほとんど出ない',a>b*2.5&&b<0.06,`同じ200本のゴロで、能力30：1本あたり${a.toFixed(2)}回、能力90：${b.toFixed(2)}回`);}
 }
 function games(KE,T,N){
   const add=(name,ok,detail)=>T.push({group:'試合を通して',name,ok,detail});

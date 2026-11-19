@@ -374,7 +374,8 @@ class Defense{
       if(rT<bT+0.4&&(!stopT||nb>stopT.nb))stopT={nb,c}}
     if(stopT){this.throwTo(h,stopT.c,stopT.nb,'stop');return}
     // 外野で持っている：中継か内野へ返す。内野どうしでは投げない（そのまま持って区切り）
-    if(OF.includes(h.role)||hyp(h.x,h.z)>FIELD.infieldR+3||hyp(h.x,h.z-15)>22){   // 外野や、ファウルグラウンドの遠くで持っている
+    const nearBase=[1,2,3].some(k=>h.dist(...basePos(k))<4);   // 塁の上（近く）で持っている子は外野扱いしない
+    if(OF.includes(h.role)||!nearBase&&hyp(h.x,h.z)>FIELD.infieldR+6||hyp(h.x,h.z-15)>22){   // 外野や、ファウルグラウンドの遠くで持っている
       let tgt=this.relay&&this.relay!==h?this.relay:this.cut&&this.cut!==h?this.cut:this.nearestIF(h);
       // 返す相手は自分より内野側（8m以上近い）の子だけ。いなければ自分で内野へ持って戻る
       if(tgt&&(OF.includes(h.role)&&!OF.includes(tgt.role)&&tgt.dist(h.x,h.z)>4||hyp(tgt.x,tgt.z)<hyp(h.x,h.z)-8)){this.throwTo(h,tgt,null);return}   // 外野手は内野の子へすぐ返す
@@ -387,7 +388,9 @@ class Defense{
     return best}
   headingTo(r){if(r.tx==null)return null;for(let b=1;b<=4;b++){const[bx,bz]=basePos(b);if(hyp(r.tx-bx,r.tz-bz)<0.6)return b}return null}
   runnerT(r,b){const[bx,bz]=basePos(b);const d=r.dist(bx,bz);const toward=r.speed>0.3?(r.vx*(bx-r.x)+r.vz*(bz-r.z))/(d||1):0;
-    if(toward<-0.3)return 9;return r.eta(bx,bz)}
+    if(toward<-0.3){const U=this.w.umpire;if(b>U.legalBase(r))return 9;   // 先の塁から離れていく走者はそこへは来ない
+      return 0.3+0.4*Y(sk(r,'iq'))+r.speed/8+KE.etaRest(r,d,0)}   // 戻る塁：送球を見てから止まって引き返す時間（数歩回っただけならすぐ戻れる）
+    return r.eta(bx,bz)}
   nearestIF(h){let best=null,bd=1e9;for(const f of this.w.fielders){if(f===h||!['SS','2B','3B','1B','P'].includes(f.role))continue;const d=f.dist(h.x,h.z);if(d<bd){bd=d;best=f}}return best}
   throwTo(h,c,b,kind,effort){
     const w=this.w;let x=c.x,z=c.z;
@@ -552,7 +555,7 @@ class Running{
       if(r.dcs==null||t-r.dcs.t>0.3){
         const m=this.ballT(nb,r)-this.arrive(r,nb),rdy=r.ready,go=this.judge(r,m,0.15+(nb===4?-0.05:0),r.ready);r.dcs={t,go};r.ready=false;
         if(go){r.plan=nb;r.next=null;r.goTo(cx,cz,{react:!rdy});continue}}   // タッチアップのスタートは捕った瞬間（反応の遅れなし）
-      if(r.roundT&&t<r.roundT&&r.tx!=null)continue;   // 回っている途中（回りきってから戻る）
+      if(r.roundT&&t<r.roundT&&r.tx!=null&&r.dist(r.tx,r.tz)>0.3)continue;   // 回っている途中（回りきったらすぐ戻る）   // 回っている途中（回りきってから戻る）
       if(away&&(r.tx==null||hyp(r.tx-lx,r.tz-lz)>0.3))r.goTo(lx,lz);
     }
   }

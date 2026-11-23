@@ -189,7 +189,7 @@ function seeded(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s
 const S={talk:2, hour:null, names:2, night:false, zoom:true};
 try{const v=JSON.parse(localStorage.getItem('kawajiki.v1')||'{}'); if(v.talk!=null)S.talk=v.talk;if(v.names!=null)S.names=v.names;if(v.night!=null)S.night=v.night;if(v.zoom!=null)S.zoom=v.zoom;if(v.eco!=null)S.eco=v.eco;if(v.ecoA!=null)S.ecoA=v.ecoA;}catch(e){}
 function saveS(){try{localStorage.setItem('kawajiki.v1',JSON.stringify({talk:S.talk,names:S.names,night:S.night,zoom:S.zoom,eco:S.eco,ecoA:S.ecoA}))}catch(e){}}
-const BUILD='20261123134254';
+const BUILD='20261123172344';
 const SPEED=clamp(+(new URLSearchParams(location.search).get('speed')||1),1,30);
 const WALL=new URLSearchParams(location.search).has('wallpaper')||location.hash==='#wallpaper';
 // スマホの壁紙（?wallpaper）は歯車を隠す。PCの壁紙（?wallpaper=1 など）は歯車を出して設定できるようにする
@@ -2452,7 +2452,7 @@ function recTeam(tr,side){
   const rest=order.filter(k=>!kids.includes(k)&&!dh.includes(k));for(let i=0;i<9;i++)if(!kids[i])kids[i]=rest.shift()||mk({},9+i);
   const used=new Set(order.map(k=>k.name).concat(kids.map(k=>k.name))),subs=dh.slice();
   for(const n of shuffle(BOY_NAMES)){if(subs.length>=3+dh.length)break;if(used.has(n))continue;subs.push(mk({name:n},9+subs.length))}
-  const t=finishTeam(def,side,kids,subs,false,null);t.order=order;t.chem=.6;t.pitchers=[kids[0]];return t;
+  const t=finishTeam(def,side,kids,subs,false,null);t.order=order;t.chem=.6;t.pitchers=[kids[0]];if(tr.capt!=null&&order[tr.capt])t.rpCapt=order[tr.capt];return t;
 }
 function rpTeams(){const rec=G.rp.rec,a3=rec.bench==='a3';return{away:recTeam(rec.teams[0],a3?-1:1),home:recTeam(rec.teams[1],a3?1:-1)}}
 function rpTeamOf(ti){return ti===0?G.away:G.home}
@@ -2684,6 +2684,7 @@ async function rpBetween(batter,bat){
 
 /* ---------- captains' janken ---------- */
 function captainOf(t){
+  if(t.rpCapt&&t.all.includes(t.rpCapt))return t.rpCapt;
   if(t.mine){const dt=DB.teams.find(x=>x.id===t.tid);const pid=dt&&dt.captain;const k=pid&&t.all.find(k=>k.pid===pid);if(k)return k}
   return t.all.find(k=>k.num===10)||t.all[0]}
 const HANDS=[['グー','✊'],['チョキ','✌️'],['パー','✋']];

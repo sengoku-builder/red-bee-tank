@@ -558,9 +558,11 @@ function mRes(){
   return h;
 }
 function mOther(){
-  const st=ui.m;
-  let h=`<h3>その他の結果　<span class="muted">${esc(batterName())}</span></h3><div class="chips">${['HBP','IBB','KWP'].map(k=>`<button data-a="ores" data-v="${k}" aria-pressed="${st.res===k}">${RES[k].l}</button>`).join('')}</div>
-    <p class="muted">四球・三振はボール・ストライクの入力で自動で決まります。振り逃げは3つめの空振りを含めてここで入れてください。</p>`;
+  const st=ui.m,s0=SS();
+  // 振り逃げはツーストライクから。一塁にランナーがいるときは2アウトのときだけ
+  const kwpOk=s0.s===2&&(!s0.bases[0]||s0.outs===2);if(st.res==='KWP'&&!kwpOk){st.res=null}
+  let h=`<h3>その他の結果　<span class="muted">${esc(batterName())}</span></h3><div class="chips">${['HBP','IBB','KWP'].map(k=>`<button data-a="ores" data-v="${k}" aria-pressed="${st.res===k}"${k==='KWP'&&!kwpOk?' disabled':''}>${RES[k].l}</button>`).join('')}</div>
+    <p class="muted">四球・三振はボール・ストライクの入力で自動で決まります。振り逃げは3つめの空振りを含めてここで入れてください。${kwpOk?'':`<br>振り逃げは、ツーストライクのとき（一塁にランナーがいるときは2アウトのときだけ）選べます。今は${s0.b}-${s0.s}・${s0.outs}アウトです。`}</p>`;
   if(st.res){h+=`<div class="lbl">ランナーと打者</div>${runnerRows(st,true)}`;const c=checkMoves(st.m,true);if(c.err)h+=`<div class="warn">${c.err}</div>`}
   const ok=st.res&&!checkMoves(st.m,true).err;
   return h+`<div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="otherOk"${ok?'':' disabled'}>確定</button></div>`;

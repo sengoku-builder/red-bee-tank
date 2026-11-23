@@ -63,7 +63,9 @@ header.top h1{font-size:16px;margin:0;flex:1;white-space:nowrap;overflow:hidden;
 .row4 button{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:10px 0;font-size:13px}
 .feed{list-style:none;margin:0;padding:0}
 .feed li{padding:6px 2px;border-bottom:1px dashed var(--line);font-size:14px;line-height:1.45}
-.feed li.hd{border:0;padding-top:12px;font-weight:700;color:var(--navy)}
+.feed li.hd{border:0;margin-top:12px;padding:7px 10px;font-weight:700;font-size:15px;color:#fff;background:#2f6b4a;border-radius:9px}
+.feed li.hd:first-child{margin-top:0}
+.rz-hit{color:#1f5fbf;font-weight:700}.rz-bb{color:#8a5a34;font-weight:700}.rz-e{color:#e07b00;font-weight:700}
 .feed .pt{font-size:12px;color:var(--muted)}
 .feed .rs{color:#c0392b;font-weight:700}
 /* sheet */
@@ -444,7 +446,7 @@ function feedHTML(s,r,recent){
     const pa=it.pa;
     const pc=pa.p.map(p=>({B:'ボ',S:'見',W:'空',F:'フ',X:'打',H:'死',PK:'牽'}[p.k])).join(' '),np=pa.p.filter(p=>p.k!=='PK').length;
     const ed=!recent&&pa.firstEi!=null;
-    h+=`<li${ed?` class="ed" data-a="paMenu" data-pi="${s.pas.indexOf(pa)}"`:''}>${ed?'<span class="edt">直す・交代</span>':''}${recent?`<span class="muted">${innLabel(it.inn,it.half)}</span> `:''}<b>${pa.slot+1}番 ${esc(pa.name)}</b>：${esc(paText(pa))}${pa.runs?` <span class="rs">${pa.runs}点</span>`:''}
+    h+=`<li${ed?` class="ed" data-a="paMenu" data-pi="${s.pas.indexOf(pa)}"`:''}>${ed?'<span class="edt">直す・交代</span>':''}${recent?`<span class="muted">${innLabel(it.inn,it.half)}</span> `:''}<b>${pa.slot+1}番 ${esc(pa.name)}</b>：${recent?esc(paText(pa)):`<span class="${['1B','2B','3B','HR'].includes(pa.res)?'rz-hit':['BB','IBB','HBP'].includes(pa.res)?'rz-bb':pa.res==='E'?'rz-e':''}">${esc(paText(pa))}</span>`}${pa.runs?` <span class="rs">${pa.runs}点</span>`:''}
       ${!recent&&s.bad.has(pa.ei)?'<div class="bad">⚠ ランナーが合っていません。タップして直してください</div>':''}<div class="pt">${np}球（${pc||'-'}）${pa.res!=='CONT'?`　${pa.out?(pa.outNo?pa.outNo+'アウト':'アウト'):''}`:''}　投手 ${esc(pa.pitName)}</div></li>`;
   }
   if(!items.length)h+=`<li class="muted">ここに打席の結果が並びます</li>`;

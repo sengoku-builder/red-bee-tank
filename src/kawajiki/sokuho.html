@@ -17,6 +17,7 @@ input,select,textarea{font-family:var(--font);font-size:16px;color:var(--ink)}
 .wrap{max-width:560px;margin:0 auto;padding:0 10px 90px}
 header.top{position:sticky;top:0;z-index:5;background:#efe8d6;padding:8px 10px 6px;display:flex;align-items:center;gap:8px;max-width:560px;margin:0 auto}
 header.top h1{font-size:16px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib[aria-pressed=true]{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}
 .ib{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:7px 11px;font-size:14px}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-width:560px;margin:0 auto;padding:0 10px 8px;position:sticky;top:46px;z-index:5;background:#efe8d6}
 .tabs button{border:1px solid var(--line);background:var(--chip);border-radius:9px;padding:8px 0;font-size:14px;font-weight:700}
@@ -228,7 +229,7 @@ function sim(rec,upto,annotate){
     if(annotate){ev.i=s.inn;ev.h=s.half;ev.s=s.cur?s.cur.slot:s.next[s.half];ev.o=s.outs;ev.bs=s.bases.map(x=>x?1:0).join('')}
     if((ev.t==='pa'||ev.t==='run')&&ev.m&&ev.m.r){for(let j=0;j<3;j++){const has=!!s.bases[j],rec_=ev.m.r[j]!=null;if(has!==rec_&&!(ev.t==='pa'&&!has))s.bad.add(i)}
       if(ev.t==='pa'&&ev.m.r.some((d,j)=>d!=null&&!s.bases[j]))s.bad.add(i)}
-    apply(s,ev,i)}
+    s._idx=i;apply(s,ev,i)}
   return s;
 }
 function reannotate(rec){sim(rec,null,true)}
@@ -241,14 +242,14 @@ function coldNow(s,r){
   return false;
 }
 function curPA(s){
-  if(!s.cur){const t=s.half,slot=s.next[t];s.cur={t,slot,name:pname(s.lu[t],slot),inn:s.inn,p:[],res:null,f:[],bb:null,reach:0,scored:false,out:false,rbi:0,runs:0,pit:s.pit[1-t].length-1,pitName:s.pit[1-t].at(-1).name,done:false};s.pas.push(s.cur)}
+  if(!s.cur){const t=s.half,slot=s.next[t];s.cur={t,slot,name:pname(s.lu[t],slot),inn:s.inn,p:[],res:null,f:[],bb:null,reach:0,scored:false,out:false,rbi:0,runs:0,pit:s.pit[1-t].length-1,pitName:s.pit[1-t].at(-1).name,done:false,firstEi:s._idx};s.pas.push(s.cur)}
   return s.cur;
 }
 function pitchCount(s){s.pit[1-s.half].at(-1).n++}
 function apply(s,ev,idx){
   if(s.over)return;
   switch(ev.t){
-    case'p':{const pa=curPA(s);pitchCount(s);const q={k:ev.k,bunt:ev.bunt,wb:ev.wb,ft:ev.ft};pa.p.push(q);
+    case'p':{const pa=curPA(s);pitchCount(s);const q={k:ev.k,bunt:ev.bunt,wb:ev.wb,ft:ev.ft,ei:idx};pa.p.push(q);
       if(ev.k==='B')s.b++;else if(ev.k==='S'||ev.k==='W')s.s++;else if(ev.k==='F'){if(ev.bunt===1&&s.s>=2)s.s=3;else if(s.s<2)s.s++}
       q.b=s.b;q.s=s.s;
       if(ev.wb){const f=1-s.half,c=s.lu[f].find(x=>x.pos==='捕'),cn=(c&&c.name)||'キャッチャー';s.wb[f][cn]=(s.wb[f][cn]||0)+1}
@@ -256,20 +257,20 @@ function apply(s,ev,idx){
       else if(s.s>=3)finish(s,ev.k==='W'?'K':ev.k==='F'?'KB':'KL',defMoves('K',s.bases),[],null,idx,true);
       break}
     case'pa':{const pa=curPA(s);const pk=ev.res==='HBP'?'H':ev.res==='KWP'?'W':ev.res==='IBB'?null:'X';
-      if(pk){pitchCount(s);pa.p.push({k:pk,b:s.b,s:pk==='W'?3:s.s})}
+      if(pk){pitchCount(s);pa.p.push({k:pk,b:s.b,s:pk==='W'?3:s.s,ei:idx})}
       s._dc=ev.dc||null;finish(s,ev.res,ev.m,ev.f||[],ev.bb||null,idx,false);break}
     case'run':{
-      if(ev.pb&&(ev.why==='牽制'||ev.why==='牽制死')){const pa=curPA(s);pa.p.push({k:'PK',pb:ev.pb,out:ev.why==='牽制死'});const pp=s.pit[1-s.half].at(-1);pp.pk=(pp.pk||0)+1}
+      if(ev.pb&&(ev.why==='牽制'||ev.why==='牽制死')){const pa=curPA(s);pa.p.push({k:'PK',pb:ev.pb,out:ev.why==='牽制死',ei:idx});const pp=s.pit[1-s.half].at(-1);pp.pk=(pp.pk||0)+1}
       const runs=move(s,ev.m,null,ev.why);
       const tx=ev.pb&&(ev.why==='牽制'||ev.why==='牽制死')?`${ev.pb}塁へ牽制（${ev.why==='牽制死'?'アウト':'セーフ'}）`:runText(ev,runs);
       s.feed.push({k:'note',inn:s.inn,half:s.half,text:tx,ei:idx,run:true});three(s);break}
     case'sub':{const old=pname(s.lu[ev.team],ev.slot);s.lu[ev.team][ev.slot]={name:ev.name,pos:ev.pos,girl:!!ev.girl,left:!!ev.left};
       if(s.cur&&s.cur.t===ev.team&&s.cur.slot===ev.slot)s.cur.name=ev.name;
-      s.feed.push({k:'note',inn:s.inn,half:s.half,text:`選手交代：${ev.slot+1}番 ${old} → ${ev.name}（${ev.pos||'-'}）`});break}
+      s.feed.push({k:'note',inn:s.inn,half:s.half,text:`選手交代：${ev.slot+1}番 ${old} → ${ev.name}（${ev.pos||'-'}）`,ei:idx,chg:true});break}
     case'pc':{const lu=s.lu[ev.team],j=lu.findIndex(p=>p.name&&p.name===ev.name),pi=lu.findIndex(p=>p.pos==='投');
       if(j>=0&&pi>=0&&j!==pi){const op=lu[j].pos;lu[j].pos='投';lu[pi].pos=op}
       else if(j<0&&pi>=0)lu[pi]={...lu[pi],name:ev.name,girl:false,left:false};
-      s.pit[ev.team].push({name:ev.name,n:0});s.feed.push({k:'note',inn:s.inn,half:s.half,text:`ピッチャー交代：${ev.name}`});break}
+      s.pit[ev.team].push({name:ev.name,n:0});s.feed.push({k:'note',inn:s.inn,half:s.half,text:`ピッチャー交代：${ev.name}`,ei:idx,chg:true});break}
     case'end':s.over=true;s.endWhy=ev.why||'normal';s.feed.push({k:'note',inn:s.inn,half:s.half,text:ev.why&&ev.why!=='normal'?`試合終了（${ENDW[ev.why]||ev.why}）`:'試合終了'});break;
   }
 }
@@ -439,17 +440,17 @@ function feedHTML(s,r,recent){
   for(const it of items){
     const key=it.inn+'-'+it.half;
     if(!recent&&key!==lastKey){h+=`<li class="hd">${innLabel(it.inn,it.half)}（${esc(r.teams[it.half].name)}の攻撃）</li>`;lastKey=key}
-    if(it.k==='note'){const ed=!recent&&it.run;h+=`<li class="muted${ed?' ed':''}"${ed?` data-a="edit" data-ei="${it.ei}"`:''}>${ed?'<span class="edt">直す</span>':''}${recent?innLabel(it.inn,it.half)+'　':''}${esc(it.text)}${s.bad.has(it.ei)?'<div class="bad">⚠ ランナーが合っていません。タップして直してください</div>':''}</li>`;continue}
+    if(it.k==='note'){const ed=!recent&&(it.run||it.chg);h+=`<li class="muted${ed?' ed':''}"${ed?` data-a="${it.chg?'delAsk':'edit'}" data-ei="${it.ei}"`:''}>${ed?`<span class="edt">${it.chg?'削除':'直す'}</span>`:''}${recent?innLabel(it.inn,it.half)+'　':''}${esc(it.text)}${s.bad.has(it.ei)?'<div class="bad">⚠ ランナーが合っていません。タップして直してください</div>':''}</li>`;continue}
     const pa=it.pa;
     const pc=pa.p.map(p=>({B:'ボ',S:'見',W:'空',F:'フ',X:'打',H:'死',PK:'牽'}[p.k])).join(' '),np=pa.p.filter(p=>p.k!=='PK').length;
-    const ed=!recent&&!pa.auto&&pa.res!=='CONT'&&pa.ei!=null;
-    h+=`<li${ed?` class="ed" data-a="edit" data-ei="${pa.ei}"`:''}>${ed?'<span class="edt">直す</span>':''}${recent?`<span class="muted">${innLabel(it.inn,it.half)}</span> `:''}<b>${pa.slot+1}番 ${esc(pa.name)}</b>：${esc(paText(pa))}${pa.runs?` <span class="rs">${pa.runs}点</span>`:''}
+    const ed=!recent&&pa.firstEi!=null;
+    h+=`<li${ed?` class="ed" data-a="paMenu" data-pi="${s.pas.indexOf(pa)}"`:''}>${ed?'<span class="edt">直す・交代</span>':''}${recent?`<span class="muted">${innLabel(it.inn,it.half)}</span> `:''}<b>${pa.slot+1}番 ${esc(pa.name)}</b>：${esc(paText(pa))}${pa.runs?` <span class="rs">${pa.runs}点</span>`:''}
       ${!recent&&s.bad.has(pa.ei)?'<div class="bad">⚠ ランナーが合っていません。タップして直してください</div>':''}<div class="pt">${np}球（${pc||'-'}）${pa.res!=='CONT'?`　${pa.out?(pa.outNo?pa.outNo+'アウト':'アウト'):''}`:''}　投手 ${esc(pa.pitName)}</div></li>`;
   }
   if(!items.length)h+=`<li class="muted">ここに打席の結果が並びます</li>`;
   return h+'</ul>';
 }
-function vFeed(){const r=R(),s=S;return`<div class="sb">${lineScore(s,r)}</div><p class="muted">打席や走者の動きをタップすると、結果を直せます（四球・三振は投球から決まるので、投球を「1つ戻す」で直してください）。</p><div class="card">${feedHTML(s,r,false)}</div>`}
+function vFeed(){const r=R(),s=S;return`<div class="sb">${lineScore(s,r)}</div><p class="muted">打席をタップすると、結果を直したり、その打席の前や途中に交代を入れたりできます。走者の動きはタップで直せ、交代の行はタップで削除できます（四球・三振は投球から決まるので、投球を「1つ戻す」で直してください）。</p><div class="card">${feedHTML(s,r,false)}</div>`}
 function vStats(){
   const r=R(),s=S;let h='';
   [0,1].forEach(t=>{
@@ -480,6 +481,7 @@ function vSetup(){
   r.teams.forEach((t,ti)=>{
     h+=`<div class="card"><h2>${ti?'後攻':'先攻'}チーム</h2><div class="frm"><input type="text" data-k="tname" data-t="${ti}" value="${esc(t.name)}">
       <div><label>帽子の色（野球場で再生するときの色）</label><div class="caps">${CAPS.map(c=>`<button data-a="cap" data-t="${ti}" data-v="${c.k}" style="background:${c.c}" aria-pressed="${t.cap===c.k}" aria-label="${c.k}"></button>`).join('')}</div></div>
+      <div><label>キャプテン（野球場で試合前のじゃんけんをします）</label><select data-k="capt" data-t="${ti}"><option value="">おまかせ</option>${t.lineup.map((p,i)=>`<option value="${i}" ${t.capt===i?'selected':''}>${i+1}番 ${esc(p.name||`${i+1}番打者`)}</option>`).join('')}</select></div>
       <div><label>打順の人数</label><select data-k="nbat" data-t="${ti}"><option value="9" ${t.lineup.length<10?'selected':''}>9人</option><option value="10" ${t.lineup.length>=10?'selected':''}>10人（DH＋守備の9人全員が打つ）</option></select></div>
       <div><label>打順・名前・守備・右打ち/左打ち・女子</label>${t.lineup.map((p,i)=>`<div class="lu"><span class="n">${i+1}</span><input type="text" data-k="pn" data-t="${ti}" data-i="${i}" value="${esc(p.name)}" placeholder="${i+1}番打者">
         <select data-k="pp" data-t="${ti}" data-i="${i}">${POSOPT.map(o=>`<option value="${o}" ${p.pos===o?'selected':''}>${o||'-'}</option>`).join('')}</select>
@@ -577,8 +579,8 @@ function mRun(){
   return h+`<div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="runOk"${!c.err&&moved?'':' disabled'}>確定</button></div>`;
 }
 function mChg(){
-  const st=ui.m,s=S,r=R();
-  let h=`<h3>交代</h3><div class="chips"><button data-a="ckind" data-v="sub" aria-pressed="${st.kind==='sub'}">選手交代（代打・代走・守備）</button><button data-a="ckind" data-v="pc" aria-pressed="${st.kind==='pc'}">ピッチャー交代</button></div>`;
+  const st=ui.m,s=SS(),r=R();
+  let h=`<h3>交代</h3>${st.insAt!=null?'<p class="muted">試合のあとから交代を入れています（選んだ場所から新しい選手の記録になります）</p>':''}<div class="chips"><button data-a="ckind" data-v="sub" aria-pressed="${st.kind==='sub'}">選手交代（代打・代走・守備）</button><button data-a="ckind" data-v="pc" aria-pressed="${st.kind==='pc'}">ピッチャー交代</button></div>`;
   if(st.kind==='sub'){
     h+=`<div class="lbl">チーム</div><div class="chips">${[0,1].map(t=>`<button data-a="cteam" data-v="${t}" aria-pressed="${st.team===t}">${esc(r.teams[t].name)}${t===s.half?'（攻撃）':'（守備）'}</button>`).join('')}</div>
       <div class="lbl">打順（入れかわる選手）</div><div class="chips">${s.lu[st.team].map((p,i)=>`<button data-a="cslot" data-v="${i}" aria-pressed="${st.slot===i}">${i+1} ${esc(pname(s.lu[st.team],i))}</button>`).join('')}</div>
@@ -593,6 +595,21 @@ function mChg(){
   }
   return h+`<div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="chgOk"${st.kind?'':' disabled'}>確定</button></div>`;
 }
+function mPaMenu(){
+  const st=ui.m,pa=S.pas[st.pi];if(!pa)return'<p>見つかりません</p><div class="acts"><button data-a="close">閉じる</button></div>';
+  const canEdit=!pa.auto&&pa.res!=='CONT'&&pa.ei!=null,last=pa.p.length-1;
+  let n=0,h=`<h3>${innLabel(pa.inn,pa.t)}　${pa.slot+1}番 ${esc(pa.name)}</h3><p>${esc(paText(pa))}</p>`;
+  if(canEdit)h+=`<div class="acts" style="margin-top:4px"><button class="ok" data-a="edit" data-ei="${pa.ei}">結果を直す</button></div>`;
+  h+=`<div class="lbl">交代を入れる場所を選ぶ</div><ul class="pl">
+    <li><span></span><span><button class="ib" data-a="insAt" data-v="${pa.firstEi}" aria-pressed="${st.at===pa.firstEi}">${st.at===pa.firstEi?'✓ ':''}この打席の前で交代</button></span><span></span></li>`;
+  pa.p.forEach((p,i)=>{
+    h+=p.k==='PK'?`<li><span class="no">－</span><span class="muted">牽制（${p.pb}塁・${p.out?'アウト':'セーフ'}）</span><span></span></li>`:`<li><span class="no">${++n}球</span><span class="k-${p.k}">${esc(pitchLabel(p))}</span><span class="ct">${p.b}-${p.s}</span></li>`;
+    if(i<last||pa.res==='CONT'){const at=p.ei+1;h+=`<li><span></span><span><button class="ib" data-a="insAt" data-v="${at}" aria-pressed="${st.at===at}">${st.at===at?'✓ ':''}ここで交代</button></span><span></span></li>`}
+  });
+  h+=`</ul>${pa.auto?'<p class="muted">四球・三振の結果は、投球から決まるのでここでは直せません。</p>':''}
+    <div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="insGo"${st.at!=null?'':' disabled'}>交代を入れる</button></div>`;
+  return h;
+}
 function mEnd(){const st=ui.m;return`<h3>試合終了</h3><p class="muted">終わり方を選んでください（あとで「取り消す」で戻せます）</p><div class="chips">${Object.entries(ENDW).map(([k,l])=>`<button data-a="ewhy" data-v="${k}" aria-pressed="${st.why===k}">${l}</button>`).join('')}</div>
   <div class="acts"><button data-a="close">やめる</button><button class="ok" data-a="endYes">試合終了</button></div>`}
 function mPko(){const st=ui.m,s=S;return`<h3>牽制</h3><div class="lbl">どの塁へ？</div><div class="chips">${[1,2,3].filter(b=>s.bases[b-1]).map(b=>`<button data-a="pkb" data-v="${b}" aria-pressed="${st.pb===b}">${b}塁（${esc(s.bases[b-1].name)}）</button>`).join('')}</div>
@@ -604,7 +621,7 @@ function renderModal(){
   const md=$('#modal');
   if(!ui.m){md.innerHTML='';return}
   const sc=md.querySelector('.sheet');const top=sc?sc.scrollTop:0;
-  const f={res:mRes,other:mOther,run:mRun,chg:mChg,confirm:mConfirm,info:mInfo,end:mEnd,pko:mPko}[ui.m.type];
+  const f={res:mRes,other:mOther,run:mRun,chg:mChg,confirm:mConfirm,info:mInfo,end:mEnd,pko:mPko,pamenu:mPaMenu}[ui.m.type];
   md.innerHTML=`<div class="ov" data-a="ovclose"><div class="sheet" role="dialog">${f()}</div></div>`;
   const ns=md.querySelector('.sheet');if(ns&&sc)ns.scrollTop=top;
   const fld=$('#fld');if(fld)fld.addEventListener('click',onField);
@@ -703,11 +720,16 @@ function act(a,d,el,ev0){
       commitEv(ev);ui.m=null;break}
     case'ckind':ui.m.kind=d.v;ui.m.name='';break;
     case'cteam':ui.m.team=+d.v;break;
-    case'cslot':{ui.m.slot=+d.v;const p=S.lu[ui.m.team][ui.m.slot];ui.m.pos=p?p.pos:'';ui.m.left=!!(p&&p.left);break}
+    case'cslot':{ui.m.slot=+d.v;const p=SS().lu[ui.m.team][ui.m.slot];ui.m.pos=p?p.pos:'';ui.m.left=!!(p&&p.left);break}
     case'cpick':ui.m.name=d.v;break;
     case'chgOk':{const st=ui.m,nm=($('#cName')||{}).value||st.name;if(!nm.trim()){toast('名前を入れてください');return}
-      if(st.kind==='sub')push({t:'sub',team:st.team,slot:st.slot,name:nm.trim(),pos:($('#cPos')||{}).value||'',left:!!st.left});
-      else push({t:'pc',team:1-S.half,name:nm.trim()});ui.m=null;break}
+      const cev=st.kind==='sub'?{t:'sub',team:st.team,slot:st.slot,name:nm.trim(),pos:($('#cPos')||{}).value||'',left:!!st.left}:{t:'pc',team:1-SS().half,name:nm.trim()};
+      if(st.insAt!=null){r.events.splice(st.insAt,0,cev);reannotate(r);touch();recalc();toast('交代を入れました')}else push(cev);ui.m=null;break}
+    case'paMenu':ui.m={type:'pamenu',pi:+d.pi,at:null};break;
+    case'insAt':ui.m.at=+d.v;break;
+    case'insGo':{const at=ui.m.at;if(at==null)return;const S0=sim(r,at);ui.m={type:'chg',S:S0,insAt:at,kind:null,team:S0.half,slot:S0.cur?S0.cur.slot:S0.next[S0.half],name:'',pos:''};break}
+    case'delAsk':{const ev=r.events[+d.ei];if(!ev)return;ui.m={type:'confirm',title:'交代を削除',text:ev.t==='pc'?`ピッチャー交代（${ev.name}）を記録から消します。`:`選手交代（${ev.slot+1}番 → ${ev.name}）を記録から消します。`,ok:'delEvYes',okl:'削除する',id:d.ei};break}
+    case'delEvYes':{const i=+d.id,ev=r.events[i];if(ev&&(ev.t==='sub'||ev.t==='pc')){r.events.splice(i,1);reannotate(r);touch();recalc();toast('削除しました')}ui.m=null;break}
     case'undo':{if(!r||!r.events.length)return;ui.bunt=false;r.events.pop();touch();recalc();toast('1つ戻しました');break}
     case'endAsk':ui.m={type:'end',why:coldNow(S,r)?'cold':'normal'};break;
     case'endYes':push({t:'end',why:ui.m&&ui.m.why||'normal'});ui.m=null;break;
@@ -726,6 +748,7 @@ document.addEventListener('change',e=>{const el=e.target,k=el.dataset.k,r=R();if
   else if(k==='tname')r.teams[+el.dataset.t].name=el.value||'チーム';
   else if(k==='pn')r.teams[+el.dataset.t].lineup[+el.dataset.i].name=el.value.trim();
   else if(k==='pp')r.teams[+el.dataset.t].lineup[+el.dataset.i].pos=el.value;
+  else if(k==='capt'){const t=r.teams[+el.dataset.t];t.capt=el.value===''?null:+el.value}
   else if(k==='nbat'){const t=r.teams[+el.dataset.t];if(el.value==='10'&&t.lineup.length<10)t.lineup.push({name:'',pos:t.lineup.some(x=>x.pos==='DH')?'':'DH',girl:false});else if(el.value==='9'&&t.lineup.length>=10)t.lineup.length=9}
   else if(k==='dhp'){const t=r.teams[+el.dataset.t];t.dhp=t.dhp||{};t.dhp.name=el.value.trim()}
   else if(k==='cinn'||k==='cd'){r.cold=(r.cold||DEFCOLD).map(c=>({...c}));const c=r.cold[+el.dataset.j],v=parseInt(el.value,10);c[k==='cinn'?'inn':'d']=v>0?v:0}

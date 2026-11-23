@@ -2449,7 +2449,7 @@ function recTeam(tr,side){
   const rest=order.filter(k=>!kids.includes(k)&&!dh.includes(k));for(let i=0;i<9;i++)if(!kids[i])kids[i]=rest.shift()||mk({},9+i);
   const used=new Set(order.map(k=>k.name).concat(kids.map(k=>k.name))),subs=dh.slice();
   for(const n of shuffle(BOY_NAMES)){if(subs.length>=3+dh.length)break;if(used.has(n))continue;subs.push(mk({name:n},9+subs.length))}
-  const t=finishTeam(def,side,kids,subs,false,null);t.order=order;t.chem=.6;t.pitchers=[kids[0]];return t;
+  const t=finishTeam(def,side,kids,subs,false,null);t.order=order;t.chem=.6;t.pitchers=[kids[0]];if(tr.capt!=null&&order[tr.capt])t.rpCapt=order[tr.capt];return t;
 }
 function rpTeams(){const rec=G.rp.rec,a3=rec.bench==='a3';return{away:recTeam(rec.teams[0],a3?-1:1),home:recTeam(rec.teams[1],a3?1:-1)}}
 function rpTeamOf(ti){return ti===0?G.away:G.home}
@@ -2681,6 +2681,7 @@ async function rpBetween(batter,bat){
 
 /* ---------- captains' janken ---------- */
 function captainOf(t){
+  if(t.rpCapt&&t.all.includes(t.rpCapt))return t.rpCapt;
   if(t.mine){const dt=DB.teams.find(x=>x.id===t.tid);const pid=dt&&dt.captain;const k=pid&&t.all.find(k=>k.pid===pid);if(k)return k}
   return t.all.find(k=>k.num===10)||t.all[0]}
 const HANDS=[['グー','✊'],['チョキ','✌️'],['パー','✋']];

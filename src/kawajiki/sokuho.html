@@ -201,7 +201,8 @@ function touch(){const r=R();if(r)r.updated=Date.now();save()}
 
 /* ---------- 試合の進行（記録から毎回組み立てる） ---------- */
 function pname(lu,slot){const p=lu[slot];return(p&&p.name)||`${slot+1}番打者`}
-function hasDH(t){return t.lineup.some(x=>x.pos==='DH')}
+// DH制で、ピッチャーが打順に入らない（9人打順）ときだけ true。10人打順（DH＋守備9人全員が打つ）は false
+function hasDH(t){return t.lineup.some(x=>x.pos==='DH')&&t.lineup.length<10}
 function pitcherOf(t){if(hasDH(t))return(t.dhp&&t.dhp.name)||'ピッチャー';const p=t.lineup.find(x=>x.pos==='投');return p&&p.name?p.name:'ピッチャー'}
 function defMoves(res,bases){
   const o=bases.map(Boolean),r=[null,null,null];
@@ -288,7 +289,7 @@ function finish(s,res,m,f,bb,ei,auto){
   const runs=move(s,m||defMoves(res,s.bases),pa);
   pa.runs=runs;pa.rbi=RES[res].norbi?0:runs;
   s.feed.push({k:'pa',inn:s.inn,half:t,pa});
-  s.next[t]=(pa.slot+1)%9;s.cur=null;s.b=0;s.s=0;
+  s.next[t]=(pa.slot+1)%s.lu[t].length;s.cur=null;s.b=0;s.s=0;
   three(s);
 }
 function three(s){
@@ -479,6 +480,7 @@ function vSetup(){
   r.teams.forEach((t,ti)=>{
     h+=`<div class="card"><h2>${ti?'後攻':'先攻'}チーム</h2><div class="frm"><input type="text" data-k="tname" data-t="${ti}" value="${esc(t.name)}">
       <div><label>帽子の色（野球場で再生するときの色）</label><div class="caps">${CAPS.map(c=>`<button data-a="cap" data-t="${ti}" data-v="${c.k}" style="background:${c.c}" aria-pressed="${t.cap===c.k}" aria-label="${c.k}"></button>`).join('')}</div></div>
+      <div><label>打順の人数</label><select data-k="nbat" data-t="${ti}"><option value="9" ${t.lineup.length<10?'selected':''}>9人</option><option value="10" ${t.lineup.length>=10?'selected':''}>10人（DH＋守備の9人全員が打つ）</option></select></div>
       <div><label>打順・名前・守備・右打ち/左打ち・女子</label>${t.lineup.map((p,i)=>`<div class="lu"><span class="n">${i+1}</span><input type="text" data-k="pn" data-t="${ti}" data-i="${i}" value="${esc(p.name)}" placeholder="${i+1}番打者">
         <select data-k="pp" data-t="${ti}" data-i="${i}">${POSOPT.map(o=>`<option value="${o}" ${p.pos===o?'selected':''}>${o||'-'}</option>`).join('')}</select>
         <button data-a="lr" data-t="${ti}" data-i="${i}" aria-pressed="false">${p.left?'左':'右'}</button><button data-a="girl" data-t="${ti}" data-i="${i}" aria-pressed="${!!p.girl}">女子</button></div>`).join('')}</div>
@@ -722,10 +724,11 @@ document.addEventListener('change',e=>{const el=e.target,k=el.dataset.k,r=R();if
   else if(k==='tname')r.teams[+el.dataset.t].name=el.value||'チーム';
   else if(k==='pn')r.teams[+el.dataset.t].lineup[+el.dataset.i].name=el.value.trim();
   else if(k==='pp')r.teams[+el.dataset.t].lineup[+el.dataset.i].pos=el.value;
+  else if(k==='nbat'){const t=r.teams[+el.dataset.t];if(el.value==='10'&&t.lineup.length<10)t.lineup.push({name:'',pos:t.lineup.some(x=>x.pos==='DH')?'':'DH',girl:false});else if(el.value==='9'&&t.lineup.length>=10)t.lineup.length=9}
   else if(k==='dhp'){const t=r.teams[+el.dataset.t];t.dhp=t.dhp||{};t.dhp.name=el.value.trim()}
   else if(k==='cinn'||k==='cd'){r.cold=(r.cold||DEFCOLD).map(c=>({...c}));const c=r.cold[+el.dataset.j],v=parseInt(el.value,10);c[k==='cinn'?'inn':'d']=v>0?v:0}
   touch();recalc();$('#hTitle').textContent=`${r.teams[0].name} vs ${r.teams[1].name}`;
-  if(k==='pp')render();
+  if(k==='pp'||k==='nbat')render();
 });
 document.addEventListener('input',e=>{const el=e.target;if(el.id==='cName'&&ui.m)ui.m.name=el.value;if(el.id==='cPos'&&ui.m)ui.m.pos=el.value});
 $('#hBack').addEventListener('click',()=>{if(ui.m){ui.m=null}else{ui.view='list';ui.id=null}render()});

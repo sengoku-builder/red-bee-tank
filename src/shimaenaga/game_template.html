@@ -173,6 +173,11 @@ const ITEMS=[
  {id:'nest',name:'巣材（苔・地衣類・羽根）',price:8000,img:'lv3',need:'water',desc:'巣作りの材料を森にそっと置いておきます。つがいが生まれるきっかけに。',note:'nestmat'},
  {id:'icicle',name:'つららの枝',price:6000,img:'lv4',need:'nest',desc:'枝先に下がるつらら。冬のシマエナガのお気に入りの水飲み場です（つららは冬の森だけに出ます）。',note:'icicle'},
  {id:'sunflower',emo:'🌻',name:'ひまわりの種のエサ台',price:3000,need:'feeder',desc:'カラの仲間やゴジュウカラの大好物。ほかの小鳥も、たまに森をのぞきに来るように。',note:'sunflower'},
+ {id:'maple',emo:'🍁',img:'sp_maple',name:'イタヤカエデの若木',price:6000,need:'feeder',desc:'冬の終わり、枝の傷から甘い樹液のつららが下がります。冬と春の森で、なめに来る姿が見られることも。',note:'maple'},
+ {id:'log',emo:'🪵',img:'sp_log',name:'苔むした朽ち木',price:5000,need:'feeder',desc:'虫がたくさんすむ倒木。子育ての時期、ヒナに運ぶ虫をくわえた親鳥が寄るように。',note:'log'},
+ {id:'fir',emo:'🌲',img:'sp_roost',name:'トドマツの若木',price:8000,need:'feeder',desc:'冬も葉が落ちない針葉樹。夜に壁紙を見ると、寄り添って眠る「ねぐらの団子」に会えることも。',note:'fir'},
+ {id:'down',emo:'🪶',name:'羽毛の巣材',price:7000,need:'nest',desc:'巣に敷きつめる、ふかふかの羽毛。次の子育てから、ヒナが7羽に増えます。',note:'down'},
+ {id:'treat',emo:'🎂',repeat:true,name:'特製バードケーキ（ごちそう）',price:500,need:'feeder',desc:'1日1回あげられます。その日は鳥がよく来て、仲間も来やすくなります。'},
  {id:'binoc',group:'obs',emo:'🔭',name:'双眼鏡',price:2000,desc:'やってきた群れの数を数えたり、名前を付けた子が混じっているか見分けたりできます。',note:'binoc'},
  {id:'camera',group:'obs',emo:'📷',name:'カメラ',price:5000,desc:'森の様子を撮って、アルバムに残せます。お気に入りはスマホにも保存できます。',note:'camera'},
  {id:'hide',group:'obs',img:'c1',name:'観察小屋（ブラインド）',price:10000,desc:'姿を隠して見守れる小屋。シマエナガがすぐ近くまで来てくれるようになります。',note:'hide'},
@@ -184,13 +189,18 @@ function saleInfo(t){t=t||now();const d=dkey(t),h=hstr('sale'+d);
  const start=dayStart(t)+(7*60+h%(15*60))*MIN,end=start+SALE_MIN;  // 7:00〜21:59のどこかで始まる
  if(t<start||t>=end)return null;
  const before=id=>S.owned[id]&&S.owned[id]<start;
- const c=ITEMS.filter(it=>!it.soon&&!before(it.id)&&(!it.need||before(it.need)));
+ const c=ITEMS.filter(it=>!it.soon&&!it.repeat&&!before(it.id)&&(!it.need||before(it.need)));
  if(!c.length)return null;
  const it=c[(h>>>12)%c.length];if(S.owned[it.id])return null;   // もう買った
  return{it,pct:[20,30,40,50][(h>>>8)%4],end}}
 function priceOf(it){const sl=saleInfo();return sl&&sl.it===it?Math.round(it.price*(100-sl.pct)/100/10)*10:it.price}
 const level=()=>S.owned.icicle&&S.owned.nest?4:S.owned.nest?3:S.owned.water?2:S.owned.feeder?1:0;
-function buy(it){tick();const pr=priceOf(it),onSale=pr<it.price;if(S.owned[it.id]||S.g<pr||(it.need&&!S.owned[it.need]))return false;
+function buyTreat(it){tick();if(treatToday()||S.g<it.price||(it.need&&!S.owned[it.need]))return false;
+ S.g-=it.price;S.treatDay=dkey(now());S.treats=(S.treats||0)+1;
+ if(S.owned.sunflower&&nextFriend()>now()+3*HOUR)setNextFriend(now()+rnd(1,3)*HOUR);
+ {const g=visitGap();if(nextVisit()>now()+g[1])setNextVisit(now()+rnd(1,3)*MIN)}
+ addLog('ごちそうを置いた');save();toast('ごちそうを置きました。今日は鳥たちがよく来そうです');render();renderShop();return true}
+function buy(it){if(it.repeat)return buyTreat(it);tick();const pr=priceOf(it),onSale=pr<it.price;if(S.owned[it.id]||S.g<pr||(it.need&&!S.owned[it.need]))return false;
  S.g-=pr;if(it.id==='sunflower')setNextFriend(now()+rnd(3,8)*HOUR);S.owned[it.id]=now();if(it.id==='nest')S.lv3At=now();
  {const g=visitGap();if(nextVisit()>now()+g[1])setNextVisit(now()+rnd(g[0],g[1]))}
  addLog(it.name+(it.group==='obs'?'を買った':'を置いた')+(onSale?'（セールで'+G(pr)+'）':''));unlock(it.note);save();toast(it.group==='obs'?it.name+'を手に入れました':it.name+'を森に置きました');if(trial){trial=null;document.body.classList.remove('trialing');$('trial').classList.remove('show')}scheduleNext();render();renderShop();pump();return true}
@@ -214,7 +224,8 @@ function life(t){t=t||now();
  return{phase:'winter',k,left:0}}
 const PNAME={pre:'冬の森',nest:'巣作り',egg:'卵をあたためる',chick:'巣の中のヒナ',dango:'エナガ団子',family:'巣立ち後の親子',winter:'冬の群れ'};
 function leftText(ms){const h=ms/HOUR;return h<1?'あと少し':h<24?'あと約'+Math.ceil(h)+'時間':'あと約'+Math.round(h/24)+'日'}
-const brood=k=>S.broods[k]||(S.broods[k]={names:[],at:0});
+const brood=k=>S.broods[k]||(S.broods[k]={names:[],at:0,n:S.owned.down?7:5});
+const chickN=k=>{const b=S.broods[k];return b&&b.n||5};
 function parentNames(){const p=S.parents;return p.a||p.b?(p.a||'？')+'と'+(p.b||'？'):'つがい'}
 
 /* ================= 知識カード ================= */
@@ -234,6 +245,13 @@ const NOTES={
  shijukara:['シジュウカラ','胸の黒いネクタイ模様が目印で、ネクタイが太いのがオスです。「ツツピー、ツツピー」とよく鳴きます。鳴き声を組み合わせて意味のある「文」をつくることが研究でわかり、話題になりました。巣箱もよく使う鳥です。'],
  gojukara:['ゴジュウカラ','目を通る黒い線が特徴。木の幹を頭を下にしてスルスル降りられる、めずらしい鳥です。北海道にすむものは、おなかが白っぽい「シロハラゴジュウカラ」という仲間（亜種）です。'],
  konkun:['混群（こんぐん）','4種の仲間がそろいました！冬の森はエサが少なく、天敵にも見つかりやすいため、種類のちがう小鳥たちが一緒に群れて行動します。これを「混群」といいます。見張りの目が増えて安全になり、エサ場も見つけやすくなるのです。シマエナガの群れには、カラの仲間やコゲラ、ゴジュウカラがよくまじっています。'],
+ maple:['イタヤカエデの樹液','北海道の森に多いイタヤカエデは、春先に幹や枝の傷から甘い樹液を出します。夜に凍って昼に解けるころ、樹液が小さなつららになり、シマエナガはそれをなめに来ます。メープルシロップの原料になるサトウカエデの仲間です。'],
+ log:['朽ち木はごちそう箱','倒れて朽ちた木には、たくさんの虫やその幼虫がすんでいます。子育て中のシマエナガは、ヒナのために1日に何百回も虫を運びます。森に朽ち木が残っていることは、小鳥たちのくらしにとってとても大切です。'],
+ fir:['ねぐらの団子','冬の夜、シマエナガは葉の茂った針葉樹などの枝で、体をぴったり寄せ合って眠ります。体重7〜8gほどの小さな体で、氷点下20℃にもなる北海道の夜を越すための知恵です。'],
+ down:['羽毛のベッド','シマエナガの巣の内側には、ほかの鳥が落とした羽毛が1,000枚以上も敷きつめられています。ふかふかの巣は卵とヒナを寒さから守ります。シマエナガが一度に産む卵は7〜12個ほどです。'],
+ kifu:['野鳥を守る活動','日本では、野鳥の会などの団体が、野鳥の調査や保護区（サンクチュアリ）の手入れ、ケガをした鳥の保護などを行っています。寄付や会員になることで、こうした活動を応援できます。'],
+ kifu2:['森の入り口の看板','寄付のおかげで、森の入り口に看板が立ちました。看板には「この森の鳥たちを見守っています」と書かれています。'],
+ kifu3:['森の守り手','たくさんの寄付をありがとう。あなたは立派な「森の守り手」です。野鳥が安心して暮らせる森は、季節の移ろいとともに、いろいろな命を育みます。'],
  nestmat:['巣の材料','シマエナガの巣は、コケをクモの糸でつなぎ合わせて作ります。外側には地衣類（木につく白っぽい苔のようなもの）を貼りつけて、木の皮そっくりに目立たなくします。中には鳥の羽毛を1,000枚以上、多いときは2,000枚を超えて敷きつめ、ふかふかのベッドにします。'],
  pair:['つがいの誕生','2〜3月ごろ、冬の群れの中でつがいが生まれ、群れを離れて子育ての準備を始めます。シマエナガの夫婦は、巣作りも子育ても2羽で協力して行います。'],
  nest:['巣作り','夫婦で2週間ほどかけて巣を作ります。巣は横に小さな出入り口がある卵のような形（ドーム形）。クモの糸で編んであるので伸び縮みし、ヒナが大きくなっても巣が広がります。'],
@@ -243,7 +261,7 @@ const NOTES={
  family:['巣立ち後の親子','巣立ったばかりの幼鳥は、顔にこげ茶色の部分があり、まだ大人のように真っ白ではありません。しばらくは家族で一緒に行動し、親からエサをもらいながら、自分でエサをとる練習をします。'],
  winter:['季節がめぐる','夏から秋にかけて、家族はほかの家族と合流して群れになり、冬を迎えます。翌年の春、その群れの中からまた新しいつがいが生まれます。'],
 };
-const NOTE_ORDER=['start','protect','visit','feeder','water','icicle','sunflower','binoc','camera','hide','kogera','yamagara','shijukara','gojukara','konkun','nestmat','pair','nest','egg','chick','dango','family','winter'];
+const NOTE_ORDER=['start','protect','visit','feeder','water','icicle','maple','log','fir','down','sunflower','binoc','camera','hide','kogera','yamagara','shijukara','gojukara','konkun','kifu','kifu2','kifu3','nestmat','pair','nest','egg','chick','dango','family','winter'];
 const noteQ=[];
 function unlock(id){if(!id||!NOTES[id]||S.notes.includes(id))return;S.notes.push(id);save();if(!WALL)noteQ.push(id)}
 function showNoteNow(id){const n=NOTES[id];$('mnTitle').textContent=n[0];$('mnBody').textContent=n[1];$('mNote').classList.add('open')}
@@ -276,9 +294,9 @@ function showEvt(e){const N=$('meNames');N.innerHTML='';$('meOk').textContent='O
   $('meOk').textContent='この名前にする';
   $('meOk').onclick=()=>{N.querySelectorAll('input').forEach(i=>S.parents[i.dataset.k]=i.value.trim());save();closeEvt()}}
  else if(e.type==='hatch'){const b=brood(e.k);$('meTag').textContent='森の出来事';$('meTitle').textContent='ヒナがかえりました！';
-  $('meBody').textContent='巣の入り口から、小さなヒナたちが顔を出しています。見えている5羽に名前を付けてあげましょう（あとから「家族」で変えられます）。';
+  $('meBody').textContent='巣の入り口から、小さなヒナたちが顔を出しています。見えている'+(b.n||5)+'羽に名前を付けてあげましょう（あとから「家族」で変えられます）。';
   const base=DEF_NAMES.slice().sort(()=>Math.random()-.5);
-  for(let i=0;i<5;i++)N.insertAdjacentHTML('beforeend','<label>'+(i+1)+'羽目<input data-i="'+i+'" maxlength="10" placeholder="'+base[i]+'" value="'+(b.names[i]||'')+'"></label>');
+  for(let i=0;i<(b.n||5);i++)N.insertAdjacentHTML('beforeend','<label>'+(i+1)+'羽目<input data-i="'+i+'" maxlength="10" placeholder="'+base[i]+'" value="'+(b.names[i]||'')+'"></label>');
   $('meOk').textContent='この名前にする';
   $('meOk').onclick=()=>{N.querySelectorAll('input').forEach(i=>b.names[+i.dataset.i]=i.value.trim()||i.placeholder);b.at=b.at||now();addLog('ヒナに名前を付けた：'+b.names.join('・'));save();closeEvt()}}
  else{$('meTag').textContent=e.tag;$('meTitle').textContent=e.title;$('meBody').textContent=e.body;$('meOk').onclick=closeEvt}
@@ -296,7 +314,10 @@ function curSeason(){const s=S.season||'winter';if(s!=='auto')return s;const m=n
 function baseKey(lv){const se=curSeason();return se==='winter'?BASE_IMG[lv]:se+'_lv'+Math.min(lv,3)}
 // ショップの絵・試し置き：今の季節の森で見せる（つららは冬だけ）
 function itemImg(it){const m=/^lv(\d)$/.exec(it.img||''),se=curSeason();return m&&se!=='winter'&&it.id!=='icicle'?se+'_lv'+Math.min(+m[1],3):it.img}
+const isNight=()=>{const h=new Date(now()).getHours();return h>=19||h<5};
 function idleScene(){const L=life();
+ if(S.owned.fir&&isNight()&&Math.random()<.3)return 'sp_roost';
+ if(S.owned.log&&(L.phase==='chick'||L.phase==='family')&&Math.random()<.35)return 'sp_log';
  switch(L.phase){
   case 'nest':case 'egg':return Math.random()<.65?'s2':'s0b';
   case 'chick':return 's3';
@@ -305,7 +326,8 @@ function idleScene(){const L=life();
   default:return baseKey(level());
  }}
 // 子育て前と冬の群れの間は、ときどきシマエナガがやってくる
-function visitGap(){return [[18,35],[9,18],[5,11],[3,7],[2.5,6]][level()].map(m=>m*MIN)}
+const treatToday=()=>S.treatDay===dkey(now());
+function visitGap(){const k=treatToday()?.5:1;return [[18,35],[9,18],[5,11],[3,7],[2.5,6]][level()].map(m=>m*MIN*k)}
 let curKey=null,nextAt=0,visiting=false,leaveAt=0,localNext=0;
 // 次に来る時刻（実時刻）。画面を閉じても数え直さない。壁紙側は保存しないので localNext で覚えておく
 const nextVisit=()=>Math.max(S.nextVisitAt||0,localNext);
@@ -350,19 +372,22 @@ function visit(){const L=life();if(!(L.phase==='pre'||L.phase==='winter'))return
    addLog(FRIENDS[n]+'が来た');save();if(first)pump();return}}
  const treat=win?'dango_old':P+'flock5';
  if(jackpot()&&Math.random()<.5)key=treat;
+ let special='';
+ if(S.owned.fir&&isNight()&&Math.random()<.4){key='sp_roost';special='夜のねぐら。シマエナガたちが寄り添って眠っています'}
+ else if(S.owned.maple&&(se==='winter'||se==='spring')&&Math.random()<.25){key='sp_maple';special='1羽がイタヤカエデの甘いつららをなめに来ました'}
  const cnt=A[key].birds.length;
  showScene(key);
  const stay=rnd(45,90)*1000,g=visitGap();leaveAt=performance.now()+stay;setNextVisit(now()+stay+rnd(g[0],g[1]));
  // 観察小屋があると、途中で何羽かがすぐ近くまで来てくれる
- closeKey=null;closeMsg='';if(win&&S.owned.hide&&Math.random()<.65){closeKey=pick(cnt===1?['c1','c3']:['c1','c2','c3']);closeAt=performance.now()+stay*rnd(.3,.45);leaveAt+=rnd(20,40)*1000}
+ closeKey=null;closeMsg='';if(!special&&win&&S.owned.hide&&Math.random()<.65){closeKey=pick(cnt===1?['c1','c3']:['c1','c2','c3']);closeAt=performance.now()+stay*rnd(.3,.45);leaveAt+=rnd(20,40)*1000}
  // 群れの20回に1回くらい、仲間が1羽まじっている
- if(flock&&key!==treat&&Math.random()<.05){const n=pick(Object.keys(FRIENDS)),fk=friendKey(n);
+ if(!special&&flock&&key!==treat&&Math.random()<(treatToday()?.15:.05)){const n=pick(Object.keys(FRIENDS)),fk=friendKey(n);
   if(A[fk]){closeKey=fk;closeMsg='群れの中に'+FRIENDS[n]+'が1羽まじっていました！';closeAt=performance.now()+stay*rnd(.35,.5);leaveAt+=rnd(25,40)*1000;closeFriend=n}}
- let msg=key===treat?'大当たりの日のごほうび。ふわふわの団子がやってきました！'
+ let msg=special?special:key===treat?'大当たりの日のごほうび。ふわふわの団子がやってきました！'
   :!flock?(cnt===1?pick(['シマエナガが1羽、通りかかりました','1羽のシマエナガが枝にとまりました']):pick([cnt+'羽のシマエナガがエサ台に寄っていきました',cnt+'羽のシマエナガが遊びに来ました']))
   :pick(['シマエナガの群れがやってきました','シマエナガたちが遊びに来ました','白いまんまるが枝に並びました']);
- let logx=flock?'':'・'+cnt+'羽';
- if(S.owned.binoc){if(flock&&key!==treat){const n=Math.round(rnd(8,18));msg+='。双眼鏡で数えると'+n+'羽';logx='・'+n+'羽'}
+ let logx=special?'・'+(key==='sp_roost'?'ねぐら':'カエデのつらら'):flock?'':'・'+cnt+'羽';
+ if(S.owned.binoc&&!special){if(flock&&key!==treat){const n=Math.round(rnd(8,18));msg+='。双眼鏡で数えると'+n+'羽';logx='・'+n+'羽'}
   const kids=pastKids();if(kids.length&&Math.random()<.6){const a=kids.slice().sort(()=>Math.random()-.5).slice(0,Math.random()<.5?1:2);msg+='。'+a.join('と')+'の姿も見えます！';logx+='・'+a.join('と')+'も'}}
  toast(msg,S.owned.binoc?7000:4500);
  addLog('シマエナガが来た（'+S.visits+'回目'+logx+'）');save();if(first)pump()}
@@ -376,7 +401,11 @@ function sceneTick(){if(trial){if(performance.now()>trial.until)endTrial();retur
    if(performance.now()>leaveAt){visiting=false;closeKey=null;showScene(baseKey(level()))}return}
   if(now()>=nextVisit())visit();
   return}
- if(performance.now()>=nextAt)scheduleNext()}
+ if(performance.now()>=nextAt){
+  if(S.owned.sunflower&&now()>=nextFriend()){const n=pick(Object.keys(FRIENDS)),fk=friendKey(n);
+   if(A[fk]){setNextFriend(now()+rnd(18,36)*HOUR*(treatToday()?.6:1));showScene(fk);const first=meetFriend(n);nextAt=performance.now()+rnd(50,80)*1000;
+    toast((first?'はじめまして！':'')+FRIENDS[n]+'が子育て中の森をのぞきに来ました'+(first?'（図鑑に登録）':''),6000);addLog(FRIENDS[n]+'が来た（子育て中）');save();if(first)pump();return}}
+  scheduleNext()}}
 
 /* ================= 描画（動く写真：2枚の写真をなめらかに切り替える） ================= */
 const cv=$('gl'),fx=$('fx'),ctx=fx.getContext('2d');
@@ -511,7 +540,7 @@ function stageText(){const L=life(),lv=level();
   case 'pre':return lv===0?'まだ静かな森。ときどきシマエナガが通りかかります':lv===1?'エサ台にシマエナガが寄るようになりました':lv===2?'水場もできて、群れでやってくる森に':'巣材がそろいました。つがいが生まれそう…';
   case 'nest':return parentNames()+'が巣作り中・'+leftText(L.left);
   case 'egg':return '卵をあたためています・ふ化まで'+leftText(L.left);
-  case 'chick':return 'ヒナ5羽が巣の中に・巣立ちまで'+leftText(L.left);
+  case 'chick':return 'ヒナ'+chickN(L.k)+'羽が巣の中に・巣立ちまで'+leftText(L.left);
   case 'dango':return 'エナガ団子！（'+leftText(L.left)+'）';
   case 'family':return '親子で森をめぐっています';
   case 'winter':return '冬の群れの季節・次のつがいまで'+leftText(L.left);
@@ -522,16 +551,28 @@ function render(){tick();camUI();const r=S.rates[dkey(now())];
  document.body.classList.toggle('showhud',S.hud!==false&&!qs.has('nohud'));
  if($('pShop').classList.contains('open'))renderShop(true)}
 let shopSig='';
-function renderShop(soft){const sl0=saleInfo(),sig=ITEMS.map(it=>(S.owned[it.id]?1:0)+''+(S.g>=priceOf(it)?1:0)).join('')+(sl0?sl0.it.id+Math.ceil((sl0.end-now())/MIN):'');if(soft&&sig===shopSig)return;shopSig=sig;const L=$('shopList');L.innerHTML='';L.dataset.g='-';
- for(const it of ITEMS){const owned=S.owned[it.id],locked=it.need&&!S.owned[it.need];
+function renderShop(soft){const sl0=saleInfo(),sig=ITEMS.map(it=>(S.owned[it.id]?1:0)+''+(S.g>=priceOf(it)?1:0)).join('')+(treatToday()?'T':'')+(S.donated||0)+'/'+Math.floor(S.g/1000)+(sl0?sl0.it.id+Math.ceil((sl0.end-now())/MIN):'');if(soft&&sig===shopSig)return;shopSig=sig;const L=$('shopList');L.innerHTML='';L.dataset.g='-';
+ for(const it of ITEMS){const owned=it.repeat?treatToday():S.owned[it.id],locked=it.need&&!S.owned[it.need];
   const d=document.createElement('div');d.className='item';
   if((it.group||'')!==L.dataset.g){L.insertAdjacentHTML('beforeend','<div class="sec">'+(it.group==='obs'?'観察の道具':'森の道具')+'</div>');L.dataset.g=it.group||''}
   d.innerHTML=(it.img?'<div class="thumb"><img alt="" src="'+A[itemImg(it)].img+'"></div>':'<div class="thumb emo">'+(it.emo||'')+'</div>')+
-   '<div class="info"><div>'+it.name+'</div><small>'+it.desc+'</small><small class="price">'+(it.soon?'準備中':owned?(it.group==='obs'?'持っています':'置いてあります'):locked?'前の道具を置くと買えます':priceTag(it))+'</small></div><div class="btns"></div>';
+   '<div class="info"><div>'+it.name+'</div><small>'+it.desc+'</small><small class="price">'+(it.soon?'準備中':owned?(it.repeat?'今日はもうあげました':it.group==='obs'?'持っています':'置いてあります'):locked?'前の道具を置くと買えます':priceTag(it))+'</small></div><div class="btns"></div>';
   const B=d.querySelector('.btns');
-  if(!it.soon&&!owned&&!locked){if(it.img){const t=document.createElement('button');t.className='glass';t.textContent=it.group==='obs'?'のぞいてみる':'試し置き';t.onclick=()=>startTrial(it);B.appendChild(t)}
+  if(!it.soon&&!owned&&!locked){if(it.img&&!it.repeat){const t=document.createElement('button');t.className='glass';t.textContent=it.group==='obs'?'のぞいてみる':'試し置き';t.onclick=()=>startTrial(it);B.appendChild(t)}
    const b=document.createElement('button');b.className='main';b.textContent='買う';b.disabled=S.g<priceOf(it);b.onclick=()=>buy(it);B.appendChild(b)}
-  L.appendChild(d)}}
+  L.appendChild(d)}
+ renderDonate(L)}
+const DONATE_TIERS=[[10000,'ブロンズ'],[50000,'シルバー'],[100000,'ゴールド'],[300000,'森の守り手']];
+function signTier(){let t=null;for(const d of DONATE_TIERS)if((S.donated||0)>=d[0])t=d;return t}
+function donate(v){tick();if(S.g<v)return;const before=signTier();S.g-=v;S.donated=(S.donated||0)+v;
+ addLog('野鳥保護に'+G(v)+'を寄付した');unlock('kifu');const after=signTier();
+ if(after&&after!==before){unlock(after[0]>=100000?'kifu3':'kifu2');toast('寄付の合計が'+G(S.donated)+'に！森の入り口に「'+after[1]+'の看板」が立ちました');}
+ else toast(G(v)+'を寄付しました。ありがとう！（合計'+G(S.donated)+'）');save();render();renderShop();pump()}
+function renderDonate(L){const t=signTier(),nx=DONATE_TIERS.find(d=>(S.donated||0)<d[0]);
+ const box=document.createElement('div');box.innerHTML='<div class="sec">野鳥保護への寄付</div><p>森の外の野鳥たちも守る活動を応援します。寄付した合計：<b>'+G(S.donated||0)+'</b>'+(t?'<br>森の入り口の看板：<b>'+t[1]+'の看板</b>「'+(S.parents.a||S.parents.b?parentNames()+'の森':'シマエナガの森')+'を見守る人」':'')+(nx?'<br>次の看板（'+nx[1]+'）まで、あと'+G(nx[0]-(S.donated||0)):'')+'</p>';
+ const row=document.createElement('div');row.style.cssText='display:flex;gap:6px;margin-bottom:6px';
+ for(const v of [1000,5000,10000]){const b=document.createElement('button');b.className='glass';b.style.flex='1';b.textContent=G(v);b.disabled=S.g<v;b.onclick=()=>donate(v);row.appendChild(b)}
+ box.appendChild(row);L.appendChild(box)}
 function priceTag(it){const pr=priceOf(it);if(pr===it.price)return G(it.price);const sl=saleInfo();
  return '<span class="old">'+G(it.price)+'</span>'+G(pr)+'<span class="off">'+sl.pct+'%オフ・あと'+Math.ceil((sl.end-now())/MIN)+'分</span>'}
 function renderNotes(){const L=$('noteList');L.innerHTML='';
@@ -555,7 +596,7 @@ const ALBUM_MAX=60;
 function idb(){return new Promise((res,rej)=>{try{const r=indexedDB.open('shimaenagaAlbum',1);r.onupgradeneeded=()=>r.result.createObjectStore('p',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
 function idbDo(mode,fn){return idb().then(db=>new Promise((res,rej)=>{const tx=db.transaction('p',mode),st=tx.objectStore('p');const r=fn(st);tx.oncomplete=()=>res(r&&r.result);tx.onerror=()=>rej(tx.error)}))}
 const albumAll=()=>idbDo('readonly',st=>st.getAll()).then(a=>(a||[]).sort((x,y)=>y.id-x.id));
-const SCENE_NAME={s1:'冬の群れ',s1_lv2:'冬の群れ',s1_lv3:'冬の群れ',s1_lv4:'冬の群れ',v0a:'通りかかった1羽',v0b:'通りかかった1羽',v1a:'エサ台に来た2羽',v1b:'エサ台に来た3羽',c1:'すぐ近くの1羽',c2:'寄り添う2羽',c3:'毛繕い',s2:'巣作り',s3:'巣の中のヒナ',s4:'エナガ団子',s5:'巣立ち後の親子',dango_old:'ごほうびの団子',s0b:'晩冬の森',s0c:'早春の森'};
+const SCENE_NAME={sp_maple:'カエデのつらら',sp_log:'朽ち木でエサ運び',sp_roost:'ねぐらの団子',s1:'冬の群れ',s1_lv2:'冬の群れ',s1_lv3:'冬の群れ',s1_lv4:'冬の群れ',v0a:'通りかかった1羽',v0b:'通りかかった1羽',v1a:'エサ台に来た2羽',v1b:'エサ台に来た3羽',c1:'すぐ近くの1羽',c2:'寄り添う2羽',c3:'毛繕い',s2:'巣作り',s3:'巣の中のヒナ',s4:'エナガ団子',s5:'巣立ち後の親子',dango_old:'ごほうびの団子',s0b:'晩冬の森',s0c:'早春の森'};
 const SEASON_SCENE={lv0:'森',lv1:'森',lv2:'森',lv3:'森',v0a:'1羽',v0b:'1羽',v1a:'2羽',v1b:'3羽',flock_lv2:'群れ',flock_lv3:'群れ',flock5:'ごほうびの団子'};
 function shotLabel(){const k=curKey||'';{const fm=/^f_\w+?_(\w+)_lv\d$/.exec(k);if(fm)return '森の仲間：'+FRIENDS[fm[1]]}const sm=/^(spring|summer|autumn)_(.+)$/.exec(k);
  let n=sm?SEASONS[sm[1]]+'の'+(SEASON_SCENE[sm[2]]||'森'):(SCENE_NAME[k]||'冬の森');const L=life();

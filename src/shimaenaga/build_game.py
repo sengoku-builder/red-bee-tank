@@ -67,6 +67,11 @@ for se, fx in (('spring', 'glow'), ('summer', 'sun'), ('autumn', 'leaf'), ('wint
         for lv in ((1, 2, 3, 4) if se == 'winter' else (1, 2, 3)):
             ASSETS[f'f_{se}_{n}_lv{lv}'] = (f'friends/{se}_{n}_lv{lv}.jpg', 1.0, [FB['winter' if se == 'winter' else 'arch'][n]], fx)
 
+# ---- ごほうびの場面（イタヤカエデ・朽ち木・トドマツ）----
+ASSETS['sp_maple'] = ('special/maple_icicle.jpg', .5, [[430,510,870,115,1]], 'snow')
+ASSETS['sp_log'] = ('special/log_caterpillar.jpg', .5, [[445,555,820,90,4]], 'glow')
+ASSETS['sp_roost'] = ('special/fir_roost.jpg', .35, [[180,628,790,55,4],[272,612,780,50,4],[365,585,745,50,4],[458,560,720,50,4],[575,530,695,60,4]], 'snow')
+
 out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'dist')
 img_dir = os.path.join(out_dir, 'img')
 shutil.rmtree(img_dir, ignore_errors=True); os.makedirs(img_dir, exist_ok=True)

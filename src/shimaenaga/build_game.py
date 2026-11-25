@@ -84,6 +84,9 @@ for i, f in enumerate(('call1_forage', 'call2_left', 'call3_unison', 'call4_wing
     ASSETS[f'm_call{i}'] = (f'marsh/{f}.jpg', 1.0, [], 'mist')
 for i, f in enumerate(('dance1_bow', 'dance2_leap', 'dance3_land', 'dance4_call'), 1):
     ASSETS[f'm_dance{i}'] = (f'marsh/{f}.jpg', .5, [], 'snow')
+# S23 ダンスの間のコマ（Geminiで2枚の間を作ったもの）
+for k, f in (('m_dance1b', 'dance1b_bow_leap'), ('m_dance2b', 'dance2b_leap_land'), ('m_dance3b', 'dance3b_land_call'), ('m_dance3c', 'dance3c_land_call')):
+    ASSETS[k] = (f'marsh/{f}.jpg', .5, [], 'snow')
 for i, f in enumerate(('fly1_further', 'fly2_right', 'fly3_horizon'), 1):
     ASSETS[f'm_fly{i}'] = (f'marsh/{f}.jpg', 1.0, [], 'mist')
 

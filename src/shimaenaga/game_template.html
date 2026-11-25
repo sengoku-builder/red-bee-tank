@@ -366,11 +366,11 @@ function marshFrames(k){const f=(key,a,b,rest)=>[key,a,b,!!rest];
    out.push(f(Math.random()<.5?'m_pair':'m_call1',5,10,1))}
   return out}
  if(k==='m_dance'){const out=[f('m_dance',1.5,2)],n=4+Math.floor(Math.random()*2);
-  for(let i=0;i<n;i++)out.push(f('m_dance1',.9,1.3),f('m_dance2',.8,1.1),f('m_dance3',.9,1.2),f('m_dance4',1.2,1.8),f('m_dance',.9,1.3));
+  for(let i=0;i<n;i++)out.push(f('m_dance1',.8,1.1),f('m_dance1b',.5,.7),f('m_dance2',.7,1),f('m_dance2b',.5,.7),f('m_dance3',.8,1.1),f('m_dance3b',.5,.7),f('m_dance3c',.5,.7),f('m_dance4',1.1,1.6),f('m_dance',.8,1.1));
   out[out.length-1]=f('m_dance',3,4);return out}
  if(k==='m_fly')return [f('m_fly',2.5,3),f('m_fly2',1.4,1.7),f('m_fly1',1.4,1.7),f('m_fly3',2.2,3),f('m_base',0,0)];
  return null}
-const MARSH_FRAMES=['m_call1','m_call2','m_call3','m_call4','m_dance1','m_dance2','m_dance3','m_dance4','m_fly1','m_fly2','m_fly3'];
+const MARSH_FRAMES=['m_call1','m_call2','m_call3','m_call4','m_dance1','m_dance1b','m_dance2','m_dance2b','m_dance3','m_dance3b','m_dance3c','m_dance4','m_fly1','m_fly2','m_fly3'];
 // コマ送りは毎フレーム見る（1秒ごとの見回りだと間に合わないので）
 function marshStep(){if(!marshSeq)return;const t=performance.now();if(t<marshSeq.at)return;const q=marshSeq;q.i++;
  if(q.i>=q.fr.length||(q.cut&&t>marshUntil&&q.fr[q.i-1][3])){marshSeq=null;marshUntil=t;return}
@@ -664,7 +664,7 @@ function idbDo(mode,fn){return idb().then(db=>new Promise((res,rej)=>{const tx=d
 const albumAll=()=>idbDo('readonly',st=>st.getAll()).then(a=>(a||[]).sort((x,y)=>y.id-x.id));
 const SCENE_NAME={sp_maple:'カエデのつらら',sp_log:'朽ち木でエサ運び',sp_roost:'ねぐらの団子',s1:'冬の群れ',s1_lv2:'冬の群れ',s1_lv3:'冬の群れ',s1_lv4:'冬の群れ',v0a:'通りかかった1羽',v0b:'通りかかった1羽',v1a:'エサ台に来た2羽',v1b:'エサ台に来た3羽',c1:'すぐ近くの1羽',c2:'寄り添う2羽',c3:'毛繕い',s2:'巣作り',s3:'巣の中のヒナ',s4:'エナガ団子',s5:'巣立ち後の親子',dango_old:'ごほうびの団子',s0b:'晩冬の森',s0c:'早春の森'};
 const SEASON_SCENE={lv0:'森',lv1:'森',lv2:'森',lv3:'森',v0a:'1羽',v0b:'1羽',v1a:'2羽',v1b:'3羽',flock_lv2:'群れ',flock_lv3:'群れ',flock5:'ごほうびの団子'};
-function shotLabel(){const k=curKey||'';if(/^m_/.test(k))return '湿原：'+({m_call1:'タンチョウの鳴き交わし',m_call2:'タンチョウの鳴き交わし',m_call3:'タンチョウの鳴き交わし',m_call4:'タンチョウの鳴き交わし',m_dance1:'タンチョウのダンス',m_dance2:'タンチョウのダンス',m_dance3:'タンチョウのダンス',m_dance4:'タンチョウのダンス',m_fly1:'飛ぶタンチョウ',m_fly2:'飛ぶタンチョウ',m_fly3:'飛ぶタンチョウ',m_base:'けあらしの川',m_pair:'タンチョウのつがい',m_fly:'飛ぶタンチョウ',m_beni:'ベニマシコ',m_shima:'霧氷のシマエナガ',m_dance:'タンチョウのダンス'})[k];{const fm=/^f_\w+?_(\w+)_lv\d$/.exec(k);if(fm)return '森の仲間：'+FRIENDS[fm[1]]}const sm=/^(spring|summer|autumn)_(.+)$/.exec(k);
+function shotLabel(){const k=curKey||'';if(/^m_/.test(k))return '湿原：'+({m_call1:'タンチョウの鳴き交わし',m_call2:'タンチョウの鳴き交わし',m_call3:'タンチョウの鳴き交わし',m_call4:'タンチョウの鳴き交わし',m_dance1:'タンチョウのダンス',m_dance1b:'タンチョウのダンス',m_dance2b:'タンチョウのダンス',m_dance3b:'タンチョウのダンス',m_dance3c:'タンチョウのダンス',m_dance2:'タンチョウのダンス',m_dance3:'タンチョウのダンス',m_dance4:'タンチョウのダンス',m_fly1:'飛ぶタンチョウ',m_fly2:'飛ぶタンチョウ',m_fly3:'飛ぶタンチョウ',m_base:'けあらしの川',m_pair:'タンチョウのつがい',m_fly:'飛ぶタンチョウ',m_beni:'ベニマシコ',m_shima:'霧氷のシマエナガ',m_dance:'タンチョウのダンス'})[k];{const fm=/^f_\w+?_(\w+)_lv\d$/.exec(k);if(fm)return '森の仲間：'+FRIENDS[fm[1]]}const sm=/^(spring|summer|autumn)_(.+)$/.exec(k);
  let n=sm?SEASONS[sm[1]]+'の'+(SEASON_SCENE[sm[2]]||'森'):(SCENE_NAME[k]||'冬の森');const L=life();
  if((k==='s3'||k==='s4')&&S.broods[L.k]){const a=S.broods[L.k].names.filter(Boolean);if(a.length)n+='（'+a.join('・')+'）'}
  if(k==='s2'&&(S.parents.a||S.parents.b))n+='（'+parentNames()+'）';return n}

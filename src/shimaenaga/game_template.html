@@ -357,13 +357,25 @@ const MARSH_EV=[['m_pair',40,'タンチョウのつがいが雪原に降り立�
  ['m_beni',15,'川辺のヤナギに、ベニマシコがとまりました',['benimashiko']],['m_shima',12,'森のシマエナガが2羽、湿原まで遊びに来ました',[]],
  ['m_dance',8,'タンチョウが雪の上でダンスを踊っています！',['tancho','dance']]];
 // S21 パラパラ写真：同じ構図でポーズ違いの写真を、短いふわっと切り替えでつなぐ
-function marshFrames(k){const f=(key,a,b)=>[key,a,b];
- if(k==='m_pair'){const out=[f('m_pair',6,9)],poses=['m_call1','m_call2','m_call3','m_call4'];
-  for(let i=0;i<3;i++){const sq=Math.random()<.5?['m_call2','m_call3']:[pick(poses)];sq.forEach(x=>out.push(f(x,4,7)));out.push(f(Math.random()<.5?'m_pair':'m_call1',5,8))}
+// S22 速めのパラパラ：1コマ0.4秒で入れ替え。鳴き交わしは「パパッと鳴く→しばらく静か」のくり返し
+const FLIP=.4;
+function marshFrames(k){const f=(key,a,b,rest)=>[key,a,b,!!rest];
+ if(k==='m_pair'){const out=[f('m_pair',5,8,1)],calls=['m_call2','m_call3','m_call4'];
+  for(let i=0;i<4;i++){const n=2+Math.floor(Math.random()*3);let prev='';
+   for(let j=0;j<n;j++){let x=pick(calls);if(x===prev)x=calls[(calls.indexOf(x)+1)%3];prev=x;out.push(f(x,.8,1.5))}
+   out.push(f(Math.random()<.5?'m_pair':'m_call1',5,10,1))}
   return out}
- if(k==='m_dance'){const out=[f('m_dance',4,5)];for(let i=0;i<2;i++)out.push(f('m_dance1',3,4.5),f('m_dance2',2.5,3.5),f('m_dance3',3,4),f('m_dance4',4,6),f('m_dance',3,4.5));return out}
- if(k==='m_fly')return [f('m_fly',5,7),f('m_fly2',4,5.5),f('m_fly1',4,5.5),f('m_fly3',5,7),f('m_base',0,0)];
+ if(k==='m_dance'){const out=[f('m_dance',1.5,2)],n=4+Math.floor(Math.random()*2);
+  for(let i=0;i<n;i++)out.push(f('m_dance1',.9,1.3),f('m_dance2',.8,1.1),f('m_dance3',.9,1.2),f('m_dance4',1.2,1.8),f('m_dance',.9,1.3));
+  out[out.length-1]=f('m_dance',3,4);return out}
+ if(k==='m_fly')return [f('m_fly',2.5,3),f('m_fly2',1.4,1.7),f('m_fly1',1.4,1.7),f('m_fly3',2.2,3),f('m_base',0,0)];
  return null}
+const MARSH_FRAMES=['m_call1','m_call2','m_call3','m_call4','m_dance1','m_dance2','m_dance3','m_dance4','m_fly1','m_fly2','m_fly3'];
+// コマ送りは毎フレーム見る（1秒ごとの見回りだと間に合わないので）
+function marshStep(){if(!marshSeq)return;const t=performance.now();if(t<marshSeq.at)return;const q=marshSeq;q.i++;
+ if(q.i>=q.fr.length||(q.cut&&t>marshUntil&&q.fr[q.i-1][3])){marshSeq=null;marshUntil=t;return}
+ const fr=q.fr[q.i];showScene(fr[0],FLIP);q.at=t+rnd(fr[1],fr[2])*1000+FLIP*1000;
+ if(fr[0]==='m_base'){marshSeq=null;marshUntil=0;marshNext=t+rnd(6,14)*MIN*(treatToday()?.6:1)}}
 let marshSeq=null,marshForce=null,marshDbg=0;
 const MARSH_BIRDS={tancho:'タンチョウ',benimashiko:'ベニマシコ'};
 let marshNext=0,marshUntil=0;
@@ -374,9 +386,6 @@ function meetMarsh(ids){const fresh=[];
  put(S,true);if(WALL){try{const o=JSON.parse(localStorage.getItem(KEY)||'{}');put(o,false);localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}else fresh.forEach(id=>noteQ.push(id));
  return fresh.some(id=>MARSH_BIRDS[id])}
 function marshTick(){const t=performance.now();
- if(marshSeq&&t>=marshSeq.at){const q=marshSeq;q.i++;
-  if(q.i>=q.fr.length||(q.cut&&t>marshUntil&&/^m_(pair|call)/.test(q.fr[q.i-1][0]))){marshSeq=null;marshUntil=t}
-  else{const fr=q.fr[q.i];showScene(fr[0],true);q.at=t+rnd(fr[1],fr[2])*1000+1200;if(fr[0]==='m_base'){marshSeq=null;marshUntil=0;marshNext=t+rnd(6,14)*MIN*(treatToday()?.6:1)}return}}
  if(marshSeq)return;
  if(marshUntil){if(t>marshUntil){marshUntil=0;showScene('m_base');marshNext=t+rnd(6,14)*MIN*(treatToday()?.6:1)}return}
  if(!marshNext){marshNext=t+rnd(1,3)*MIN;return}
@@ -388,7 +397,7 @@ function marshTick(){const t=performance.now();
  {const fr=marshFrames(ev[0]);if(fr){marshSeq={fr,i:0,cut:ev[0]==='m_pair',at:t+rnd(fr[0][1],fr[0][2])*1000+3200};fr.forEach(x=>getImg(x[0],()=>{}))}}const first=meetMarsh(ev[3]);
  toast(ev[2]+(first?'（図鑑に登録）':''),5500);addLog('湿原：'+ev[2]);save();pump()}
 function scheduleNext(){const L=life();visiting=false;marshSeq=null;
- if(inMarsh()){marshUntil=0;marshSeq=null;marshNext=performance.now()+rnd(1,3)*MIN;showScene('m_base');MARSH_EV.forEach((e,i)=>setTimeout(()=>getImg(e[0],()=>{}),1500+i*400));return}
+ if(inMarsh()){marshUntil=0;marshSeq=null;marshNext=performance.now()+rnd(1,3)*MIN;showScene('m_base');MARSH_EV.map(e=>e[0]).concat(MARSH_FRAMES).forEach((k,i)=>setTimeout(()=>A[k]&&getImg(k,()=>{}),1500+i*400));return}
  prefetch();
  if(L.phase==='pre'||L.phase==='winter')showScene(baseKey(level()));
  else{showScene(idleScene());nextAt=performance.now()+rnd(2.5,5)*MIN}
@@ -515,7 +524,7 @@ function upload(slot,key,im){gl.activeTexture(gl.TEXTURE0+slot);gl.bindTexture(g
 function showScene(key,quick){if(!A[key])return;curKey=key;
  if(!ready){getImg(key,im=>{upload(0,key,im);ready=true});return}
  if(slots[0].key===key&&!fading)return;
- getImg(key,im=>{if(curKey!==key)return;upload(1,key,im);fading={t:0,dur:quick?1.2:3.2};mx=0.0001})}
+ getImg(key,im=>{if(curKey!==key)return;upload(1,key,im);fading={t:0,dur:typeof quick==='number'?quick:quick?1.2:3.2};mx=0.0001})}
 function finishFade(){const a=slots[0];slots[0]=slots[1];slots[1]=a;
  // テクスチャのユニット番号と鳥の情報を入れ替える
  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,slots[0].tex);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,slots[1].tex);
@@ -731,6 +740,7 @@ scheduleNext();
 let last=0,sec=0,lastSig=level()+'/'+life().phase+'/'+curSeason()+'/'+(inMarsh()?'m':'f');
 function frame(ts){if(WALL&&ts-last<30){requestAnimationFrame(frame);return}
  const dt=Math.min(.25,(ts-last)/1000||0),t=ts/1000;last=ts;
+ marshStep();
  if(ts-sec>1000){sec=ts;
   if(WALL&&Math.floor(ts/5000)!==Math.floor((ts-1000)/5000)){load()}
   tick();if(!WALL){checkLife();save()}render();{const sig=level()+'/'+life().phase+'/'+curSeason()+'/'+(inMarsh()?'m':'f');if(sig!==lastSig){lastSig=sig;if(!trial)scheduleNext()}}sceneTick();if(!WALL&&!anyModal()&&(evtQ.length||noteQ.length))pump()}

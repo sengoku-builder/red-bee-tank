@@ -721,7 +721,7 @@ function hudUp(e){if(!hudDrag||e.pointerId!==hudDrag.id)return;clearTimeout(hudD
 WH.addEventListener('pointerup',hudUp);WH.addEventListener('pointercancel',hudUp);
 cv.addEventListener('click',closePanels);
 $('bReset').onclick=()=>{if(confirm('森を最初からやり直しますか？（G・道具・家族・カードがすべて消えます）')){try{localStorage.removeItem(KEY)}catch(e){}location.reload()}};
-if(DEBUG){$('debug').hidden=false;document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{S.offset=(S.offset||0)+ +b.dataset.skip;tick();checkLife();save();render();scheduleNext();pump()});
+if(DEBUG){$('debug').hidden=false;$('debug').insertAdjacentHTML('beforeend','<span style="font-size:10px;opacity:.7;align-self:center">版 '+BUILD.slice(4,8)+'-'+BUILD.slice(8,12)+'</span>');document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{S.offset=(S.offset||0)+ +b.dataset.skip;tick();checkLife();save();render();scheduleNext();pump()});
  $('dRich').onclick=()=>{S.g+=10000;save();render()};$('dVisit').onclick=()=>{if(inMarsh()){marshForce=['m_pair','m_fly','m_dance','m_beni','m_shima'][marshDbg++%5];marshSeq=null;marshUntil=0;marshNext=1;return}visiting=false;setNextVisit(0)}}
 
 /* ================= 起動 ================= */

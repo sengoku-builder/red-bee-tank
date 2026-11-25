@@ -721,7 +721,7 @@ WH.addEventListener('pointerup',hudUp);WH.addEventListener('pointercancel',hudUp
 cv.addEventListener('click',closePanels);
 $('bReset').onclick=()=>{if(confirm('森を最初からやり直しますか？（G・道具・家族・カードがすべて消えます）')){try{localStorage.removeItem(KEY)}catch(e){}location.reload()}};
 if(DEBUG){$('debug').hidden=false;document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{S.offset=(S.offset||0)+ +b.dataset.skip;tick();checkLife();save();render();scheduleNext();pump()});
- $('dRich').onclick=()=>{S.g+=10000;save();render()};$('dVisit').onclick=()=>{visiting=false;setNextVisit(0)}}
+ $('dRich').onclick=()=>{S.g+=10000;save();render()};$('dVisit').onclick=()=>{if(inMarsh()){marshSeq=null;marshUntil=0;marshNext=1;return}visiting=false;setNextVisit(0)}}
 
 /* ================= 起動 ================= */
 if(WALL)document.body.classList.add('wall');

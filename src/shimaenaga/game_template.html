@@ -356,6 +356,15 @@ const inMarsh=()=>MARSH_ON&&S.owned.ticket&&S.place==='marsh';
 const MARSH_EV=[['m_pair',40,'タンチョウのつがいが雪原に降り立ちました',['tancho']],['m_fly',25,'タンチョウが3羽、川の上を飛んでいきます',['tancho']],
  ['m_beni',15,'川辺のヤナギに、ベニマシコがとまりました',['benimashiko']],['m_shima',12,'森のシマエナガが2羽、湿原まで遊びに来ました',[]],
  ['m_dance',8,'タンチョウが雪の上でダンスを踊っています！',['tancho','dance']]];
+// S21 パラパラ写真：同じ構図でポーズ違いの写真を、短いふわっと切り替えでつなぐ
+function marshFrames(k){const f=(key,a,b)=>[key,a,b];
+ if(k==='m_pair'){const out=[f('m_pair',6,9)],poses=['m_call1','m_call2','m_call3','m_call4'];
+  for(let i=0;i<3;i++){const sq=Math.random()<.5?['m_call2','m_call3']:[pick(poses)];sq.forEach(x=>out.push(f(x,4,7)));out.push(f(Math.random()<.5?'m_pair':'m_call1',5,8))}
+  return out}
+ if(k==='m_dance'){const out=[f('m_dance',4,5)];for(let i=0;i<2;i++)out.push(f('m_dance1',3,4.5),f('m_dance2',2.5,3.5),f('m_dance3',3,4),f('m_dance4',4,6),f('m_dance',3,4.5));return out}
+ if(k==='m_fly')return [f('m_fly',5,7),f('m_fly2',4,5.5),f('m_fly1',4,5.5),f('m_fly3',5,7),f('m_base',0,0)];
+ return null}
+let marshSeq=null;
 const MARSH_BIRDS={tancho:'タンチョウ',benimashiko:'ベニマシコ'};
 let marshNext=0,marshUntil=0;
 // 湿原で会った鳥を図鑑に（壁紙は全体を保存しないので、その部分だけ書き足す）
@@ -365,15 +374,20 @@ function meetMarsh(ids){const fresh=[];
  put(S,true);if(WALL){try{const o=JSON.parse(localStorage.getItem(KEY)||'{}');put(o,false);localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}else fresh.forEach(id=>noteQ.push(id));
  return fresh.some(id=>MARSH_BIRDS[id])}
 function marshTick(){const t=performance.now();
+ if(marshSeq&&t>=marshSeq.at){const q=marshSeq;q.i++;
+  if(q.i>=q.fr.length||(q.cut&&t>marshUntil&&/^m_(pair|call)/.test(q.fr[q.i-1][0]))){marshSeq=null;marshUntil=t}
+  else{const fr=q.fr[q.i];showScene(fr[0],true);q.at=t+rnd(fr[1],fr[2])*1000+1200;if(fr[0]==='m_base'){marshSeq=null;marshUntil=0;marshNext=t+rnd(6,14)*MIN*(treatToday()?.6:1)}return}}
+ if(marshSeq)return;
  if(marshUntil){if(t>marshUntil){marshUntil=0;showScene('m_base');marshNext=t+rnd(6,14)*MIN*(treatToday()?.6:1)}return}
  if(!marshNext){marshNext=t+rnd(1,3)*MIN;return}
  if(t<marshNext)return;
  const ws=MARSH_EV.map(e=>e[1]*(e[0]==='m_dance'&&jackpot()?3:1));let r=Math.random()*ws.reduce((a,b)=>a+b,0),ev=MARSH_EV[0];
  for(let i=0;i<MARSH_EV.length;i++){if((r-=ws[i])<0){ev=MARSH_EV[i];break}}
- showScene(ev[0]);marshUntil=t+rnd(45,90)*1000;const first=meetMarsh(ev[3]);
+ showScene(ev[0]);marshUntil=t+rnd(45,90)*1000;
+ {const fr=marshFrames(ev[0]);if(fr){marshSeq={fr,i:0,cut:ev[0]==='m_pair',at:t+rnd(fr[0][1],fr[0][2])*1000+3200};fr.forEach(x=>getImg(x[0],()=>{}))}}const first=meetMarsh(ev[3]);
  toast(ev[2]+(first?'（図鑑に登録）':''),5500);addLog('湿原：'+ev[2]);save();pump()}
-function scheduleNext(){const L=life();visiting=false;
- if(inMarsh()){marshUntil=0;marshNext=performance.now()+rnd(1,3)*MIN;showScene('m_base');MARSH_EV.forEach((e,i)=>setTimeout(()=>getImg(e[0],()=>{}),1500+i*400));return}
+function scheduleNext(){const L=life();visiting=false;marshSeq=null;
+ if(inMarsh()){marshUntil=0;marshSeq=null;marshNext=performance.now()+rnd(1,3)*MIN;showScene('m_base');MARSH_EV.forEach((e,i)=>setTimeout(()=>getImg(e[0],()=>{}),1500+i*400));return}
  prefetch();
  if(L.phase==='pre'||L.phase==='winter')showScene(baseKey(level()));
  else{showScene(idleScene());nextAt=performance.now()+rnd(2.5,5)*MIN}
@@ -640,7 +654,7 @@ function idbDo(mode,fn){return idb().then(db=>new Promise((res,rej)=>{const tx=d
 const albumAll=()=>idbDo('readonly',st=>st.getAll()).then(a=>(a||[]).sort((x,y)=>y.id-x.id));
 const SCENE_NAME={sp_maple:'カエデのつらら',sp_log:'朽ち木でエサ運び',sp_roost:'ねぐらの団子',s1:'冬の群れ',s1_lv2:'冬の群れ',s1_lv3:'冬の群れ',s1_lv4:'冬の群れ',v0a:'通りかかった1羽',v0b:'通りかかった1羽',v1a:'エサ台に来た2羽',v1b:'エサ台に来た3羽',c1:'すぐ近くの1羽',c2:'寄り添う2羽',c3:'毛繕い',s2:'巣作り',s3:'巣の中のヒナ',s4:'エナガ団子',s5:'巣立ち後の親子',dango_old:'ごほうびの団子',s0b:'晩冬の森',s0c:'早春の森'};
 const SEASON_SCENE={lv0:'森',lv1:'森',lv2:'森',lv3:'森',v0a:'1羽',v0b:'1羽',v1a:'2羽',v1b:'3羽',flock_lv2:'群れ',flock_lv3:'群れ',flock5:'ごほうびの団子'};
-function shotLabel(){const k=curKey||'';if(/^m_/.test(k))return '湿原：'+({m_base:'けあらしの川',m_pair:'タンチョウのつがい',m_fly:'飛ぶタンチョウ',m_beni:'ベニマシコ',m_shima:'霧氷のシマエナガ',m_dance:'タンチョウのダンス'})[k];{const fm=/^f_\w+?_(\w+)_lv\d$/.exec(k);if(fm)return '森の仲間：'+FRIENDS[fm[1]]}const sm=/^(spring|summer|autumn)_(.+)$/.exec(k);
+function shotLabel(){const k=curKey||'';if(/^m_/.test(k))return '湿原：'+({m_call1:'タンチョウの鳴き交わし',m_call2:'タンチョウの鳴き交わし',m_call3:'タンチョウの鳴き交わし',m_call4:'タンチョウの鳴き交わし',m_dance1:'タンチョウのダンス',m_dance2:'タンチョウのダンス',m_dance3:'タンチョウのダンス',m_dance4:'タンチョウのダンス',m_fly1:'飛ぶタンチョウ',m_fly2:'飛ぶタンチョウ',m_fly3:'飛ぶタンチョウ',m_base:'けあらしの川',m_pair:'タンチョウのつがい',m_fly:'飛ぶタンチョウ',m_beni:'ベニマシコ',m_shima:'霧氷のシマエナガ',m_dance:'タンチョウのダンス'})[k];{const fm=/^f_\w+?_(\w+)_lv\d$/.exec(k);if(fm)return '森の仲間：'+FRIENDS[fm[1]]}const sm=/^(spring|summer|autumn)_(.+)$/.exec(k);
  let n=sm?SEASONS[sm[1]]+'の'+(SEASON_SCENE[sm[2]]||'森'):(SCENE_NAME[k]||'冬の森');const L=life();
  if((k==='s3'||k==='s4')&&S.broods[L.k]){const a=S.broods[L.k].names.filter(Boolean);if(a.length)n+='（'+a.join('・')+'）'}
  if(k==='s2'&&(S.parents.a||S.parents.b))n+='（'+parentNames()+'）';return n}

@@ -79,6 +79,13 @@ ASSETS['m_fly'] = ('marsh/winter_cranes_flying.jpg', 1.0, [], 'mist')
 ASSETS['m_dance'] = ('marsh/winter_crane_dance.jpg', .5, [], 'snow')
 ASSETS['m_beni'] = ('marsh/winter_benimashiko.jpg', .4, [[490,525,860,115,1]], 'snow')
 ASSETS['m_shima'] = ('marsh/winter_shimaenaga_pair.jpg', .4, [[370,605,830,70,0],[530,585,795,70,0]], 'snow')
+# S21 パラパラ写真（同じ構図でポーズ違い。鳥の位置が写真ごとに違うので、細かい揺らしはなし）
+for i, f in enumerate(('call1_forage', 'call2_left', 'call3_unison', 'call4_wings'), 1):
+    ASSETS[f'm_call{i}'] = (f'marsh/{f}.jpg', 1.0, [], 'mist')
+for i, f in enumerate(('dance1_bow', 'dance2_leap', 'dance3_land', 'dance4_call'), 1):
+    ASSETS[f'm_dance{i}'] = (f'marsh/{f}.jpg', .5, [], 'snow')
+for i, f in enumerate(('fly1_further', 'fly2_right', 'fly3_horizon'), 1):
+    ASSETS[f'm_fly{i}'] = (f'marsh/{f}.jpg', 1.0, [], 'mist')
 
 out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'dist')
 img_dir = os.path.join(out_dir, 'img')

@@ -72,7 +72,7 @@ ASSETS['sp_maple'] = ('special/maple_icicle.jpg', .5, [[430,510,870,115,1]], 'sn
 ASSETS['sp_log'] = ('special/log_caterpillar.jpg', .5, [[445,555,820,90,4]], 'glow')
 ASSETS['sp_roost'] = ('special/fir_roost.jpg', .35, [[180,628,790,55,4],[272,612,780,50,4],[365,585,745,50,4],[458,560,720,50,4],[575,530,695,60,4]], 'snow')
 
-# ---- 湿原（S20）。公開するまでは ?preview=marsh のときだけ出る。公開は MARSH_RELEASE=1 python3 build_game.py ----
+# ---- 湿原（S20）。2026-11-25 公開済み（MARSH_RELEASE=0 で隠した版も作れる） ----
 ASSETS['m_base'] = ('marsh/winter_base.jpg', 1.0, [], 'mist')
 ASSETS['m_pair'] = ('marsh/winter_cranes_pair.jpg', 1.0, [[270,885,1235,60,4],[500,970,1225,55,4]], 'mist')
 ASSETS['m_fly'] = ('marsh/winter_cranes_flying.jpg', 1.0, [], 'mist')
@@ -106,7 +106,7 @@ for k, v in ASSETS.items():
     out[k] = {'img': 'img/' + name, 'snow': snow, 'birds': birds, 'fx': fx}
 t = open(os.path.join(HERE, 'game_template.html'), encoding='utf-8').read()
 BUILD = time.strftime('%Y%m%d%H%M%S')
-s = t.replace('__ASSETS__', json.dumps(out, ensure_ascii=False)).replace('__BUILD__', BUILD).replace('__MARSH_RELEASE__', 'true' if os.environ.get('MARSH_RELEASE') == '1' else 'false')
+s = t.replace('__ASSETS__', json.dumps(out, ensure_ascii=False)).replace('__BUILD__', BUILD).replace('__MARSH_RELEASE__', 'false' if os.environ.get('MARSH_RELEASE') == '0' else 'true'  # 2026-11-25 公開済み)
 open(os.path.join(out_dir, 'index.html'), 'w', encoding='utf-8').write(s)
 # 版の番号（ページはこれを見て、新しい版が出ていたら読み込み直す）
 open(os.path.join(out_dir, 'version.json'), 'w').write(json.dumps({'build': BUILD}))

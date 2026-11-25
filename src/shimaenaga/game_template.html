@@ -108,7 +108,7 @@ body.trialing #bShot,body.paneling #bShot{display:none}
  <section class="panel glass" id="pNote"><h2>知識ノート</h2><p>出来事が起きると、カードが1枚ずつ増えていきます。</p><div id="noteList"></div></section>
  <section class="panel glass" id="pLog"><h2>記録</h2><div class="log" id="logList"></div>
   <div class="sec">壁紙</div><div id="wpBox"></div><label style="display:block;font-size:13px;margin:4px 0"><input type="checkbox" id="hudChk"> 壁紙に状態（Gや子育ての様子）を表示する</label><button class="glass" id="bHudMove" style="margin-top:4px">壁紙の表示を動かす</button>
-  <div class="sec">季節</div><div class="seasons" id="seasonBox"></div><p id="seasonMsg"></p>
+  <div id="placeWrap"></div><div class="sec">季節</div><div class="seasons" id="seasonBox"></div><p id="seasonMsg"></p>
   <div class="sec">やり直し</div><button class="glass" id="bReset">最初からやり直す</button></section>
  <div class="glass" id="hudBar">壁紙に出る表示です。<b>長押し</b>すると持ち上がるので、そのまま指で好きな場所へ動かしてください。<div class="row"><button class="glass" id="hudReset">元の位置に戻す</button><button class="main" id="hudDone">完了</button></div></div>
  <div class="trial glass" id="trial"><span id="trialMsg"></span><button class="main" id="trialBuy">買う</button><button class="glass" id="trialEnd">やめる</button></div>
@@ -128,6 +128,9 @@ const A=__ASSETS__;
 const IW=768,IH=1376,MAXN=6;
 const qs=new URLSearchParams(location.search),DEBUG=qs.has('debug'),WALL=qs.has('wallpaper');
 const BUILD='__BUILD__';
+// 湿原は完成まで秘密。MARSH_RELEASE を true にすると全員に公開。それまでは ?preview=marsh のリンクでだけ見られる
+const MARSH_RELEASE=__MARSH_RELEASE__;
+const MARSH_ON=MARSH_RELEASE||qs.get('preview')==='marsh';
 const $=id=>document.getElementById(id);
 
 /* ================= 保存データ ================= */
@@ -177,6 +180,7 @@ const ITEMS=[
  {id:'log',emo:'🪵',img:'sp_log',name:'苔むした朽ち木',price:5000,need:'feeder',desc:'虫がたくさんすむ倒木。子育ての時期、ヒナに運ぶ虫をくわえた親鳥が寄るように。',note:'log'},
  {id:'fir',emo:'🌲',img:'sp_roost',name:'トドマツの若木',price:8000,need:'feeder',desc:'冬も葉が落ちない針葉樹。夜に壁紙を見ると、寄り添って眠る「ねぐらの団子」に会えることも。',note:'fir'},
  {id:'down',emo:'🪶',name:'羽毛の巣材',price:7000,need:'nest',desc:'巣に敷きつめる、ふかふかの羽毛。次の子育てから、ヒナが7羽に増えます。',note:'down'},
+ {id:'ticket',emo:'🧳',name:'湿原への旅のしたく',price:30000,desc:'タンチョウの夫婦から招待された、東の大きな湿原へ出かける準備。買うと、森と湿原を行き来できるようになります。',note:'marsh'},
  {id:'treat',emo:'🎂',repeat:true,name:'特製バードケーキ（ごちそう）',price:500,need:'feeder',desc:'1日1回あげられます。その日は鳥がよく来て、仲間も来やすくなります。'},
  {id:'binoc',group:'obs',emo:'🔭',name:'双眼鏡',price:2000,desc:'やってきた群れの数を数えたり、名前を付けた子が混じっているか見分けたりできます。',note:'binoc'},
  {id:'camera',group:'obs',emo:'📷',name:'カメラ',price:5000,desc:'森の様子を撮って、アルバムに残せます。お気に入りはスマホにも保存できます。',note:'camera'},
@@ -189,7 +193,8 @@ function saleInfo(t){t=t||now();const d=dkey(t),h=hstr('sale'+d);
  const start=dayStart(t)+(7*60+h%(15*60))*MIN,end=start+SALE_MIN;  // 7:00〜21:59のどこかで始まる
  if(t<start||t>=end)return null;
  const before=id=>S.owned[id]&&S.owned[id]<start;
- const c=ITEMS.filter(it=>!it.soon&&!it.repeat&&!before(it.id)&&(!it.need||before(it.need)));
+ const showItem=it=>it.id!=='ticket'||(MARSH_ON&&S.marsh&&S.marsh.invited);
+ const c=ITEMS.filter(it=>!it.soon&&!it.repeat&&showItem(it)&&!before(it.id)&&(!it.need||before(it.need)));
  if(!c.length)return null;
  const it=c[(h>>>12)%c.length];if(S.owned[it.id])return null;   // もう買った
  return{it,pct:[20,30,40,50][(h>>>8)%4],end}}
@@ -201,7 +206,7 @@ function buyTreat(it){tick();if(treatToday()||S.g<it.price||(it.need&&!S.owned[i
  {const g=visitGap();if(nextVisit()>now()+g[1])setNextVisit(now()+rnd(1,3)*MIN)}
  addLog('ごちそうを置いた');save();toast('ごちそうを置きました。今日は鳥たちがよく来そうです');render();renderShop();return true}
 function buy(it){if(it.repeat)return buyTreat(it);tick();const pr=priceOf(it),onSale=pr<it.price;if(S.owned[it.id]||S.g<pr||(it.need&&!S.owned[it.need]))return false;
- S.g-=pr;if(it.id==='sunflower')setNextFriend(now()+rnd(3,8)*HOUR);S.owned[it.id]=now();if(it.id==='nest')S.lv3At=now();
+ S.g-=pr;if(it.id==='sunflower')setNextFriend(now()+rnd(3,8)*HOUR);S.owned[it.id]=now();if(it.id==='nest')S.lv3At=now();if(it.id==='ticket'){S.place='marsh';unlock('kearashi');evtQ.push({type:'info',tag:'旅のはじまり',title:'湿原にやってきました',body:'見わたすかぎりの雪の湿原を、川が大きくうねりながら流れています。朝の川からは、けあらしの霧が立ちのぼっています。「記録」の「出かける場所」で、いつでも森に帰れます。'})}
  {const g=visitGap();if(nextVisit()>now()+g[1])setNextVisit(now()+rnd(g[0],g[1]))}
  addLog(it.name+(it.group==='obs'?'を買った':'を置いた')+(onSale?'（セールで'+G(pr)+'）':''));unlock(it.note);save();toast(it.group==='obs'?it.name+'を手に入れました':it.name+'を森に置きました');if(trial){trial=null;document.body.classList.remove('trialing');$('trial').classList.remove('show')}scheduleNext();render();renderShop();pump();return true}
 let trial=null;
@@ -252,6 +257,11 @@ const NOTES={
  kifu:['野鳥を守る活動','日本では、野鳥の会などの団体が、野鳥の調査や保護区（サンクチュアリ）の手入れ、ケガをした鳥の保護などを行っています。寄付や会員になることで、こうした活動を応援できます。'],
  kifu2:['森の入り口の看板','寄付のおかげで、森の入り口に看板が立ちました。看板には「この森の鳥たちを見守っています」と書かれています。'],
  kifu3:['森の守り手','たくさんの寄付をありがとう。あなたは立派な「森の守り手」です。野鳥が安心して暮らせる森は、季節の移ろいとともに、いろいろな命を育みます。'],
+ marsh:['大地をうねる川','北海道東部の釧路湿原は、日本でいちばん大きな湿原です。その中を、釧路川などの川が大きく曲がりくねりながら（蛇行しながら）流れています。人の手がほとんど入っていない自然のままの姿が残り、水鳥の大切なすみかとしてラムサール条約にも登録されています。'],
+ kearashi:['けあらし','冷えこんだ冬の朝、空気が川や海の水よりずっと冷たいと、水面から湯気のような霧が立ちのぼります。これを「けあらし」といいます。湿原の川では、けあらしで岸の木々の枝に霜がつき、真っ白な霧氷になることもあります。'],
+ tancho:['タンチョウ','頭のてっぺんが赤い、日本でいちばん大きな鳥のひとつです（翼を広げると約2.4m）。国の特別天然記念物。明治時代には絶滅したと思われていましたが、釧路湿原で見つかり、地元の人たちの冬のエサやりなどで、いまは1,800羽ほどまで増えました。'],
+ dance:['タンチョウのダンス','冬の終わりから春にかけて、タンチョウのつがいは鳴き交わしながら、翼を広げて飛びはね、ダンスのように舞います。夫婦の絆を深めるためと考えられていて、タンチョウの夫婦はふつう一生いっしょにくらします。'],
+ benimashiko:['ベニマシコ','オスは名前のとおり紅色（べにいろ）の小鳥で、尾が長めです。北海道では夏に子育てをし、冬は多くが本州へ渡るので、冬の湿原で出会えたらとてもラッキー。「フィッ、フィッ」とやさしい声で鳴きます。'],
  nestmat:['巣の材料','シマエナガの巣は、コケをクモの糸でつなぎ合わせて作ります。外側には地衣類（木につく白っぽい苔のようなもの）を貼りつけて、木の皮そっくりに目立たなくします。中には鳥の羽毛を1,000枚以上、多いときは2,000枚を超えて敷きつめ、ふかふかのベッドにします。'],
  pair:['つがいの誕生','2〜3月ごろ、冬の群れの中でつがいが生まれ、群れを離れて子育ての準備を始めます。シマエナガの夫婦は、巣作りも子育ても2羽で協力して行います。'],
  nest:['巣作り','夫婦で2週間ほどかけて巣を作ります。巣は横に小さな出入り口がある卵のような形（ドーム形）。クモの糸で編んであるので伸び縮みし、ヒナが大きくなっても巣が広がります。'],
@@ -261,7 +271,7 @@ const NOTES={
  family:['巣立ち後の親子','巣立ったばかりの幼鳥は、顔にこげ茶色の部分があり、まだ大人のように真っ白ではありません。しばらくは家族で一緒に行動し、親からエサをもらいながら、自分でエサをとる練習をします。'],
  winter:['季節がめぐる','夏から秋にかけて、家族はほかの家族と合流して群れになり、冬を迎えます。翌年の春、その群れの中からまた新しいつがいが生まれます。'],
 };
-const NOTE_ORDER=['start','protect','visit','feeder','water','icicle','maple','log','fir','down','sunflower','binoc','camera','hide','kogera','yamagara','shijukara','gojukara','konkun','kifu','kifu2','kifu3','nestmat','pair','nest','egg','chick','dango','family','winter'];
+const NOTE_ORDER=['start','protect','visit','feeder','water','icicle','maple','log','fir','down','sunflower','binoc','camera','hide','kogera','yamagara','shijukara','gojukara','konkun','marsh','kearashi','tancho','dance','benimashiko','kifu','kifu2','kifu3','nestmat','pair','nest','egg','chick','dango','family','winter'];
 const noteQ=[];
 function unlock(id){if(!id||!NOTES[id]||S.notes.includes(id))return;S.notes.push(id);save();if(!WALL)noteQ.push(id)}
 function showNoteNow(id){const n=NOTES[id];$('mnTitle').textContent=n[0];$('mnBody').textContent=n[1];$('mNote').classList.add('open')}
@@ -304,7 +314,9 @@ function showEvt(e){const N=$('meNames');N.innerHTML='';$('meOk').textContent='O
 function closeEvt(){$('mEvt').classList.remove('open');render();setTimeout(pump,250)}
 const anyModal=()=>['mLot','mNote','mEvt','mPhoto'].some(id=>$(id).classList.contains('open'));
 // 出来事 → 知識カード → くじ の順に1つずつ出す
-function pump(){if(WALL||anyModal())return;if(evtQ.length){showEvt(evtQ.shift());return}if(noteQ.length){showNoteNow(noteQ.shift());return}maybeLottery()}
+function pump(){if(WALL||anyModal())return;
+ if(MARSH_ON&&level()>=3&&!(S.marsh&&S.marsh.invited)){S.marsh=S.marsh||{};S.marsh.invited=now();save();
+  evtQ.push({type:'info',tag:'お手紙',title:'湿原から招待状が届きました',body:'東の大きな湿原にすむ、タンチョウの夫婦からの手紙です。「冬の湿原は、けあらしと霧氷でいちばん美しい季節です。大地をうねって流れる川を、ぜひ見に来てください」 ショップに「湿原への旅のしたく」が並びました。'})}if(evtQ.length){showEvt(evtQ.shift());return}if(noteQ.length){showNoteNow(noteQ.shift());return}maybeLottery()}
 
 /* ================= 場面の選び方 ================= */
 const BASE_IMG=['lv0','lv1','lv2','lv3','lv4'];
@@ -340,7 +352,29 @@ function prefetch(){const se=curSeason(),win=se==='winter',P=win?'':se+'_',lv=le
  const ks=lv===0?[P+'v0a',P+'v0b']:lv===1?[P+'v1a',P+'v1b']:[win?'s1_lv'+lv:P+'flock_lv'+Math.min(lv,3)];
  ks.push(win?'dango_old':P+'flock5');if(win&&S.owned.hide)ks.push('c1','c2','c3');
  ks.forEach((k,i)=>A[k]&&setTimeout(()=>getImg(k,()=>{}),1500+i*400))}
-function scheduleNext(){const L=life();visiting=false;prefetch();
+const inMarsh=()=>MARSH_ON&&S.owned.ticket&&S.place==='marsh';
+const MARSH_EV=[['m_pair',40,'タンチョウのつがいが雪原に降り立ちました',['tancho']],['m_fly',25,'タンチョウが3羽、川の上を飛んでいきます',['tancho']],
+ ['m_beni',15,'川辺のヤナギに、ベニマシコがとまりました',['benimashiko']],['m_shima',12,'森のシマエナガが2羽、湿原まで遊びに来ました',[]],
+ ['m_dance',8,'タンチョウが雪の上でダンスを踊っています！',['tancho','dance']]];
+const MARSH_BIRDS={tancho:'タンチョウ',benimashiko:'ベニマシコ'};
+let marshNext=0,marshUntil=0;
+// 湿原で会った鳥を図鑑に（壁紙は全体を保存しないので、その部分だけ書き足す）
+function meetMarsh(ids){const fresh=[];
+ const put=(o,rec)=>{o.marsh=o.marsh||{};const z=o.marsh.zukan||(o.marsh.zukan={});o.notes=o.notes||[];
+  for(const id of ids){if(MARSH_BIRDS[id]){if(!z[id]){z[id]={first:now(),count:0};if(rec)fresh.push(id)}z[id].count++}if(!o.notes.includes(id)){o.notes.push(id);if(rec&&!MARSH_BIRDS[id])fresh.push(id)}}};
+ put(S,true);if(WALL){try{const o=JSON.parse(localStorage.getItem(KEY)||'{}');put(o,false);localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}else fresh.forEach(id=>noteQ.push(id));
+ return fresh.some(id=>MARSH_BIRDS[id])}
+function marshTick(){const t=performance.now();
+ if(marshUntil){if(t>marshUntil){marshUntil=0;showScene('m_base');marshNext=t+rnd(6,14)*MIN*(treatToday()?.6:1)}return}
+ if(!marshNext){marshNext=t+rnd(1,3)*MIN;return}
+ if(t<marshNext)return;
+ const ws=MARSH_EV.map(e=>e[1]*(e[0]==='m_dance'&&jackpot()?3:1));let r=Math.random()*ws.reduce((a,b)=>a+b,0),ev=MARSH_EV[0];
+ for(let i=0;i<MARSH_EV.length;i++){if((r-=ws[i])<0){ev=MARSH_EV[i];break}}
+ showScene(ev[0]);marshUntil=t+rnd(45,90)*1000;const first=meetMarsh(ev[3]);
+ toast(ev[2]+(first?'（図鑑に登録）':''),5500);addLog('湿原：'+ev[2]);save();pump()}
+function scheduleNext(){const L=life();visiting=false;
+ if(inMarsh()){marshUntil=0;marshNext=performance.now()+rnd(1,3)*MIN;showScene('m_base');MARSH_EV.forEach((e,i)=>setTimeout(()=>getImg(e[0],()=>{}),1500+i*400));return}
+ prefetch();
  if(L.phase==='pre'||L.phase==='winter')showScene(baseKey(level()));
  else{showScene(idleScene());nextAt=performance.now()+rnd(2.5,5)*MIN}
 }
@@ -358,7 +392,7 @@ function meetFriend(n){const first=!(S.zukan&&S.zukan[n]);
  else{noteQ.length;if(first){noteQ.push(n)}if(Object.keys(FRIENDS).every(k=>S.zukan[k])&&!noteQ.includes('konkun')&&first)noteQ.push('konkun')}
  return first}
 function pastKids(){const L=life(),out=[];for(const k in S.broods){if(L.phase==='winter'||+k<L.k)for(const n of S.broods[k].names)if(n)out.push(n)}return out}
-function visit(){const L=life();if(!(L.phase==='pre'||L.phase==='winter'))return;
+function visit(){if(inMarsh())return;const L=life();if(!(L.phase==='pre'||L.phase==='winter'))return;
  visiting=true;S.visits++;const first=!S.notes.includes('visit');unlock('visit');
  // 道具に合わせて来る羽数が変わる：なし＝1羽、エサ台＝2〜3羽、水鉢から＝群れ
  const lv=level(),flock=lv>=2;
@@ -393,6 +427,7 @@ function visit(){const L=life();if(!(L.phase==='pre'||L.phase==='winter'))return
  addLog('シマエナガが来た（'+S.visits+'回目'+logx+'）');save();if(first)pump()}
 const CLOSE_MSG={c1:'1羽が、小屋のすぐ近くの枝にとまりました',c2:'2羽が寄り添って、目の前の枝に並びました',c3:'1羽が目の前で、ていねいに毛繕いを始めました'};
 function sceneTick(){if(trial){if(performance.now()>trial.until)endTrial();return}
+ if(inMarsh()){marshTick();return}
  const L=life();
  if(L.phase==='pre'||L.phase==='winter'){
   if(visiting){if(closeKey&&performance.now()>closeAt){showScene(closeKey);
@@ -498,13 +533,15 @@ function makeSprites(){sprDPR=DPR;SPR=[];
   if(blur){gr.addColorStop(0,'rgba(255,255,255,.9)');gr.addColorStop(.45,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)')}
   else{const e=r/R2;gr.addColorStop(0,'#fff');gr.addColorStop(e*.75,'#fff');gr.addColorStop(Math.min(1,e*1.05),'rgba(255,255,255,.35)');gr.addColorStop(1,'rgba(255,255,255,0)')}
   g.fillStyle=gr;g.fillRect(0,0,R2*2,R2*2);SPR.push({c,h:R2})}}
-const AMT={snow:1,glow:0,sun:0,leaf:0};
+const AMT={snow:1,glow:0,sun:0,leaf:0,mist:0};
+const fogs=[];for(let i=0;i<9;i++)fogs.push({x:Math.random()*1.4-.2,y:.42+Math.random()*.3,s:.7+Math.random()*.8,v:.004+Math.random()*.006,ph:Math.random()*9});
 const motes=[];for(let i=0;i<70;i++)motes.push({x:Math.random(),y:Math.random(),z:Math.random(),ph:Math.random()*9});
 const leaves=[];for(let i=0;i<30;i++)leaves.push({x:Math.random(),y:Math.random()*1.1-.1,z:Math.random(),ph:Math.random()*9,r:Math.random()*6,vr:(Math.random()-.5)*2.2,c:Math.floor(Math.random()*4)});
 let GLOW=null,SUN=null,LEAF=[],fxDPR=0;
 function soft(r,rgb,a0){const R2=Math.ceil(r),c=document.createElement('canvas');c.width=c.height=R2*2;const g=c.getContext('2d'),gr=g.createRadialGradient(R2,R2,0,R2,R2,R2);
  gr.addColorStop(0,'rgba('+rgb+','+a0+')');gr.addColorStop(.5,'rgba('+rgb+','+a0*.45+')');gr.addColorStop(1,'rgba('+rgb+',0)');g.fillStyle=gr;g.fillRect(0,0,R2*2,R2*2);return c}
-function makeFx(){fxDPR=DPR;GLOW=soft(7*DPR,'255,252,230',1);SUN=soft(26*DPR,'255,246,200',.9);LEAF=[];
+let FOG=null;
+function makeFx(){fxDPR=DPR;FOG=soft(140*DPR,'255,246,236',1);GLOW=soft(7*DPR,'255,252,230',1);SUN=soft(26*DPR,'255,246,200',.9);LEAF=[];
  for(const col of ['#b8521e','#d9822b','#8f3d17','#e9b23c']){const w=Math.ceil(20*DPR),h=Math.ceil(12*DPR),c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
   g.fillStyle=col;g.beginPath();g.moveTo(1,h/2);g.quadraticCurveTo(w*.45,-h*.15,w-1,h/2);g.quadraticCurveTo(w*.45,h*1.15,1,h/2);g.fill();
   g.strokeStyle='rgba(255,236,200,.55)';g.lineWidth=Math.max(1,DPR*.7);g.stroke();g.strokeStyle='rgba(90,40,10,.55)';g.lineWidth=Math.max(1,DPR*.6);g.beginPath();g.moveTo(1,h/2);g.lineTo(w-2,h/2);g.stroke();LEAF.push(c)}}
@@ -531,11 +568,14 @@ function drawLeaf(dt,amt){const cnt=Math.round(leaves.length*amt);
 function snow(dt){if(sprDPR!==DPR)makeSprites();if(fxDPR!==DPR)makeFx();ctx.clearRect(0,0,W,H);
  const a=curKey?A[curKey]:null,fx=(a&&a.fx)||'snow',tgt=a?a.snow:1;
  for(const m in AMT)AMT[m]=smooth(AMT[m],m===fx?tgt:0,.9,dt);
+ if(AMT.mist>.01){for(const f of fogs){f.x+=dt*f.v;f.ph+=dt*.2;if(f.x>1.3){f.x=-.3;f.y=.42+Math.random()*.3}
+   const w=FOG.width*f.s*1.6,h=FOG.height*f.s*.55;ctx.globalAlpha=AMT.mist*(.10+.06*Math.sin(f.ph));ctx.drawImage(FOG,f.x*W-w/2,f.y*H-h/2,w,h)}
+  drawSnow(dt,AMT.mist*.25)}
  if(AMT.snow>.01)drawSnow(dt,AMT.snow);if(AMT.glow>.01)drawGlow(dt,AMT.glow);if(AMT.sun>.01)drawSun(dt,AMT.sun);if(AMT.leaf>.01)drawLeaf(dt,AMT.leaf);
  ctx.globalAlpha=1}
 
 /* ================= 画面の表示 ================= */
-function stageText(){const L=life(),lv=level();
+function stageText(){if(inMarsh())return '湿原にお出かけ中';const L=life(),lv=level();
  switch(L.phase){
   case 'pre':return lv===0?'まだ静かな森。ときどきシマエナガが通りかかります':lv===1?'エサ台にシマエナガが寄るようになりました':lv===2?'水場もできて、群れでやってくる森に':'巣材がそろいました。つがいが生まれそう…';
   case 'nest':return parentNames()+'が巣作り中・'+leftText(L.left);
@@ -552,7 +592,7 @@ function render(){tick();camUI();const r=S.rates[dkey(now())];
  if($('pShop').classList.contains('open'))renderShop(true)}
 let shopSig='';
 function renderShop(soft){const sl0=saleInfo(),sig=ITEMS.map(it=>(S.owned[it.id]?1:0)+''+(S.g>=priceOf(it)?1:0)).join('')+(treatToday()?'T':'')+(S.donated||0)+'/'+Math.floor(S.g/1000)+(sl0?sl0.it.id+Math.ceil((sl0.end-now())/MIN):'');if(soft&&sig===shopSig)return;shopSig=sig;const L=$('shopList');L.innerHTML='';L.dataset.g='-';
- for(const it of ITEMS){const owned=it.repeat?treatToday():S.owned[it.id],locked=it.need&&!S.owned[it.need];
+ for(const it of ITEMS){if(it.id==='ticket'&&!(MARSH_ON&&S.marsh&&S.marsh.invited))continue;const owned=it.repeat?treatToday():S.owned[it.id],locked=it.need&&!S.owned[it.need];
   const d=document.createElement('div');d.className='item';
   if((it.group||'')!==L.dataset.g){L.insertAdjacentHTML('beforeend','<div class="sec">'+(it.group==='obs'?'観察の道具':'森の道具')+'</div>');L.dataset.g=it.group||''}
   d.innerHTML=(it.img?'<div class="thumb"><img alt="" src="'+A[itemImg(it)].img+'"></div>':'<div class="thumb emo">'+(it.emo||'')+'</div>')+
@@ -580,7 +620,9 @@ function renderNotes(){const L=$('noteList');L.innerHTML='';
   box.innerHTML='<div class="sec">森の仲間図鑑 '+got+' / '+ks.length+'</div><div class="zukan">'+ks.map(k=>{const fk='f_autumn_'+k+'_lv1';
    return '<div><div class="ph">'+(z[k]&&A[fk]?'<img alt="" src="'+A[fk].img+'">':'？')+'</div>'+(z[k]?FRIENDS[k]+'<br>'+z[k].count+'回':'？？？')+'</div>'}).join('')+'</div>'+
    (got?'':'<p>ひまわりの種のエサ台を置いたり、群れをよく見ていると、ほかの小鳥に会えるかも。</p>');L.appendChild(box)}
- for(const id of NOTE_ORDER){const n=NOTES[id],has=S.notes.includes(id),d=document.createElement('div');d.className='note'+(has?'':' locked');
+ if(MARSH_ON&&S.owned.ticket){const z=(S.marsh&&S.marsh.zukan)||{},ks=Object.keys(MARSH_BIRDS),th={tancho:'m_dance',benimashiko:'m_beni'},box=document.createElement('div');
+  box.innerHTML='<div class="sec">湿原の鳥図鑑 '+ks.filter(k=>z[k]).length+' / '+ks.length+'</div><div class="zukan">'+ks.map(k=>'<div><div class="ph">'+(z[k]&&A[th[k]]?'<img alt="" src="'+A[th[k]].img+'">':'？')+'</div>'+(z[k]?MARSH_BIRDS[k]+'<br>'+z[k].count+'回':'？？？')+'</div>').join('')+'</div>';L.appendChild(box)}
+ for(const id of NOTE_ORDER){if(!MARSH_ON&&['marsh','kearashi','tancho','dance','benimashiko'].includes(id))continue;const n=NOTES[id],has=S.notes.includes(id),d=document.createElement('div');d.className='note'+(has?'':' locked');
   d.innerHTML='<h3>'+(has?n[0]:'？？？')+'</h3>'+(has?'<div>'+n[1]+'</div>':'');L.appendChild(d)}}
 function renderFam(){const L=$('famList');L.innerHTML='';const lf=life();
  if(lf.phase==='pre'){L.innerHTML='<p>まだつがいはいません。道具をそろえて、シマエナガが安心して子育てできる森にしましょう。</p><p>これまでに来たシマエナガ：'+S.visits+'回</p>';return}
@@ -598,7 +640,7 @@ function idbDo(mode,fn){return idb().then(db=>new Promise((res,rej)=>{const tx=d
 const albumAll=()=>idbDo('readonly',st=>st.getAll()).then(a=>(a||[]).sort((x,y)=>y.id-x.id));
 const SCENE_NAME={sp_maple:'カエデのつらら',sp_log:'朽ち木でエサ運び',sp_roost:'ねぐらの団子',s1:'冬の群れ',s1_lv2:'冬の群れ',s1_lv3:'冬の群れ',s1_lv4:'冬の群れ',v0a:'通りかかった1羽',v0b:'通りかかった1羽',v1a:'エサ台に来た2羽',v1b:'エサ台に来た3羽',c1:'すぐ近くの1羽',c2:'寄り添う2羽',c3:'毛繕い',s2:'巣作り',s3:'巣の中のヒナ',s4:'エナガ団子',s5:'巣立ち後の親子',dango_old:'ごほうびの団子',s0b:'晩冬の森',s0c:'早春の森'};
 const SEASON_SCENE={lv0:'森',lv1:'森',lv2:'森',lv3:'森',v0a:'1羽',v0b:'1羽',v1a:'2羽',v1b:'3羽',flock_lv2:'群れ',flock_lv3:'群れ',flock5:'ごほうびの団子'};
-function shotLabel(){const k=curKey||'';{const fm=/^f_\w+?_(\w+)_lv\d$/.exec(k);if(fm)return '森の仲間：'+FRIENDS[fm[1]]}const sm=/^(spring|summer|autumn)_(.+)$/.exec(k);
+function shotLabel(){const k=curKey||'';if(/^m_/.test(k))return '湿原：'+({m_base:'けあらしの川',m_pair:'タンチョウのつがい',m_fly:'飛ぶタンチョウ',m_beni:'ベニマシコ',m_shima:'霧氷のシマエナガ',m_dance:'タンチョウのダンス'})[k];{const fm=/^f_\w+?_(\w+)_lv\d$/.exec(k);if(fm)return '森の仲間：'+FRIENDS[fm[1]]}const sm=/^(spring|summer|autumn)_(.+)$/.exec(k);
  let n=sm?SEASONS[sm[1]]+'の'+(SEASON_SCENE[sm[2]]||'森'):(SCENE_NAME[k]||'冬の森');const L=life();
  if((k==='s3'||k==='s4')&&S.broods[L.k]){const a=S.broods[L.k].names.filter(Boolean);if(a.length)n+='（'+a.join('・')+'）'}
  if(k==='s2'&&(S.parents.a||S.parents.b))n+='（'+parentNames()+'）';return n}
@@ -627,7 +669,11 @@ $('bShop').onclick=()=>toggle('pShop',renderShop);
 $('bFam').onclick=()=>toggle('pFam',renderFam);
 $('bNote').onclick=()=>toggle('pNote',renderNotes);
 $('bAlbum').onclick=()=>toggle('pAlbum',renderAlbum);
-$('bLog').onclick=()=>toggle('pLog',()=>{renderSeasons();$('logList').innerHTML=S.log.slice(0,40).join('<br>')||'まだ記録はありません';$('hudChk').checked=S.hud!==false});
+function renderPlace(){const w=$('placeWrap');w.innerHTML='';if(!(MARSH_ON&&S.owned.ticket))return;
+ w.innerHTML='<div class="sec">出かける場所</div><div class="seasons" id="placeBox"></div>';const b=$('placeBox');
+ for(const [k,l] of [['forest','シマエナガの森'],['marsh','冬の湿原']]){const x=document.createElement('button');x.className='glass'+((S.place||'forest')===k?' on':'');x.textContent=l;
+  x.onclick=()=>{S.place=k;save();renderPlace();lastSig='';scheduleNext();render();toast(k==='marsh'?'湿原にやってきました':'シマエナガの森に帰ってきました')};b.appendChild(x)}}
+$('bLog').onclick=()=>toggle('pLog',()=>{renderPlace();renderSeasons();$('logList').innerHTML=S.log.slice(0,40).join('<br>')||'まだ記録はありません';$('hudChk').checked=S.hud!==false});
 (function(){const b=$('wpBox');if(window.ShimaApp){b.innerHTML='<button class="main" id="bWp">この森を壁紙にする</button><p>ホーム画面の壁紙が、この森の動く写真になります。遊んだ内容はそのまま壁紙に反映されます。</p>';$('bWp').onclick=()=>{try{ShimaApp.setWallpaper()}catch(e){}}}
  else b.innerHTML='<p>スマホの「シマエナガの森」アプリで開くと、この森をそのまま壁紙にできます。</p>'})();
 $('hudChk').onchange=e=>{S.hud=e.target.checked;save();render()};
@@ -635,7 +681,7 @@ function renderSeasons(){const b=$('seasonBox');b.innerHTML='';const cur=S.seaso
  for(const k of ['auto','spring','summer','autumn','winter']){const x=document.createElement('button');x.className='glass'+(k===cur?' on':'');x.textContent=SEASONS[k];
   x.onclick=()=>{S.season=k;save();renderSeasons();lastSig='';const ph=life().phase;
    toast(k==='auto'?'今の月に合わせて、森の季節が変わります（今は'+SEASONS[curSeason()]+'）':SEASONS[k]+'の森にしました'+(ph==='pre'||ph==='winter'?'':'。子育ての場面が終わると'+SEASONS[curSeason()]+'の森になります'))};b.appendChild(x)}
- $('seasonMsg').textContent='春・夏・秋は、冬とは少しちがう場所の枝になります。'+(S.season==='auto'?'自動：12〜3月は冬、4〜5月は春、6〜8月は夏、9〜11月は秋。':'')}
+ $('seasonMsg').textContent=(inMarsh()?'湿原はいまは冬だけです。季節は森に帰ったときに使われます。':'')+'春・夏・秋は、冬とは少しちがう場所の枝になります。'+(S.season==='auto'?'自動：12〜3月は冬、4〜5月は春、6〜8月は夏、9〜11月は秋。':'')}
 /* ----- 壁紙の表示を長押しで好きな場所へ（位置は画面に対する割合で覚える） ----- */
 const WH=$('whud');let hudDrag=null;
 function placeHud(){if(hudDrag)return;const p=S.hudPos;
@@ -667,12 +713,12 @@ if(DEBUG){$('debug').hidden=false;document.querySelectorAll('[data-skip]').forEa
 if(WALL)document.body.classList.add('wall');
 tick();unlock('start');unlock('protect');checkLife();initVisit();save();render();
 scheduleNext();
-let last=0,sec=0,lastSig=level()+'/'+life().phase+'/'+curSeason();
+let last=0,sec=0,lastSig=level()+'/'+life().phase+'/'+curSeason()+'/'+(inMarsh()?'m':'f');
 function frame(ts){if(WALL&&ts-last<30){requestAnimationFrame(frame);return}
  const dt=Math.min(.25,(ts-last)/1000||0),t=ts/1000;last=ts;
  if(ts-sec>1000){sec=ts;
   if(WALL&&Math.floor(ts/5000)!==Math.floor((ts-1000)/5000)){load()}
-  tick();if(!WALL){checkLife();save()}render();{const sig=level()+'/'+life().phase+'/'+curSeason();if(sig!==lastSig){lastSig=sig;if(!trial)scheduleNext()}}sceneTick();if(!WALL&&!anyModal()&&(evtQ.length||noteQ.length))pump()}
+  tick();if(!WALL){checkLife();save()}render();{const sig=level()+'/'+life().phase+'/'+curSeason()+'/'+(inMarsh()?'m':'f');if(sig!==lastSig){lastSig=sig;if(!trial)scheduleNext()}}sceneTick();if(!WALL&&!anyModal()&&(evtQ.length||noteQ.length))pump()}
  if(ready){if(fading){fading.t+=dt;const x=Math.min(1,fading.t/fading.dur);mx=x*x*(3-2*x);if(x>=1)finishFade()}
   gl.viewport(0,0,W,H);const v=view();gl.uniform4f(U('vw'),v[0],v[1],v[2],v[3]);gl.uniform1f(U('mx'),mx);
   animSlot(0,t,dt);if(fading)animSlot(1,t,dt);gl.drawArrays(gl.TRIANGLE_STRIP,0,4)}

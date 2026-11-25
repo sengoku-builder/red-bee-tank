@@ -72,6 +72,14 @@ ASSETS['sp_maple'] = ('special/maple_icicle.jpg', .5, [[430,510,870,115,1]], 'sn
 ASSETS['sp_log'] = ('special/log_caterpillar.jpg', .5, [[445,555,820,90,4]], 'glow')
 ASSETS['sp_roost'] = ('special/fir_roost.jpg', .35, [[180,628,790,55,4],[272,612,780,50,4],[365,585,745,50,4],[458,560,720,50,4],[575,530,695,60,4]], 'snow')
 
+# ---- 湿原（S20）。公開するまでは ?preview=marsh のときだけ出る。公開は MARSH_RELEASE=1 python3 build_game.py ----
+ASSETS['m_base'] = ('marsh/winter_base.jpg', 1.0, [], 'mist')
+ASSETS['m_pair'] = ('marsh/winter_cranes_pair.jpg', 1.0, [[270,885,1235,60,4],[500,970,1225,55,4]], 'mist')
+ASSETS['m_fly'] = ('marsh/winter_cranes_flying.jpg', 1.0, [], 'mist')
+ASSETS['m_dance'] = ('marsh/winter_crane_dance.jpg', .5, [], 'snow')
+ASSETS['m_beni'] = ('marsh/winter_benimashiko.jpg', .4, [[490,525,860,115,1]], 'snow')
+ASSETS['m_shima'] = ('marsh/winter_shimaenaga_pair.jpg', .4, [[370,605,830,70,0],[530,585,795,70,0]], 'snow')
+
 out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'dist')
 img_dir = os.path.join(out_dir, 'img')
 shutil.rmtree(img_dir, ignore_errors=True); os.makedirs(img_dir, exist_ok=True)
@@ -88,7 +96,7 @@ for k, v in ASSETS.items():
     out[k] = {'img': 'img/' + name, 'snow': snow, 'birds': birds, 'fx': fx}
 t = open(os.path.join(HERE, 'game_template.html'), encoding='utf-8').read()
 BUILD = time.strftime('%Y%m%d%H%M%S')
-s = t.replace('__ASSETS__', json.dumps(out, ensure_ascii=False)).replace('__BUILD__', BUILD)
+s = t.replace('__ASSETS__', json.dumps(out, ensure_ascii=False)).replace('__BUILD__', BUILD).replace('__MARSH_RELEASE__', 'true' if os.environ.get('MARSH_RELEASE') == '1' else 'false')
 open(os.path.join(out_dir, 'index.html'), 'w', encoding='utf-8').write(s)
 # 版の番号（ページはこれを見て、新しい版が出ていたら読み込み直す）
 open(os.path.join(out_dir, 'version.json'), 'w').write(json.dumps({'build': BUILD}))

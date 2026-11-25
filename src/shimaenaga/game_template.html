@@ -364,7 +364,7 @@ function marshFrames(k){const f=(key,a,b)=>[key,a,b];
  if(k==='m_dance'){const out=[f('m_dance',4,5)];for(let i=0;i<2;i++)out.push(f('m_dance1',3,4.5),f('m_dance2',2.5,3.5),f('m_dance3',3,4),f('m_dance4',4,6),f('m_dance',3,4.5));return out}
  if(k==='m_fly')return [f('m_fly',5,7),f('m_fly2',4,5.5),f('m_fly1',4,5.5),f('m_fly3',5,7),f('m_base',0,0)];
  return null}
-let marshSeq=null;
+let marshSeq=null,marshForce=null,marshDbg=0;
 const MARSH_BIRDS={tancho:'タンチョウ',benimashiko:'ベニマシコ'};
 let marshNext=0,marshUntil=0;
 // 湿原で会った鳥を図鑑に（壁紙は全体を保存しないので、その部分だけ書き足す）
@@ -383,6 +383,7 @@ function marshTick(){const t=performance.now();
  if(t<marshNext)return;
  const ws=MARSH_EV.map(e=>e[1]*(e[0]==='m_dance'&&jackpot()?3:1));let r=Math.random()*ws.reduce((a,b)=>a+b,0),ev=MARSH_EV[0];
  for(let i=0;i<MARSH_EV.length;i++){if((r-=ws[i])<0){ev=MARSH_EV[i];break}}
+ if(marshForce){ev=MARSH_EV.find(e=>e[0]===marshForce)||ev;marshForce=null}
  showScene(ev[0]);marshUntil=t+rnd(45,90)*1000;
  {const fr=marshFrames(ev[0]);if(fr){marshSeq={fr,i:0,cut:ev[0]==='m_pair',at:t+rnd(fr[0][1],fr[0][2])*1000+3200};fr.forEach(x=>getImg(x[0],()=>{}))}}const first=meetMarsh(ev[3]);
  toast(ev[2]+(first?'（図鑑に登録）':''),5500);addLog('湿原：'+ev[2]);save();pump()}
@@ -721,7 +722,7 @@ WH.addEventListener('pointerup',hudUp);WH.addEventListener('pointercancel',hudUp
 cv.addEventListener('click',closePanels);
 $('bReset').onclick=()=>{if(confirm('森を最初からやり直しますか？（G・道具・家族・カードがすべて消えます）')){try{localStorage.removeItem(KEY)}catch(e){}location.reload()}};
 if(DEBUG){$('debug').hidden=false;document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{S.offset=(S.offset||0)+ +b.dataset.skip;tick();checkLife();save();render();scheduleNext();pump()});
- $('dRich').onclick=()=>{S.g+=10000;save();render()};$('dVisit').onclick=()=>{if(inMarsh()){marshSeq=null;marshUntil=0;marshNext=1;return}visiting=false;setNextVisit(0)}}
+ $('dRich').onclick=()=>{S.g+=10000;save();render()};$('dVisit').onclick=()=>{if(inMarsh()){marshForce=['m_pair','m_fly','m_dance','m_beni','m_shima'][marshDbg++%5];marshSeq=null;marshUntil=0;marshNext=1;return}visiting=false;setNextVisit(0)}}
 
 /* ================= 起動 ================= */
 if(WALL)document.body.classList.add('wall');

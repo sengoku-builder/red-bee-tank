@@ -90,7 +90,7 @@ class Defense{
     // 一塁への送球が無事に捕られたら、一塁の後ろへカバーに走っていた子はそこで止まる
     const stop1=e=>{const c=this.cover[1];if(!c||e.who!==c.id||!this.lastThrow||this.lastThrow.base!==1)return;const[bx,bz]=basePos(1);
       for(const f of w.fielders){if(f===c||f.tx==null||Object.values(this.cover).includes(f)||f===this.relay||f===this.cut)continue;if(hyp(f.tx-bx,f.tz-bz)<16){f.stop();if(this.lunge)this.lunge.delete(f)}}};w.on('catch',stop1);w.on('pickup',stop1);}
-  reset(){this.ofTouched=false;this.lockRelay=null;this.firstPlan=true;this.lunge=null;this.involved=new Set();this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.cut=null;this.chased=false;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
+  reset(){this.ofTouched=false;this.lockRelay=null;this.firstPlan=true;this.lunge=null;this.involved=new Set();this.lastThrow=null;this.chaser=null;this.cur=null;this.cover={};this.relay=null;this.cut=null;this.chased=false;this.c1=null;this.f1s=null;this.nextPlan=this.w.t;this.decideAt=null;this.dove.clear();this.tried.clear();this.target=null;this.mis=0}
   // 外野の深さ：打者が強いほど下がる（レフト・ライト 能力30約46m・60約50m・S約54m、センターは+7m）
   setDepth(bat){const r=42+13*bat/100,o={};for(const[role,cr]of[['LF',r],['RF',r],['CF',r+7]]){const[x,z]=FIELD.pos[role],d=hyp(x,z);o[role]=[x*cr/d,z*cr/d]}this.opos=o}
   posOf(role){return this.opos&&this.opos[role]||FIELD.pos[role]}
@@ -153,6 +153,14 @@ class Defense{
     const w=this.w,F=this.F,tb0=this.playBase(),[tbx,tbz]=basePos(tb0);
     const deep=OF.includes(best.f.role)&&this.useRelay(best.f,hyp(best.x-tbx,best.z-tbz))||hyp(best.x,best.z)>55;   // 中継が要るかは、直接と中継の速さを比べて決める
     const{cover,relay,used:busy}=this.roleTable(best.x,best.z,best.f,deep);this.fixCover(cover,busy,relay);
+    // 一塁カバー：ファーストが打球へ三、四歩（約2.7m）以上出たら、一塁に先に着ける子（セカンドかピッチャー）が入る。二、三歩ならファーストが自分で戻る
+    {const f1=F['1B'],[bx,bz]=basePos(1),inUse=f=>Object.entries(cover).some(([k,g])=>g===f&&+k!==1);
+      if(f1&&cover[1]&&!deep){if(!this.f1s)this.f1s=[f1.x,f1.z];const out=best.f===f1||hyp(f1.x-this.f1s[0],f1.z-this.f1s[1])>2.7&&f1.dist(bx,bz)>2.7;   // 守備位置から三、四歩以上打球へ出たか
+        if(!out){if(cover[1]!==f1&&!inUse(f1)){cover[1]=f1;busy.add(f1)}this.c1=null}
+        else{const P=F.P,pInv=P&&(best.f===P||this.lunge&&this.lunge.get(P)>w.t&&!(P.tx!=null&&hyp(P.tx-bx,P.tz-bz)<14));   // ピッチャーも打球に向かっているか
+          const c=(pInv?[F['2B']]:[P,F['2B']]).filter(f=>f&&f!==best.f&&!inUse(f));let pick=c[0]||null;   // ふつうはピッチャーが一塁へ。ピッチャーも打球に向かっていればセカンド
+          const cur=this.c1&&c.includes(this.c1)?this.c1:null;if(cur&&pick&&pick!==cur&&pick.eta(bx,bz)>cur.eta(bx,bz)-0.5)pick=cur;   // 一度向かった子は、はっきり遅いときだけ替える
+          if(pick&&pick!==cover[1]){cover[1]=pick;busy.add(pick)}this.c1=pick}}}
     this.cover=cover;this.relay=relay;const t=w.t;
     // まず打球へ：打球の通り道の近くにいる内野手は、届かなくても一歩二歩打球に向かう（抜けたら自分の役へ）
     if(this.firstPlan){this.firstPlan=false;this.lunge=new Map();
@@ -192,11 +200,14 @@ class Defense{
         // キャッチャー：二塁・三塁にランナーがいなければ一塁の後ろ
         const cc=F.C,cOK=cc&&!busy.has(cc)&&cc!==best.f&&!Object.values(cover).includes(cc)&&!live2.some(r=>r.rb.base>=2);if(cOK){cc.goTo(17.5,9.5,{react:true});busy.add(cc)}
         // ①捕る内野手の後ろ（打球の通り道の延長。抜けたら止める）
-        give(inField(best.x*(d+13)/d,best.z*(d+13)/d),true);
+        {const R=Math.max(d+13,FIELD.infieldR+4);give(inField(best.x*R/d,best.z*R/d),true)}   // 外野手は外野の芝の上まで（内野の中へは入らない）
         // ②送球の後ろ：投げる見込みのある塁（一塁と、押し出しの塁）。送球の線を塁の後ろへ延ばしたところ
         const on=b=>live2.some(r=>r.rb.base===b),fb=[1];if(on(1))fb.push(2);if(on(1)&&on(2))fb.push(3);
         for(const b of fb.reverse()){const[bx,bz]=basePos(b),dx=bx-best.x,dz=bz-best.z,dd=hyp(dx,dz)||1;give(inField(bx+dx/dd*12,bz+dz/dd*12),true)}}}
-    const sb=F['2B'];if(!deep&&sb&&!busy.has(sb)&&!lunging(sb)){if(best.f===F.P){sb.goTo(2,21,{react:true});busy.add(sb)}else if(best.f===F['1B']){sb.goTo(14,21,{react:true});busy.add(sb)}}
+    // セカンド：ピッチャーやファーストが捕るゴロで、横や後ろへ抜けそうな強さなら、捕る子の後ろ（打球の通り道の延長）へ。弱い打球なら入らない
+    const sb=F['2B'];if(!deep&&sb&&!busy.has(sb)&&!lunging(sb)&&(best.f===F.P||best.f===F['1B'])&&this.pr){let sp=0;
+      for(let i=1;i<this.pr.length;i++){if(this.pr[i][0]>=best.t){const q0=this.pr[i-1],q1=this.pr[i];sp=hyp(q1[1]-q0[1],q1[2]-q0[2])/Math.max(0.01,q1[0]-q0[0]);break}}
+      if(sp>8){const d=hyp(best.x,best.z)||1;sb.goTo(best.x+best.x/d*6,best.z+best.z/d*6,{react:true});busy.add(sb)}}
     // ほかの子は定位置近くで様子を見る
     for(const f of w.fielders)if(!busy.has(f)&&f!==best.f&&f!==w.ball.holder&&!lunging(f)){const[px,pz]=this.posOf(f.role);if(f.tx==null&&f.dist(px,pz)>3)f.goTo(px,pz,{frac:0.6})}
   }

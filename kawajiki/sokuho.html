@@ -149,6 +149,8 @@ const POSJ=['投','捕','一','二','三','遊','左','中','右'];
 const POSF=['ピッチャー','キャッチャー','ファースト','セカンド','サード','ショート','レフト','センター','ライト'];
 const POSOPT=['投','捕','一','二','三','遊','左','中','右','DH',''];
 const CAPS=[{k:'navy',c:'#25408a'},{k:'red',c:'#c9443b'},{k:'green',c:'#2f8a58'},{k:'orange',c:'#d9822b'},{k:'sky',c:'#3b93d4'},{k:'purple',c:'#7a4fb3'},{k:'black',c:'#2b2f3a'},{k:'yellow',c:'#e0b021'},{k:'pink',c:'#e0679a'},{k:'brown',c:'#8a5a34'}];
+// イニングの帯：攻撃側チームの帽子の色。明るい色（黄色など）は文字を濃く
+function hdStyle(t){const c=(CAPS.find(x=>x.k===(t&&t.cap))||{}).c||'#2f6b4a',n=parseInt(c.slice(1),16),L=(0.299*(n>>16)+0.587*(n>>8&255)+0.114*(n&255))/255;return`background:${c};color:${L>0.55?'#2b2f3a':'#fff'}`}
 // 壁紙と同じ座標（ホーム(0,0)、二塁(0,32.6)、外野フェンス約63）
 const BASES=[[0,0],[16.3,16.3],[0,32.6],[-16.3,16.3]];
 const FPOS=[[0,15.6],[0,-1.25],[14.6,19.5],[6.8,28.5],[-14.6,19.5],[-6.8,28.5],[-23,45],[0,52],[23,45]];
@@ -493,7 +495,7 @@ function feedHTML(s,r,recent){
   let h='<ul class="feed">',lastKey='';
   for(const it of items){
     const key=it.inn+'-'+it.half;
-    if(!recent&&key!==lastKey){h+=`<li class="hd">${innLabel(it.inn,it.half)}（${esc(r.teams[it.half].name)}の攻撃）</li>`;lastKey=key}
+    if(!recent&&key!==lastKey){h+=`<li class="hd" style="${hdStyle(r.teams[it.half])}">${innLabel(it.inn,it.half)}（${esc(r.teams[it.half].name)}の攻撃）</li>`;lastKey=key}
     if(it.k==='note'){const ed=!recent&&(it.run||it.chg);h+=`<li class="muted${ed?' ed':''}"${ed?` data-a="${it.chg?'delAsk':'edit'}" data-ei="${it.ei}"`:''}>${ed?`<span class="edt">${it.chg?'削除':'直す'}</span>`:''}${recent?innLabel(it.inn,it.half)+'　':''}${esc(it.text)}${s.bad.has(it.ei)?'<div class="bad">⚠ ランナーが合っていません。タップして直してください</div>':''}</li>`;continue}
     const pa=it.pa;
     const pc=pa.p.map(p=>({B:'ボ',S:'見',W:'空',F:'フ',X:'打',H:'死',PK:'牽'}[p.k])).join(' '),np=pa.p.filter(p=>p.k!=='PK').length;

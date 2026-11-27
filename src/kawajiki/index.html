@@ -343,6 +343,8 @@ let phaseName='', switching=null;
 /* ---------- my teams & records ---------- */
 const BOY_NAMES=['はると','そうた','ゆうま','りく','こうた','ひなた','いつき','みなと','あさひ','たいが','しゅん','けんた','れん','だいち','かい','ゆうと','ゆうせい','しょう','あらた','そら','こうき','はやと','りょう','たいち','たくみ','けいた','まさと','ゆうき','あきと','なおや','ひろと','つばさ','こうへい','げんき','りょうま','かずま','こはく','いぶき','たける','じん','しおん','そうま','わたる','けんと','はるき','ゆうご','かなた','しんや','てつ','りゅうせい'];
 const CAPS=[{k:'navy',l:'紺',c:'#25408a',d:'#182c63'},{k:'red',l:'赤',c:'#c9443b',d:'#90302a'},{k:'green',l:'緑',c:'#2f8a58',d:'#1f6440'},{k:'orange',l:'オレンジ',c:'#d9822b',d:'#a3601c'},{k:'sky',l:'水色',c:'#3b93d4',d:'#2a6fa3'},{k:'purple',l:'紫',c:'#7a4fb3',d:'#5a3889'},{k:'black',l:'黒',c:'#2b2f3a',d:'#15181f'},{k:'yellow',l:'黄',c:'#e0b021',d:'#a88210'},{k:'pink',l:'ピンク',c:'#e0679a',d:'#b04a74'},{k:'brown',l:'茶',c:'#8a5a34',d:'#633e22'}];
+// イニングの帯：攻撃側チームの帽子の色。明るい色（黄色など）は文字を濃く
+function hdStyle(t){const c=(CAPS.find(x=>x.k===(t&&t.cap))||{}).c||'#2f6b4a',n=parseInt(c.slice(1),16),L=(0.299*(n>>16)+0.587*(n>>8&255)+0.114*(n&255))/255;return`background:${c};color:${L>0.55?'#2b2f3a':'#fff'}`}
 const BODIES=[{k:'white',l:'白',c:'#f7f6ef',p:'#f4f3ec'},{k:'gray',l:'グレー',c:'#a9b1bc',p:'#e9ebee'},{k:'cream',l:'クリーム',c:'#f1ece0',p:'#f1ece0'},{k:'pale',l:'うす水色',c:'#dcebf5',p:'#eef4f8'},{k:'navy',l:'紺',c:'#2c3c66',p:'#e9ebee'}];
 function teamDef(t){const c=CAPS.find(x=>x.k===t.cap)||CAPS[0],b=BODIES.find(x=>x.k===t.body)||BODIES[0];return{name:t.name||'マイチーム',cap:c.c,capD:c.d,body:b.c,trim:c.c,pants:b.p,sock:c.c}}
 function uid(){return Math.random().toString(36).slice(2,9)}
@@ -2470,7 +2472,7 @@ function vwBuild(){
   let ls=`<table class="vwls"><tr><th></th>${Array.from({length:N},(_,i)=>`<th><button data-vi="${i+1}">${i+1}</button></th>`).join('')}<th>計</th></tr>`;
   [0,1].forEach(t=>{ls+=`<tr><td class="tn">${vwEsc(r.teams[t].name)}</td>${Array.from({length:N},(_,i)=>`<td>${fin[t][i]??''}</td>`).join('')}<td class="tot">${tot(t)}</td></tr>`});ls+='</table>';
   let li='',key='';
-  ch.forEach((c,ix)=>{const k=c.i+'-'+c.h;if(k!==key){key=k;li+=`<li class="hd">${c.i}回${c.h?'ウラ':'オモテ'}（${vwEsc(r.teams[c.h].name)}の攻撃）</li>`}
+  ch.forEach((c,ix)=>{const k=c.i+'-'+c.h;if(k!==key){key=k;li+=`<li class="hd" style="${hdStyle(r.teams[c.h])}">${c.i}回${c.h?'ウラ':'オモテ'}（${vwEsc(r.teams[c.h].name)}の攻撃）</li>`}
     li+=`<li><button data-vc="${ix}"><b>${c.s+1}番 ${vwEsc(c.n)}</b>：<span class="${c.c==='h'?'rz-hit':c.c==='b'?'rz-bb':c.c==='e'?'rz-e':''}">${vwEsc(c.x)}</span>${c.r?` <span class="rs">${c.r}点</span>`:''}</button></li>`});
   const el=document.createElement('div');el.id='vw';el.hidden=true;
   el.innerHTML=`<div class="vwc"><div class="vwt">${vwEsc(r.date||'')}　${vwEsc(r.teams[0].name)} vs ${vwEsc(r.teams[1].name)}</div>
